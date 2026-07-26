@@ -1,0 +1,33 @@
+---
+description: Align backend work with the React Native FE app and backend-stack.md
+alwaysApply: true
+---
+
+# Frontend-aligned backend
+
+This repo is the **backend** for the Ilm o Irfan React Native app.
+
+## Companion frontend
+
+- Path: `D:\Projects\Ilm-o-Irfan-App-FE`
+- Stack: React Native CLI, TypeScript, NativeWind, Zustand, MMKV, react-native-pdf
+
+## Source of truth for backend design
+
+- Local: `docs/backend-stack.md`
+- Also in FE: `D:\Projects\Ilm-o-Irfan-App-FE\docs\backend-stack.md`
+
+Stack: **Supabase** (PostgreSQL, Auth, Storage, Edge Functions) + **RevenueCat**. No custom Node API, no Redis for v1.
+
+## When the user asks to build or change backend features
+
+1. **Inspect the frontend** under `D:\Projects\Ilm-o-Irfan-App-FE` (screens, stores, types, API usage, mock data) to see what the app expects.
+2. **Follow** `docs/backend-stack.md` for schema, RLS, Storage buckets, Edge Functions, and entitlements.
+3. **Implement only what is needed** for that request (migrations, RLS, Edge Functions, seed data, env examples).
+4. Keep FE and BE contracts matched (table/column names, auth flows, signed PDF URLs, entitlement checks).
+
+## Do not
+
+- Invent a separate REST/Nest/Express API unless the user explicitly asks.
+- Put PDF/cover bytes in Postgres — use Storage paths.
+- Allow client writes to `entitlements` — webhook / service role only.

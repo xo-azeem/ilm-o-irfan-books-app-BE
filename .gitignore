@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+.deno/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Supabase local
+.branches
+.temp
+supabase/.temp/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+!.cursor/rules/
