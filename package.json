@@ -1,0 +1,21 @@
+{
+  "name": "ilm-o-irfan-app-be",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Supabase backend for Ilm o Irfan (PostgreSQL, Auth, Storage, Edge Functions)",
+  "scripts": {
+    "supabase:start": "npx supabase start",
+    "supabase:stop": "npx supabase stop",
+    "supabase:status": "npx supabase status",
+    "db:reset": "npx supabase db reset",
+    "db:push": "npx supabase db push",
+    "functions:serve": "npx supabase functions serve",
+    "types:generate": "npx supabase gen types typescript --local > types/database.ts"
+  },
+  "devDependencies": {
+    "supabase": "^2.26.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
