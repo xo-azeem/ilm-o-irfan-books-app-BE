@@ -56,6 +56,26 @@ as $$
   select trim(both '-' from regexp_replace(lower(unaccent(coalesce(input, ''))), '[^a-z0-9]+', '-', 'g'));
 $$;
 
+create or replace function public.books_search_vector(
+  title text,
+  description text,
+  genre text,
+  tag text,
+  tags text[]
+)
+returns tsvector
+language sql
+immutable
+parallel safe
+as $$
+  select
+    setweight(to_tsvector('english', coalesce(title, '')), 'A')
+    || setweight(to_tsvector('english', coalesce(description, '')), 'B')
+    || setweight(to_tsvector('english', coalesce(genre, '')), 'C')
+    || setweight(to_tsvector('english', coalesce(tag, '')), 'C')
+    || setweight(to_tsvector('english', coalesce(array_to_string(tags, ' '), '')), 'C');
+$$;
+
 -- Authors
 create table if not exists public.authors (
   id uuid primary key default gen_random_uuid(),
@@ -118,11 +138,7 @@ begin
   ) then
     alter table public.books
       add column search_vector tsvector generated always as (
-        setweight(to_tsvector('english', coalesce(title, '')), 'A')
-        || setweight(to_tsvector('english', coalesce(description, '')), 'B')
-        || setweight(to_tsvector('english', coalesce(genre, '')), 'C')
-        || setweight(to_tsvector('english', coalesce(tag, '')), 'C')
-        || setweight(to_tsvector('english', coalesce(array_to_string(tags, ' '), '')), 'C')
+        public.books_search_vector(title, description, genre, tag, tags)
       ) stored;
   end if;
 end $$;

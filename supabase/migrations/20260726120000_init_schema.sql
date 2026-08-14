@@ -29,6 +29,28 @@ as $$
   select trim(both '-' from regexp_replace(lower(unaccent(coalesce(input, ''))), '[^a-z0-9]+', '-', 'g'));
 $$;
 
+-- Wrapper marked IMMUTABLE so it can be used in a generated column.
+-- to_tsvector(regconfig, text) is STABLE in Postgres; this is the standard pattern.
+create or replace function public.books_search_vector(
+  title text,
+  description text,
+  genre text,
+  tag text,
+  tags text[]
+)
+returns tsvector
+language sql
+immutable
+parallel safe
+as $$
+  select
+    setweight(to_tsvector('english', coalesce(title, '')), 'A')
+    || setweight(to_tsvector('english', coalesce(description, '')), 'B')
+    || setweight(to_tsvector('english', coalesce(genre, '')), 'C')
+    || setweight(to_tsvector('english', coalesce(tag, '')), 'C')
+    || setweight(to_tsvector('english', coalesce(array_to_string(tags, ' '), '')), 'C');
+$$;
+
 -- -----------------------------------------------------------------------------
 -- Catalog: authors
 -- -----------------------------------------------------------------------------
@@ -79,11 +101,7 @@ create table public.books (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now()),
   search_vector tsvector generated always as (
-    setweight(to_tsvector('english', coalesce(title, '')), 'A')
-    || setweight(to_tsvector('english', coalesce(description, '')), 'B')
-    || setweight(to_tsvector('english', coalesce(genre, '')), 'C')
-    || setweight(to_tsvector('english', coalesce(tag, '')), 'C')
-    || setweight(to_tsvector('english', coalesce(array_to_string(tags, ' '), '')), 'C')
+    public.books_search_vector(title, description, genre, tag, tags)
   ) stored,
   constraint books_slug_unique unique (slug),
   constraint books_title_not_blank check (length(trim(title)) > 0),
