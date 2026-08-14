@@ -27,11 +27,13 @@ Deno.serve(async (req) => {
     const expectedAuth = Deno.env.get('REVENUECAT_WEBHOOK_AUTH')
     const entitlementId = Deno.env.get('REVENUECAT_ENTITLEMENT_ID') ?? 'premium'
 
-    if (expectedAuth) {
-      const auth = req.headers.get('Authorization')
-      if (auth !== expectedAuth) {
-        return json({ error: 'Invalid webhook authorization' }, 401)
-      }
+    if (!expectedAuth) {
+      return json({ error: 'Webhook authorization is not configured' }, 500)
+    }
+
+    const auth = req.headers.get('Authorization')
+    if (auth !== expectedAuth) {
+      return json({ error: 'Invalid webhook authorization' }, 401)
     }
 
     const payload = await req.json()
