@@ -49,7 +49,7 @@ books.pdf_path   → Storage pdfs/
 
 ### Users & library
 
-- **profiles** — `id = auth.users.id`, contact + address fields for Personal Details
+- **profiles** — `id = auth.users.id`, contact + address fields, `role` (`user` | `admin`). Guest/subscriber are **not** stored here (anon session vs `entitlements`).
 - **reading_progress** — page, fraction, chapter label, `last_read_at`
 - **wishlist** — saved books
 - **downloads** — status + size metadata
@@ -81,13 +81,15 @@ books.pdf_path   → Storage pdfs/
 | Area | Policy |
 | --- | --- |
 | Published catalog + active plans | `SELECT` for `anon` + `authenticated` |
-| `profiles` | read/update own row |
+| `profiles` | read/update own contact fields; `role` is not client-writable |
 | progress / wishlist / downloads / highlights / streaks | CRUD own rows |
-| `entitlements` | `SELECT` own only; writes via service role |
+| `entitlements` | `SELECT` own (admins may `SELECT` all); writes via service role |
+| Catalog writes + unpublished reads | `authenticated` + `is_admin()` (JWT `app_metadata.app_role`) |
+| Storage `covers` / `pdfs` writes | admin JWT only; PDFs still have no client SELECT |
 
 ## Applying schema
 
 - Supabase migrations: `supabase/migrations/`
-- pgAdmin one-shot: `sql/pgadmin/01_full_schema.sql` then `02_seed.sql`
+- pgAdmin one-shot: `sql/pgadmin/01_full_schema.sql`, `03_harden_grants_rls_indexes.sql`, `04_admin_roles.sql`, then `02_seed.sql`
 
 See [setup-guide.md](./setup-guide.md) for connection steps.

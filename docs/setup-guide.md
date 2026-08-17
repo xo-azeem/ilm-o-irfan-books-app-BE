@@ -33,6 +33,9 @@ Use this for the real app (Auth, Storage, Edge Functions, RLS).
    - contents of `supabase/migrations/20260726120000_init_schema.sql`
    - contents of `supabase/migrations/20260726120100_rls_policies.sql`
    - contents of `supabase/migrations/20260726120200_storage_buckets.sql`
+   - contents of `supabase/migrations/20260814114738_harden_grants_rls_indexes.sql`
+   - contents of `supabase/migrations/20260814120331_harden_function_search_path.sql`
+   - contents of `supabase/migrations/20260816194000_admin_roles_cms.sql`
    - contents of `supabase/seed.sql`
 
 **Option 2b — CLI (best long-term)**
@@ -61,6 +64,9 @@ Set secrets (Dashboard → Edge Functions → Secrets, or CLI):
 npx supabase secrets set REVENUECAT_WEBHOOK_AUTH="Bearer your-shared-secret"
 npx supabase secrets set REVENUECAT_ENTITLEMENT_ID="premium"
 npx supabase secrets set SIGNED_PDF_EXPIRES_IN="300"
+# Dev only — lets any signed-in user open PDFs without an entitlement.
+# Unsafe for production. Leave unset or "false" before a public release.
+npx supabase secrets set ALLOW_PDF_WITHOUT_ENTITLEMENT="false"
 ```
 
 ### 4. Auth providers
@@ -192,7 +198,17 @@ pgAdmin connection for local Supabase:
 
 Upload sample files in Dashboard → Storage, matching paths in `seed.sql`.
 
-PDFs are only served via **`get-signed-pdf`** after auth + entitlement checks.
+PDFs are only served via **`get-signed-pdf`**. Every book requires an **active entitlement**, except admins (JWT `app_metadata.app_role = admin`) who may also preview unpublished drafts.
+
+### Promote the first admin
+
+After you have signed up in the app:
+
+```sql
+update public.profiles set role = 'admin' where email = 'THE_ADMIN_EMAIL';
+```
+
+That user must **sign out and sign back in** so the JWT picks up `app_metadata.app_role`. Do not set `role` from the client.
 
 ---
 

@@ -541,6 +541,7 @@ export type Database = {
           id: string
           phone: string | null
           postal_code: string | null
+          role: string
           state: string | null
           updated_at: string
         }
@@ -557,6 +558,7 @@ export type Database = {
           id: string
           phone?: string | null
           postal_code?: string | null
+          role?: string
           state?: string | null
           updated_at?: string
         }
@@ -573,6 +575,7 @@ export type Database = {
           id?: string
           phone?: string | null
           postal_code?: string | null
+          role?: string
           state?: string | null
           updated_at?: string
         }
@@ -713,6 +716,20 @@ export type Database = {
       }
     }
     Views: {
+      admin_user_directory: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          entitlement_status: string | null
+          expires_at: string | null
+          full_name: string | null
+          id: string | null
+          plan_name: string | null
+          role: string | null
+          store: string | null
+        }
+        Relationships: []
+      }
       book_list_items: {
         Row: {
           author_id: string | null
@@ -763,6 +780,11 @@ export type Database = {
       }
     }
     Functions: {
+      admin_dashboard_stats: { Args: Record<string, never>; Returns: Json }
+      admin_set_user_role: {
+        Args: { new_role: string; target_id: string }
+        Returns: undefined
+      }
       books_search_vector: {
         Args: {
           description: string
@@ -775,6 +797,7 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      is_admin: { Args: Record<string, never>; Returns: boolean }
       slugify: { Args: { input: string }; Returns: string }
       unaccent: { Args: { "": string }; Returns: string }
       user_has_active_premium: {

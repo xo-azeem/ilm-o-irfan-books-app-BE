@@ -1,5 +1,6 @@
 // Edge Function: get-signed-pdf
-// Verify JWT → load book → check premium entitlement → return short-lived Storage URL
+// JWT required. Admins may preview drafts. Everyone else needs an active
+// entitlement for every book. ALLOW_PDF_WITHOUT_ENTITLEMENT is dev-only.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -18,10 +19,13 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const expiresIn = Number(Deno.env.get('SIGNED_PDF_EXPIRES_IN') ?? '300')
+    // Dev-only: skip entitlement for signed-in non-admins. Unsafe for production.
+    const allowWithoutEntitlement =
+      Deno.env.get('ALLOW_PDF_WITHOUT_ENTITLEMENT') === 'true'
 
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      return json({ error: 'Missing Authorization header' }, 401)
+      return json({ error: 'Missing Authorization header', code: 'AUTH_REQUIRED' }, 401)
     }
 
     const userClient = createClient(supabaseUrl, anonKey, {
@@ -34,7 +38,7 @@ Deno.serve(async (req) => {
     } = await userClient.auth.getUser()
 
     if (userError || !user) {
-      return json({ error: 'Unauthorized' }, 401)
+      return json({ error: 'Unauthorized', code: 'AUTH_REQUIRED' }, 401)
     }
 
     const body = await req.json().catch(() => ({}))
@@ -44,11 +48,13 @@ Deno.serve(async (req) => {
       return json({ error: 'bookId is required' }, 400)
     }
 
+    const isAdmin = user.app_metadata?.app_role === 'admin'
+
     const admin = createClient(supabaseUrl, serviceKey)
 
     const { data: book, error: bookError } = await admin
       .from('books')
-      .select('id, title, pdf_path, is_premium, is_published, file_size_bytes')
+      .select('id, title, pdf_path, is_published, file_size_bytes')
       .eq('id', bookId)
       .maybeSingle()
 
@@ -56,7 +62,7 @@ Deno.serve(async (req) => {
       return json({ error: bookError.message }, 500)
     }
 
-    if (!book || !book.is_published) {
+    if (!book || (!isAdmin && !book.is_published)) {
       return json({ error: 'Book not found' }, 404)
     }
 
@@ -64,7 +70,7 @@ Deno.serve(async (req) => {
       return json({ error: 'PDF not available for this book' }, 404)
     }
 
-    if (book.is_premium) {
+    if (!isAdmin && !allowWithoutEntitlement) {
       const { data: entitlement, error: entError } = await admin
         .from('entitlements')
         .select('status, expires_at')
@@ -81,12 +87,34 @@ Deno.serve(async (req) => {
           new Date(entitlement.expires_at).getTime() > Date.now())
 
       if (!active) {
-        return json({ error: 'Premium entitlement required', code: 'PREMIUM_REQUIRED' }, 403)
+        return json(
+          { error: 'Active subscription required', code: 'PREMIUM_REQUIRED' },
+          403,
+        )
       }
     }
 
     // pdf_path is stored as "pdfs/filename.pdf" or just "filename.pdf"
     const objectPath = book.pdf_path.replace(/^pdfs\//, '')
+    const fileName = objectPath.split('/').pop() ?? objectPath
+    const folder = objectPath.includes('/')
+      ? objectPath.slice(0, objectPath.lastIndexOf('/'))
+      : ''
+
+    const { data: listed, error: listError } = await admin.storage
+      .from('pdfs')
+      .list(folder, { search: fileName, limit: 100 })
+
+    const stored = listed?.some((item) => item.name === fileName)
+    if (listError || !stored) {
+      return json(
+        {
+          error: listError?.message ?? 'PDF file not found in storage',
+          code: 'PDF_NOT_IN_STORAGE',
+        },
+        404,
+      )
+    }
 
     const { data: signed, error: signError } = await admin.storage
       .from('pdfs')
