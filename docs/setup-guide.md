@@ -8,7 +8,7 @@ This repo is the **Supabase** backend for Ilm o Irfan. PostgreSQL is the databas
 | --- | --- |
 | `supabase/migrations/` | Production schema, RLS, storage buckets |
 | `supabase/functions/` | `get-signed-pdf`, `revenuecat-webhook` |
-| `supabase/seed.sql` | Sample catalog matching FE mocks |
+| `supabase/seed.sql` | Baseline categories and subscription plan |
 | `sql/pgadmin/` | Same schema/seed for running in pgAdmin Query Tool |
 | `.env.example` | Keys / connection placeholders |
 
@@ -65,8 +65,9 @@ npx supabase secrets set REVENUECAT_WEBHOOK_AUTH="Bearer your-shared-secret"
 npx supabase secrets set REVENUECAT_ENTITLEMENT_ID="premium"
 npx supabase secrets set SIGNED_PDF_EXPIRES_IN="300"
 # Dev only — lets any signed-in user open PDFs without an entitlement.
+# Also toggled from Admin → Overview ("Free PDF access") via app_settings.
 # Unsafe for production. Leave unset or "false" before a public release.
-npx supabase secrets set ALLOW_PDF_WITHOUT_ENTITLEMENT="false"
+npx supabase secrets set ALLOW_PDF_WITHOUT_ENTITLEMENT="true"
 ```
 
 ### 4. Auth providers
@@ -196,9 +197,16 @@ pgAdmin connection for local Supabase:
 | `pdfs` | No | `books.pdf_path` e.g. `pdfs/slug.pdf` |
 | `avatars` | No | `profiles.avatar_path` e.g. `{user_id}/avatar.webp` |
 
-Upload sample files in Dashboard → Storage, matching paths in `seed.sql`.
+Upload cover and PDF files in Dashboard → Storage using the paths stored on each book.
 
-PDFs are only served via **`get-signed-pdf`**. Every book requires an **active entitlement**, except admins (JWT `app_metadata.app_role = admin`) who may also preview unpublished drafts.
+PDFs are only served via **`get-signed-pdf`**. A signed-in user can open a book when any of these is true:
+
+- they are an **admin** (`profiles.role` / JWT `app_metadata.app_role`)
+- **`ALLOW_PDF_WITHOUT_ENTITLEMENT`** Edge Function env is `true` / `1` / `yes` / `on`
+- **`app_settings.allow_pdf_without_entitlement`** is on (Admin → Overview switch)
+- they have an **active entitlement**
+
+Admins may also preview unpublished drafts. Turn the switch and env **off** before a public release.
 
 ### Promote the first admin
 

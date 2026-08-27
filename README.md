@@ -27,7 +27,7 @@ Schema reference: [`docs/schema.md`](docs/schema.md)
 supabase/
   migrations/     # schema, RLS, storage
   functions/      # get-signed-pdf, revenuecat-webhook
-  seed.sql        # sample catalog
+  seed.sql        # baseline categories + plan
 sql/pgadmin/      # run in pgAdmin Query Tool
 docs/             # stack, schema, setup
 ```

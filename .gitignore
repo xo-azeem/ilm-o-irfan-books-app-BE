@@ -11,6 +11,7 @@ node_modules/
 .branches
 .temp
 supabase/.temp/
+scripts/.import-books.sql
 
 # OS / IDE
 .DS_Store

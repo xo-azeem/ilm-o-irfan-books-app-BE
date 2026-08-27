@@ -60,6 +60,7 @@ books.pdf_path   → Storage pdfs/
 
 - **plans** — Premium definition + RevenueCat product id + features JSON
 - **entitlements** — active/expired status, expiry, RC ids, store
+- **app_settings** — singleton product flags; `allow_pdf_without_entitlement` skips the paywall when on
 
 ## FE field mapping
 
@@ -84,12 +85,13 @@ books.pdf_path   → Storage pdfs/
 | `profiles` | read/update own contact fields; `role` is not client-writable |
 | progress / wishlist / downloads / highlights / streaks | CRUD own rows |
 | `entitlements` | `SELECT` own (admins may `SELECT` all); writes via service role |
+| `app_settings` | `SELECT` for anon + authenticated; `UPDATE` for `is_admin()` only |
 | Catalog writes + unpublished reads | `authenticated` + `is_admin()` (JWT `app_metadata.app_role`) |
 | Storage `covers` / `pdfs` writes | admin JWT only; PDFs still have no client SELECT |
 
 ## Applying schema
 
 - Supabase migrations: `supabase/migrations/`
-- pgAdmin one-shot: `sql/pgadmin/01_full_schema.sql`, `03_harden_grants_rls_indexes.sql`, `04_admin_roles.sql`, then `02_seed.sql`
+- pgAdmin one-shot: `sql/pgadmin/01_full_schema.sql`, `03_harden_grants_rls_indexes.sql`, `04_admin_roles.sql`, `06_app_settings.sql`, then `02_seed.sql`
 
 See [setup-guide.md](./setup-guide.md) for connection steps.

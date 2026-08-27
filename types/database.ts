@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          allow_pdf_without_entitlement: boolean
+          id: number
+          updated_at: string
+        }
+        Insert: {
+          allow_pdf_without_entitlement?: boolean
+          id?: number
+          updated_at?: string
+        }
+        Update: {
+          allow_pdf_without_entitlement?: boolean
+          id?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       authors: {
         Row: {
           avatar_path: string | null
