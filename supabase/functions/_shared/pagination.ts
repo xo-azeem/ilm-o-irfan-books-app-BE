@@ -19,6 +19,7 @@ export type PaginatedResult<T> = PaginationMeta & {
   data: T[]
 }
 
+// Keep incoming query values safe and predictable.
 export function normalizePage(
   value: number | string | undefined,
   defaultPage = 1,
@@ -32,6 +33,7 @@ export function normalizePage(
   return Math.trunc(parsed)
 }
 
+// Prevent oversized page requests.
 export function normalizePageSize(
   value: number | string | undefined,
   defaultPageSize = 20,
@@ -43,10 +45,10 @@ export function normalizePageSize(
     return defaultPageSize
   }
 
-  const safeValue = Math.trunc(parsed)
-  return Math.min(safeValue, maxPageSize)
+  return Math.min(Math.trunc(parsed), maxPageSize)
 }
 
+// Converts page number + size into SQL range values.
 export function getPaginationRange(
   page: number | string | undefined,
   pageSize: number | string | undefined,
@@ -69,6 +71,7 @@ export function getPaginationRange(
   }
 }
 
+// Builds the final paginated response for a list endpoint.
 export function paginate<T>(
   items: T[],
   totalCount: number | null,
@@ -99,6 +102,7 @@ export function paginate<T>(
   }
 }
 
+// Reads query values from a request object.
 export function parsePaginationQuery(
   params: Record<string, string | undefined>,
   defaultPage = 1,
@@ -115,6 +119,7 @@ export function parsePaginationQuery(
   }
 }
 
+// Cursor-based helper for scroll or load-more style APIs.
 export function buildCursorPagination<T>(
   items: T[],
   getCursor: (item: T) => string,
@@ -140,7 +145,8 @@ export function buildCursorPagination<T>(
     hasNextPage: opts.hasNextPage ?? trimmed.length === pageSize,
     hasPreviousPage: opts.hasPreviousPage ?? false,
     nextCursor:
-      opts.nextCursor ?? (trimmed.length > 0 ? getCursor(trimmed[trimmed.length - 1]) : null),
+      opts.nextCursor ??
+      (trimmed.length > 0 ? getCursor(trimmed[trimmed.length - 1]) : null),
     previousCursor:
       opts.previousCursor ??
       (trimmed.length > 0 ? getCursor(trimmed[0]) : null),
