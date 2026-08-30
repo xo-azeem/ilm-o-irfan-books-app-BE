@@ -70,3 +70,84 @@ verify_jwt = true
 
 [functions.revenuecat-webhook]
 verify_jwt = false
+
+[functions.home-feed]
+verify_jwt = false
+
+[functions.books-list]
+verify_jwt = false
+
+[functions.book-detail]
+verify_jwt = false
+
+[functions.search-books]
+verify_jwt = false
+
+[functions.categories-list]
+verify_jwt = false
+
+[functions.collections-list]
+verify_jwt = false
+
+[functions.plans-list]
+verify_jwt = false
+
+[functions.profile-read]
+verify_jwt = true
+
+[functions.profile-update]
+verify_jwt = true
+
+[functions.reading-progress]
+verify_jwt = true
+
+[functions.reading-progress-upsert]
+verify_jwt = true
+
+[functions.wishlist-list]
+verify_jwt = true
+
+[functions.wishlist-toggle]
+verify_jwt = true
+
+[functions.downloads-list]
+verify_jwt = true
+
+[functions.downloads-create]
+verify_jwt = true
+
+[functions.highlights-list]
+verify_jwt = true
+
+[functions.highlights-upsert]
+verify_jwt = true
+
+[functions.library-overview]
+verify_jwt = true
+
+[functions.entitlements-status]
+verify_jwt = true
+
+[functions.admin-books]
+verify_jwt = true
+
+[functions.admin-book-update]
+verify_jwt = true
+
+[functions.admin-categories]
+verify_jwt = true
+
+[functions.admin-collections]
+verify_jwt = true
+
+[functions.admin-users]
+verify_jwt = true
+
+[functions.admin-analytics]
+verify_jwt = true
+
+[functions.admin-settings]
+verify_jwt = true
+
+[functions.admin-settings-update]
+verify_jwt = true
