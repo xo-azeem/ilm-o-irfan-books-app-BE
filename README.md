@@ -63,6 +63,38 @@ npm run functions:serve      # local functions (needs Docker + supabase start)
 Only the `:local` variant needs Docker. Always push migrations before regenerating, or the
 output will be missing whatever the new migration adds.
 
+## Pagination contract
+
+Pagination means breaking a large dataset into smaller chunks and sending only one chunk at a time to the user. This is how the app can show the first set of books immediately, then load the next set when the user scrolls down or presses Next.
+
+Typical flow:
+
+1. Request the first chunk: `page=1` and `pageSize=20`
+2. Show the returned items to the user
+3. When the user scrolls or requests more, send the next chunk: `page=2`, `page=3`, etc.
+4. Repeat until the list is exhausted
+
+Backend rules:
+
+- Request parameters: `page` and `pageSize` (or `limit` as a compatible alias)
+- Default: `page=1`, `pageSize=20`
+- Maximum recommended page size: `100`
+- Response shape:
+
+```json
+{
+  "data": [],
+  "page": 1,
+  "pageSize": 20,
+  "totalCount": 121,
+  "totalPages": 7,
+  "hasNextPage": true,
+  "hasPreviousPage": false
+}
+```
+
+This pattern is used for list APIs such as books, collections, categories, search results, and library screens. For large datasets, prefer cursor-based pagination with a stable sort key such as `created_at` + `id` to avoid expensive `OFFSET` scans. The shared helper lives in `supabase/functions/_shared/pagination.ts` and should be reused by all list endpoints.
+
 ## Security rules (non-negotiable)
 
 - PDF/cover **bytes** live in Storage — never in Postgres.
