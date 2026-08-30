@@ -95,34 +95,51 @@ Backend rules:
 
 This pattern is used for list APIs such as books, collections, categories, search results, and library screens. For large datasets, prefer cursor-based pagination with a stable sort key such as `created_at` + `id` to avoid expensive `OFFSET` scans. The shared helper lives in `supabase/functions/_shared/pagination.ts` and should be reused by all list endpoints.
 
-## Implemented public catalog phase
+## Implemented backend phases
 
-The first backend phase is now in place for the app's public catalog and browsing flow.
+The backend is now structured in functional phases for the app's real product flows.
 
-### Included endpoints
+### Public catalog phase
+
+Included endpoints:
 
 - `GET /books` — paginated list of published books
 - `GET /books/:id` — single book detail lookup
 - `GET /books/search` — search by title, genre, or author
 - `GET /categories` — category list with counts
 - `GET /collections` — collection and shelf summaries
+- `GET /plans` — active premium plans
+- `GET /home` — home feed with collections, categories, and featured books
 
-These endpoints live under `supabase/functions/` and are meant to be consumed by the mobile app via Supabase Edge Functions, with the shared pagination helper handling `page`, `pageSize`, and response metadata.
+These endpoints live under `supabase/functions/` and use the shared pagination helper for list responses.
 
-## Upcoming authenticated user phase
+### Authenticated user phase
 
-The next phase will add the user-owned endpoints for logged-in experiences, including:
+Included endpoints:
 
-- `/profile`
-- `/reading-progress`
-- `/wishlist`
-- `/downloads`
-- `/highlights`
-- `/library`
-- `/entitlements`
-- `/pdf/signed`
+- `GET /profile` / `PUT /profile`
+- `GET /reading-progress` / `POST /reading-progress`
+- `GET /wishlist` / `POST /wishlist/:bookId`
+- `GET /downloads` / `POST /downloads`
+- `GET /highlights` / `POST /highlights`
+- `GET /library`
+- `GET /entitlements`
+- `POST /pdf/signed`
 
-These endpoints will be protected by authenticated user access and use RLS-safe queries with user-scoped data.
+These are protected by authenticated access and user-scoped data queries.
+
+### Admin phase
+
+Included endpoints:
+
+- `GET /admin/books` / `PATCH /admin/books/:id`
+- `GET /admin/users`
+- `GET /admin/analytics`
+- `GET /admin/categories`
+- `GET /admin/collections`
+- `GET /admin/settings` / `PATCH /admin/settings`
+
+These endpoints enforce admin checks and use service-role access for privileged backend operations.
 
 ## Security rules (non-negotiable)
 
