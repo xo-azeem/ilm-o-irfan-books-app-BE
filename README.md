@@ -95,6 +95,35 @@ Backend rules:
 
 This pattern is used for list APIs such as books, collections, categories, search results, and library screens. For large datasets, prefer cursor-based pagination with a stable sort key such as `created_at` + `id` to avoid expensive `OFFSET` scans. The shared helper lives in `supabase/functions/_shared/pagination.ts` and should be reused by all list endpoints.
 
+## Implemented public catalog phase
+
+The first backend phase is now in place for the app's public catalog and browsing flow.
+
+### Included endpoints
+
+- `GET /books` — paginated list of published books
+- `GET /books/:id` — single book detail lookup
+- `GET /books/search` — search by title, genre, or author
+- `GET /categories` — category list with counts
+- `GET /collections` — collection and shelf summaries
+
+These endpoints live under `supabase/functions/` and are meant to be consumed by the mobile app via Supabase Edge Functions, with the shared pagination helper handling `page`, `pageSize`, and response metadata.
+
+## Upcoming authenticated user phase
+
+The next phase will add the user-owned endpoints for logged-in experiences, including:
+
+- `/profile`
+- `/reading-progress`
+- `/wishlist`
+- `/downloads`
+- `/highlights`
+- `/library`
+- `/entitlements`
+- `/pdf/signed`
+
+These endpoints will be protected by authenticated user access and use RLS-safe queries with user-scoped data.
+
 ## Security rules (non-negotiable)
 
 - PDF/cover **bytes** live in Storage — never in Postgres.
