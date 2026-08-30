@@ -10,27 +10,143 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.5"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          changes: Json
+          created_at: string
+          entity_id: string | null
+          entity_label: string | null
+          entity_type: string
+          id: string
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_id?: string | null
+          changes?: Json
+          created_at?: string
+          entity_id?: string | null
+          entity_label?: string | null
+          entity_type: string
+          id?: string
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          changes?: Json
+          created_at?: string
+          entity_id?: string | null
+          entity_label?: string | null
+          entity_type?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_audit_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "admin_user_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_audit_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_settings: {
         Row: {
           allow_pdf_without_entitlement: boolean
+          featured_collection_id: string | null
           id: number
+          maintenance_message: string | null
+          maintenance_mode: boolean
+          min_supported_version: string | null
+          signup_enabled: boolean
+          support_email: string | null
           updated_at: string
         }
         Insert: {
           allow_pdf_without_entitlement?: boolean
+          featured_collection_id?: string | null
           id?: number
+          maintenance_message?: string | null
+          maintenance_mode?: boolean
+          min_supported_version?: string | null
+          signup_enabled?: boolean
+          support_email?: string | null
           updated_at?: string
         }
         Update: {
           allow_pdf_without_entitlement?: boolean
+          featured_collection_id?: string | null
           id?: number
+          maintenance_message?: string | null
+          maintenance_mode?: boolean
+          min_supported_version?: string | null
+          signup_enabled?: boolean
+          support_email?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "app_settings_featured_collection_fk"
+            columns: ["featured_collection_id"]
+            isOneToOne: false
+            referencedRelation: "admin_collection_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "app_settings_featured_collection_fk"
+            columns: ["featured_collection_id"]
+            isOneToOne: false
+            referencedRelation: "collection_summaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "app_settings_featured_collection_fk"
+            columns: ["featured_collection_id"]
+            isOneToOne: false
+            referencedRelation: "collections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       authors: {
         Row: {
@@ -83,6 +199,13 @@ export type Database = {
             foreignKeyName: "book_categories_book_id_fkey"
             columns: ["book_id"]
             isOneToOne: false
+            referencedRelation: "admin_book_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "book_categories_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
             referencedRelation: "book_list_items"
             referencedColumns: ["id"]
           },
@@ -91,6 +214,13 @@ export type Database = {
             columns: ["book_id"]
             isOneToOne: false
             referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "book_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "admin_category_rows"
             referencedColumns: ["id"]
           },
           {
@@ -196,6 +326,13 @@ export type Database = {
             foreignKeyName: "books_author_id_fkey"
             columns: ["author_id"]
             isOneToOne: false
+            referencedRelation: "admin_author_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "books_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
             referencedRelation: "authors"
             referencedColumns: ["id"]
           },
@@ -265,6 +402,13 @@ export type Database = {
             foreignKeyName: "collection_books_book_id_fkey"
             columns: ["book_id"]
             isOneToOne: false
+            referencedRelation: "admin_book_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_books_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
             referencedRelation: "book_list_items"
             referencedColumns: ["id"]
           },
@@ -273,6 +417,13 @@ export type Database = {
             columns: ["book_id"]
             isOneToOne: false
             referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_books_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "admin_collection_rows"
             referencedColumns: ["id"]
           },
           {
@@ -366,6 +517,13 @@ export type Database = {
             foreignKeyName: "downloads_book_id_fkey"
             columns: ["book_id"]
             isOneToOne: false
+            referencedRelation: "admin_book_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "downloads_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
             referencedRelation: "book_list_items"
             referencedColumns: ["id"]
           },
@@ -374,6 +532,13 @@ export type Database = {
             columns: ["book_id"]
             isOneToOne: false
             referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "downloads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "admin_user_directory"
             referencedColumns: ["id"]
           },
           {
@@ -430,7 +595,21 @@ export type Database = {
             foreignKeyName: "entitlements_plan_id_fkey"
             columns: ["plan_id"]
             isOneToOne: false
+            referencedRelation: "admin_user_directory"
+            referencedColumns: ["plan_id"]
+          },
+          {
+            foreignKeyName: "entitlements_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
             referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entitlements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "admin_user_directory"
             referencedColumns: ["id"]
           },
           {
@@ -481,6 +660,13 @@ export type Database = {
             foreignKeyName: "highlights_book_id_fkey"
             columns: ["book_id"]
             isOneToOne: false
+            referencedRelation: "admin_book_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "highlights_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
             referencedRelation: "book_list_items"
             referencedColumns: ["id"]
           },
@@ -489,6 +675,13 @@ export type Database = {
             columns: ["book_id"]
             isOneToOne: false
             referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "highlights_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "admin_user_directory"
             referencedColumns: ["id"]
           },
           {
@@ -641,6 +834,13 @@ export type Database = {
             foreignKeyName: "reading_progress_book_id_fkey"
             columns: ["book_id"]
             isOneToOne: false
+            referencedRelation: "admin_book_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reading_progress_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
             referencedRelation: "book_list_items"
             referencedColumns: ["id"]
           },
@@ -649,6 +849,13 @@ export type Database = {
             columns: ["book_id"]
             isOneToOne: false
             referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reading_progress_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "admin_user_directory"
             referencedColumns: ["id"]
           },
           {
@@ -687,6 +894,13 @@ export type Database = {
             foreignKeyName: "reading_streaks_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
+            referencedRelation: "admin_user_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reading_streaks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -713,6 +927,13 @@ export type Database = {
             foreignKeyName: "wishlist_book_id_fkey"
             columns: ["book_id"]
             isOneToOne: false
+            referencedRelation: "admin_book_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wishlist_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
             referencedRelation: "book_list_items"
             referencedColumns: ["id"]
           },
@@ -727,6 +948,13 @@ export type Database = {
             foreignKeyName: "wishlist_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "admin_user_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wishlist_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -734,16 +962,197 @@ export type Database = {
       }
     }
     Views: {
+      admin_author_rows: {
+        Row: {
+          avatar_path: string | null
+          bio: string | null
+          book_count: number | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+          published_count: number | null
+          slug: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_path?: string | null
+          bio?: string | null
+          book_count?: never
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          published_count?: never
+          slug?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_path?: string | null
+          bio?: string | null
+          book_count?: never
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          published_count?: never
+          slug?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      admin_book_rows: {
+        Row: {
+          author_id: string | null
+          author_name: string | null
+          category_ids: string[] | null
+          collection_ids: string[] | null
+          cover_color: string | null
+          cover_color_dark: string | null
+          cover_path: string | null
+          created_at: string | null
+          currency: string | null
+          description: string | null
+          download_count: number | null
+          file_size_bytes: number | null
+          format: string | null
+          genre: string | null
+          id: string | null
+          is_premium: boolean | null
+          is_published: boolean | null
+          pdf_path: string | null
+          price_cents: number | null
+          published_at: string | null
+          rating: number | null
+          rating_count: number | null
+          read_time_minutes: number | null
+          reader_count: number | null
+          slug: string | null
+          tag: string | null
+          tags: string[] | null
+          title: string | null
+          updated_at: string | null
+          wishlist_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "books_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "admin_author_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "books_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "authors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "books_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "book_list_items"
+            referencedColumns: ["author_id"]
+          },
+        ]
+      }
+      admin_category_rows: {
+        Row: {
+          accent: string | null
+          accent_dark: string | null
+          book_count: number | null
+          created_at: string | null
+          icon_key: string | null
+          id: string | null
+          label: string | null
+          slug: string | null
+          sort_order: number | null
+        }
+        Insert: {
+          accent?: string | null
+          accent_dark?: string | null
+          book_count?: never
+          created_at?: string | null
+          icon_key?: string | null
+          id?: string | null
+          label?: string | null
+          slug?: string | null
+          sort_order?: number | null
+        }
+        Update: {
+          accent?: string | null
+          accent_dark?: string | null
+          book_count?: never
+          created_at?: string | null
+          icon_key?: string | null
+          id?: string | null
+          label?: string | null
+          slug?: string | null
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
+      admin_collection_rows: {
+        Row: {
+          accent: string | null
+          book_count: number | null
+          created_at: string | null
+          id: string | null
+          is_published: boolean | null
+          kind: string | null
+          slug: string | null
+          sort_order: number | null
+          subtitle: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          accent?: string | null
+          book_count?: never
+          created_at?: string | null
+          id?: string | null
+          is_published?: boolean | null
+          kind?: string | null
+          slug?: string | null
+          sort_order?: number | null
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          accent?: string | null
+          book_count?: never
+          created_at?: string | null
+          id?: string | null
+          is_published?: boolean | null
+          kind?: string | null
+          slug?: string | null
+          sort_order?: number | null
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       admin_user_directory: {
         Row: {
+          avatar_path: string | null
+          books_finished: number | null
+          books_started: number | null
+          country: string | null
           created_at: string | null
+          downloads_count: number | null
           email: string | null
           entitlement_status: string | null
           expires_at: string | null
           full_name: string | null
           id: string | null
+          is_subscriber: boolean | null
+          last_read_at: string | null
+          phone: string | null
+          plan_id: string | null
           plan_name: string | null
           role: string | null
+          starts_at: string | null
           store: string | null
         }
         Relationships: []
@@ -798,11 +1207,52 @@ export type Database = {
       }
     }
     Functions: {
-      admin_dashboard_stats: { Args: Record<string, never>; Returns: Json }
+      admin_analytics: { Args: { p_days?: number }; Returns: Json }
+      admin_bulk_update_books: {
+        Args: {
+          p_ids: string[]
+          p_is_premium?: boolean
+          p_is_published?: boolean
+        }
+        Returns: Json
+      }
+      admin_dashboard_stats: { Args: never; Returns: Json }
+      admin_delete_books: { Args: { p_ids: string[] }; Returns: Json }
+      admin_delete_storage_object: {
+        Args: { p_bucket: string; p_name: string }
+        Returns: undefined
+      }
+      admin_reorder: {
+        Args: { p_ids: string[]; p_table: string }
+        Returns: undefined
+      }
+      admin_set_book_relations: {
+        Args: {
+          p_book_id: string
+          p_category_ids: string[]
+          p_collection_ids: string[]
+        }
+        Returns: undefined
+      }
+      admin_set_collection_books: {
+        Args: { p_book_ids: string[]; p_collection_id: string }
+        Returns: undefined
+      }
+      admin_set_entitlement: {
+        Args: {
+          p_expires_at?: string
+          p_plan_id?: string
+          p_status: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       admin_set_user_role: {
         Args: { new_role: string; target_id: string }
         Returns: undefined
       }
+      admin_storage_audit: { Args: never; Returns: Json }
+      admin_user_detail: { Args: { p_user_id: string }; Returns: Json }
       books_search_vector: {
         Args: {
           description: string
@@ -813,9 +1263,9 @@ export type Database = {
         }
         Returns: unknown
       }
+      is_admin: { Args: never; Returns: boolean }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
-      is_admin: { Args: Record<string, never>; Returns: boolean }
       slugify: { Args: { input: string }; Returns: string }
       unaccent: { Args: { "": string }; Returns: string }
       user_has_active_premium: {
@@ -825,6 +1275,468 @@ export type Database = {
     }
     Enums: {
       [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  storage: {
+    Tables: {
+      buckets: {
+        Row: {
+          allowed_mime_types: string[] | null
+          avif_autodetection: boolean | null
+          created_at: string | null
+          file_size_limit: number | null
+          id: string
+          name: string
+          owner: string | null
+          owner_id: string | null
+          public: boolean | null
+          type: Database["storage"]["Enums"]["buckettype"]
+          updated_at: string | null
+          versioning_status: string
+        }
+        Insert: {
+          allowed_mime_types?: string[] | null
+          avif_autodetection?: boolean | null
+          created_at?: string | null
+          file_size_limit?: number | null
+          id: string
+          name: string
+          owner?: string | null
+          owner_id?: string | null
+          public?: boolean | null
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string | null
+          versioning_status?: string
+        }
+        Update: {
+          allowed_mime_types?: string[] | null
+          avif_autodetection?: boolean | null
+          created_at?: string | null
+          file_size_limit?: number | null
+          id?: string
+          name?: string
+          owner?: string | null
+          owner_id?: string | null
+          public?: boolean | null
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string | null
+          versioning_status?: string
+        }
+        Relationships: []
+      }
+      buckets_analytics: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          format: string
+          id: string
+          name: string
+          type: Database["storage"]["Enums"]["buckettype"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          format?: string
+          id?: string
+          name: string
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          format?: string
+          id?: string
+          name?: string
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      buckets_vectors: {
+        Row: {
+          created_at: string
+          id: string
+          type: Database["storage"]["Enums"]["buckettype"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      migrations: {
+        Row: {
+          executed_at: string | null
+          hash: string
+          id: number
+          name: string
+        }
+        Insert: {
+          executed_at?: string | null
+          hash: string
+          id: number
+          name: string
+        }
+        Update: {
+          executed_at?: string | null
+          hash?: string
+          id?: number
+          name?: string
+        }
+        Relationships: []
+      }
+      objects: {
+        Row: {
+          archived_at: string | null
+          bucket_id: string | null
+          created_at: string | null
+          id: string
+          is_delete_marker: boolean
+          is_versioned: boolean
+          last_accessed_at: string | null
+          metadata: Json | null
+          name: string | null
+          owner: string | null
+          owner_id: string | null
+          path_tokens: string[] | null
+          updated_at: string | null
+          user_metadata: Json | null
+          version: string | null
+        }
+        Insert: {
+          archived_at?: string | null
+          bucket_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_delete_marker?: boolean
+          is_versioned?: boolean
+          last_accessed_at?: string | null
+          metadata?: Json | null
+          name?: string | null
+          owner?: string | null
+          owner_id?: string | null
+          path_tokens?: string[] | null
+          updated_at?: string | null
+          user_metadata?: Json | null
+          version?: string | null
+        }
+        Update: {
+          archived_at?: string | null
+          bucket_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_delete_marker?: boolean
+          is_versioned?: boolean
+          last_accessed_at?: string | null
+          metadata?: Json | null
+          name?: string | null
+          owner?: string | null
+          owner_id?: string | null
+          path_tokens?: string[] | null
+          updated_at?: string | null
+          user_metadata?: Json | null
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "objects_bucketId_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "buckets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      s3_multipart_uploads: {
+        Row: {
+          bucket_id: string
+          created_at: string
+          id: string
+          in_progress_size: number
+          key: string
+          metadata: Json | null
+          owner_id: string | null
+          upload_signature: string
+          user_metadata: Json | null
+          version: string
+        }
+        Insert: {
+          bucket_id: string
+          created_at?: string
+          id: string
+          in_progress_size?: number
+          key: string
+          metadata?: Json | null
+          owner_id?: string | null
+          upload_signature: string
+          user_metadata?: Json | null
+          version: string
+        }
+        Update: {
+          bucket_id?: string
+          created_at?: string
+          id?: string
+          in_progress_size?: number
+          key?: string
+          metadata?: Json | null
+          owner_id?: string | null
+          upload_signature?: string
+          user_metadata?: Json | null
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "s3_multipart_uploads_bucket_id_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "buckets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      s3_multipart_uploads_parts: {
+        Row: {
+          bucket_id: string
+          created_at: string
+          etag: string
+          id: string
+          key: string
+          owner_id: string | null
+          part_number: number
+          size: number
+          upload_id: string
+          version: string
+        }
+        Insert: {
+          bucket_id: string
+          created_at?: string
+          etag: string
+          id?: string
+          key: string
+          owner_id?: string | null
+          part_number: number
+          size?: number
+          upload_id: string
+          version: string
+        }
+        Update: {
+          bucket_id?: string
+          created_at?: string
+          etag?: string
+          id?: string
+          key?: string
+          owner_id?: string | null
+          part_number?: number
+          size?: number
+          upload_id?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "s3_multipart_uploads_parts_bucket_id_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "buckets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "s3_multipart_uploads_parts_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "s3_multipart_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vector_indexes: {
+        Row: {
+          bucket_id: string
+          created_at: string
+          data_type: string
+          dimension: number
+          distance_metric: string
+          id: string
+          metadata_configuration: Json | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          bucket_id: string
+          created_at?: string
+          data_type: string
+          dimension: number
+          distance_metric: string
+          id?: string
+          metadata_configuration?: Json | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          bucket_id?: string
+          created_at?: string
+          data_type?: string
+          dimension?: number
+          distance_metric?: string
+          id?: string
+          metadata_configuration?: Json | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vector_indexes_bucket_id_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "buckets_vectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      allow_any_operation: {
+        Args: { expected_operations: string[] }
+        Returns: boolean
+      }
+      allow_only_operation: {
+        Args: { expected_operation: string }
+        Returns: boolean
+      }
+      can_insert_object: {
+        Args: { bucketid: string; metadata: Json; name: string; owner: string }
+        Returns: undefined
+      }
+      extension: { Args: { name: string }; Returns: string }
+      filename: { Args: { name: string }; Returns: string }
+      foldername: { Args: { name: string }; Returns: string[] }
+      get_common_prefix: {
+        Args: { p_delimiter: string; p_key: string; p_prefix: string }
+        Returns: string
+      }
+      get_size_by_bucket: {
+        Args: never
+        Returns: {
+          bucket_id: string
+          size: number
+        }[]
+      }
+      list_multipart_uploads_with_delimiter: {
+        Args: {
+          bucket_id: string
+          delimiter_param: string
+          max_keys?: number
+          next_key_token?: string
+          next_upload_token?: string
+          prefix_param: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          key: string
+        }[]
+      }
+      list_objects_with_delimiter: {
+        Args: {
+          _bucket_id: string
+          delimiter_param: string
+          max_keys?: number
+          next_token?: string
+          prefix_param: string
+          sort_order?: string
+          start_after?: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          last_accessed_at: string
+          metadata: Json
+          name: string
+          updated_at: string
+        }[]
+      }
+      operation: { Args: never; Returns: string }
+      search: {
+        Args: {
+          bucketname: string
+          levels?: number
+          limits?: number
+          offsets?: number
+          prefix: string
+          search?: string
+          sortcolumn?: string
+          sortorder?: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          last_accessed_at: string
+          metadata: Json
+          name: string
+          updated_at: string
+        }[]
+      }
+      search_by_timestamp: {
+        Args: {
+          p_bucket_id: string
+          p_level: number
+          p_limit: number
+          p_prefix: string
+          p_sort_column: string
+          p_sort_column_after: string
+          p_sort_order: string
+          p_start_after: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          key: string
+          last_accessed_at: string
+          metadata: Json
+          name: string
+          updated_at: string
+        }[]
+      }
+      search_v2: {
+        Args: {
+          bucket_name: string
+          levels?: number
+          limits?: number
+          prefix: string
+          sort_column?: string
+          sort_column_after?: string
+          sort_order?: string
+          start_after?: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          key: string
+          last_accessed_at: string
+          metadata: Json
+          name: string
+          updated_at: string
+        }[]
+      }
+    }
+    Enums: {
+      buckettype: "STANDARD" | "ANALYTICS" | "VECTOR"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -950,7 +1862,15 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
+  },
+  storage: {
+    Enums: {
+      buckettype: ["STANDARD", "ANALYTICS", "VECTOR"],
+    },
   },
 } as const

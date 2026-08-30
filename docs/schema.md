@@ -88,10 +88,60 @@ books.pdf_path   → Storage pdfs/
 | `app_settings` | `SELECT` for anon + authenticated; `UPDATE` for `is_admin()` only |
 | Catalog writes + unpublished reads | `authenticated` + `is_admin()` (JWT `app_metadata.app_role`) |
 | Storage `covers` / `pdfs` writes | admin JWT only; PDFs still have no client SELECT |
+| `admin_audit_log` | `SELECT` for `is_admin()`; rows written only by SECURITY DEFINER triggers |
+| library tables (progress / downloads / wishlist / highlights / streaks) | own rows, **plus** `SELECT` all for `is_admin()` |
+| `plans` | public `SELECT` of active plans; full write for `is_admin()` |
+
+## Admin CMS (v2)
+
+`20260830120000_admin_cms_v2.sql` adds the production CMS surface.
+
+### Tables and columns
+
+- **admin_audit_log** — actor, action, entity, and changed keys with before/after values. Written by
+  `private.audit_write()` triggers on `books`, `authors`, `categories`, `collections`, `plans`,
+  `app_settings`, and on `profiles.role` changes only (self-edits are not logged).
+- **app_settings** — new flags: `maintenance_mode`, `maintenance_message`, `signup_enabled`,
+  `min_supported_version`, `support_email`, `featured_collection_id`.
+- **books** — `published_at` is now stamped by the `books_stamp_published_at` trigger (set on the
+  first publish, cleared on unpublish), so clients must stop sending it. A `NOT VALID` check
+  constraint also blocks publishing a title that has no `pdf_path`.
+
+### Views
+
+| View | Purpose |
+| --- | --- |
+| `admin_book_rows` | One row per book with author name, `category_ids`, `collection_ids`, and reader / download / wishlist counts |
+| `admin_author_rows` | Authors with book and published counts |
+| `admin_category_rows` | Categories with book counts |
+| `admin_collection_rows` | Collections with membership counts |
+| `admin_user_directory` | Rebuilt: adds `is_subscriber`, reading and download counts, `last_read_at` |
+
+All are `security_invoker`, so admin RLS still applies.
+
+### RPCs (all guarded by `is_admin()`)
+
+| Function | Purpose |
+| --- | --- |
+| `admin_bulk_update_books(ids, is_published, is_premium)` | Batch publish / premium; skips titles with no PDF |
+| `admin_delete_books(ids)` | Deletes rows and returns the storage paths to purge |
+| `admin_set_book_relations(book, categories, collections)` | Replaces a book's joins in one call |
+| `admin_set_collection_books(collection, ordered_ids)` | Replaces membership, preserving order |
+| `admin_reorder(table, ids)` | Persists a `sort_order` reorder for categories or collections |
+| `admin_set_entitlement(user, status, plan, expires_at)` | Comps and support fixes; marks `store = 'promotional'` |
+| `admin_user_detail(user)` | Profile, streak, recent reading, downloads, and counts |
+| `admin_analytics(days)` | Day-bucketed signups / reads / downloads, top books and categories |
+| `admin_storage_audit()` | Unreferenced storage objects and books pointing at missing files |
+| `admin_delete_storage_object(bucket, name)` | Deletes an orphan; refuses if a book still references it |
+| `admin_dashboard_stats()` | Extended with catalog, plan, and 7-day activity counters |
+
+RevenueCat still owns store purchases — a webhook event overwrites a manual `admin_set_entitlement`
+grant, which is why that grant is labelled promotional.
 
 ## Applying schema
 
 - Supabase migrations: `supabase/migrations/`
-- pgAdmin one-shot: `sql/pgadmin/01_full_schema.sql`, `03_harden_grants_rls_indexes.sql`, `04_admin_roles.sql`, `06_app_settings.sql`, then `02_seed.sql`
+- pgAdmin one-shot: `sql/pgadmin/01_full_schema.sql`, `03_harden_grants_rls_indexes.sql`, `04_admin_roles.sql`, `06_app_settings.sql`, `07_admin_cms_v2.sql`, then `02_seed.sql`
+- After applying, regenerate typings: `npm run types:generate`
 
 See [setup-guide.md](./setup-guide.md) for connection steps.

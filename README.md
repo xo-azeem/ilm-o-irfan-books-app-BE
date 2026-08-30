@@ -53,10 +53,15 @@ Full click-by-click instructions are in the setup guide.
 
 ```bash
 npm install
-npm run db:push          # push migrations to linked project
-npm run functions:serve  # local functions (needs Docker + supabase start)
-npm run types:generate   # TypeScript types from local DB
+npm run db:push              # push migrations to the linked project
+npm run types:generate       # types from the linked project (run AFTER db:push)
+npm run types:generate:local # types from the local Docker stack instead
+npm run functions:serve      # local functions (needs Docker + supabase start)
 ```
+
+`types:generate` needs CLI auth — `npx supabase login` once, or set `SUPABASE_ACCESS_TOKEN`.
+Only the `:local` variant needs Docker. Always push migrations before regenerating, or the
+output will be missing whatever the new migration adds.
 
 ## Security rules (non-negotiable)
 
