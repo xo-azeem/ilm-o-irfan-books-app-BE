@@ -9,6 +9,9 @@ export type EndpointDefinition = {
   access: EndpointAccess
   description: string
   notes?: string
+  // Still deployed so older app builds get a 410 with a pointer, not a 404.
+  deprecated?: boolean
+  replacedBy?: string
 }
 
 export const endpointManifest: EndpointDefinition[] = [
@@ -194,6 +197,15 @@ export const endpointManifest: EndpointDefinition[] = [
     method: 'GET',
     access: 'admin',
     description: 'Returns app configuration and product flags.',
+  },
+  {
+    name: 'signed-pdf',
+    route: '/functions/v1/signed-pdf',
+    method: 'POST',
+    access: 'public',
+    description: 'Deprecated alias for get-signed-pdf. Always responds 410.',
+    deprecated: true,
+    replacedBy: 'get-signed-pdf',
   },
   {
     name: 'revenuecat-webhook',

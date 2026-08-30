@@ -1,98 +1,105 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { requireAdmin, requireMethod } from '../_shared/auth.ts'
+import {
+  BadRequestError,
+  fail,
+  failFromDbError,
+  failUnexpected,
+  handleOptions,
+  ok,
+  readJsonBody,
+} from '../_shared/http.ts'
+import {
+  asBoolean,
+  asInteger,
+  asOptionalText,
+  asStringArray,
+  pickProvided,
+  requireUuidField,
+  type FieldSpec,
+} from '../_shared/payload.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
+// Allow-list. Anything not named here (id, slug, rating, timestamps,
+// published_at) is not writable through this endpoint. published_at in
+// particular is stamped by a trigger on the first publish.
+const EDITABLE_FIELDS: FieldSpec[] = [
+  { column: 'title', aliases: ['title'], coerce: asOptionalText('title') },
+  { column: 'description', aliases: ['description'], coerce: asOptionalText('description') },
+  { column: 'genre', aliases: ['genre'], coerce: asOptionalText('genre') },
+  {
+    column: 'is_published',
+    aliases: ['is_published', 'isPublished'],
+    coerce: asBoolean('is_published'),
+  },
+  { column: 'is_premium', aliases: ['is_premium', 'isPremium'], coerce: asBoolean('is_premium') },
+  {
+    column: 'price_cents',
+    aliases: ['price_cents', 'priceCents'],
+    coerce: asInteger('price_cents', { min: 0 }),
+  },
+  { column: 'cover_path', aliases: ['cover_path', 'coverPath'], coerce: asOptionalText('cover_path') },
+  { column: 'pdf_path', aliases: ['pdf_path', 'pdfPath'], coerce: asOptionalText('pdf_path') },
+  { column: 'tag', aliases: ['tag'], coerce: asOptionalText('tag') },
+  { column: 'tags', aliases: ['tags'], coerce: asStringArray('tags') },
+  {
+    column: 'read_time_minutes',
+    aliases: ['read_time_minutes', 'readTimeMinutes'],
+    coerce: asInteger('read_time_minutes', { min: 0 }),
+  },
+]
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const preflight = handleOptions(req)
+  if (preflight) return preflight
 
   try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return json({ error: 'Authorization header is required' }, 401)
+    const notAllowed = requireMethod(req, ['PATCH', 'PUT', 'POST'])
+    if (notAllowed) return notAllowed
+
+    const ctx = await requireAdmin(req)
+    if (ctx instanceof Response) return ctx
+
+    const payload = await readJsonBody(req)
+    const bookId = requireUuidField(payload, ['id', 'book_id', 'bookId'], 'id')
+
+    const update = pickProvided(payload, EDITABLE_FIELDS)
+
+    if (Object.keys(update).length === 0) {
+      return fail('INVALID_REQUEST', 'No editable book fields were provided', 400)
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: { headers: { Authorization: authHeader } },
-      },
-    )
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      return json({ error: 'Unauthorized' }, 401)
+    // title and description are NOT NULL in the schema, so an explicit null
+    // would be a constraint violation rather than a clear message.
+    for (const column of ['title', 'description'] as const) {
+      if (column in update && update[column] === null) {
+        return fail('INVALID_REQUEST', `${column} cannot be null`, 400)
+      }
     }
 
-    const admin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    )
-
-    const { data: profile } = await admin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
-
-    if (user.app_metadata?.app_role !== 'admin' && profile?.role !== 'admin') {
-      return json({ error: 'Forbidden' }, 403)
-    }
-
-    const payload = await req.json().catch(() => ({}))
-    const bookId = payload.id ?? payload.book_id ?? payload.bookId
-
-    if (!bookId) {
-      return json({ error: 'book id is required' }, 400)
-    }
-
-    const updateObj: Record<string, unknown> = {}
-
-    if ('title' in payload) updateObj.title = payload.title
-    if ('description' in payload) updateObj.description = payload.description
-    if ('genre' in payload) updateObj.genre = payload.genre
-    if ('is_published' in payload) updateObj.is_published = payload.is_published
-    if ('is_premium' in payload) updateObj.is_premium = payload.is_premium
-    if ('price_cents' in payload) updateObj.price_cents = payload.price_cents
-    if ('cover_path' in payload) updateObj.cover_path = payload.cover_path
-    if ('pdf_path' in payload) updateObj.pdf_path = payload.pdf_path
-    if ('tag' in payload) updateObj.tag = payload.tag
-    if ('tags' in payload) updateObj.tags = payload.tags
-
-    if (Object.keys(updateObj).length === 0) {
-      return json({ error: 'No fields to update' }, 400)
-    }
-
-    const { data, error } = await admin
+    const { data, error } = await ctx.admin
       .from('books')
-      .update(updateObj)
+      .update(update)
       .eq('id', bookId)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
-      return json({ error: { code: 'ADMIN_BOOK_UPDATE_FAILED', message: 'Unable to update book' } }, 500)
+      return failFromDbError(
+        'admin-book-update',
+        'ADMIN_BOOK_UPDATE_FAILED',
+        'Unable to update book',
+        error,
+      )
     }
 
-    return json({ data })
+    if (!data) {
+      return fail('NOT_FOUND', 'Book not found', 404)
+    }
+
+    return ok(data)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: { code: 'ADMIN_BOOK_UPDATE_UNEXPECTED_ERROR', message } }, 500)
+    if (error instanceof BadRequestError) {
+      return fail(error.code, error.message, 400)
+    }
+    return failUnexpected('admin-book-update', error)
   }
 })

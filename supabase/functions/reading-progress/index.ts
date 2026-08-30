@@ -1,125 +1,150 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { requireMethod, requireUser } from '../_shared/auth.ts'
+import {
+  BadRequestError,
+  fail,
+  failFromDbError,
+  failUnexpected,
+  handleOptions,
+  list,
+  ok,
+  readJsonBody,
+} from '../_shared/http.ts'
+import { paginate, rangeFromRequest } from '../_shared/pagination.ts'
+import { asOptionalInteger, asOptionalText, asInteger, requireUuidField } from '../_shared/payload.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+// The scale is fixed by the database: reading_progress.progress is CHECK
+// (progress >= 0 and progress <= 1), and admin_user_directory counts a book as
+// finished at >= 0.99.
+//
+// Guessing the scale per request cannot work. `progress: 1` is genuinely
+// ambiguous - it is "finished" on a 0-1 scale and "1% read" on a 0-100 scale -
+// and the old `value > 1 ? value / 100 : value` heuristic resolved it as
+// "finished", marking a book complete for a reader one page in. So the two
+// scales get two field names and anything out of range is a 400.
+function resolveProgress(payload: Record<string, unknown>): number | undefined {
+  const hasFraction = Object.hasOwn(payload, 'progress')
+  const hasPercent =
+    Object.hasOwn(payload, 'progress_percent') || Object.hasOwn(payload, 'progressPercent')
 
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
-
-function normalizeProgress(value: unknown): number {
-  if (value == null || value === '') {
-    return 0
+  if (hasFraction && hasPercent) {
+    throw new BadRequestError('Send either progress (0-1) or progress_percent (0-100), not both')
   }
 
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed)) {
-    throw new Error('progress must be a number between 0 and 1 or 0 and 100')
+  if (hasPercent) {
+    const raw = payload.progress_percent ?? payload.progressPercent
+    const parsed = Number(raw)
+
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+      throw new BadRequestError('progress_percent must be a number between 0 and 100')
+    }
+
+    return Number((parsed / 100).toFixed(4))
   }
 
-  const clamped = parsed > 1 ? parsed / 100 : parsed
-  if (clamped < 0 || clamped > 1) {
-    throw new Error('progress must be between 0 and 1')
+  if (hasFraction) {
+    const parsed = Number(payload.progress)
+
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+      throw new BadRequestError(
+        'progress must be a number between 0 and 1. Use progress_percent for a 0-100 value.',
+      )
+    }
+
+    return Number(parsed.toFixed(4))
   }
 
-  return Number(clamped.toFixed(4))
+  return undefined
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const preflight = handleOptions(req)
+  if (preflight) return preflight
 
   try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return json({ error: { code: 'AUTH_REQUIRED', message: 'Authorization header is required' } }, 401)
-    }
+    const notAllowed = requireMethod(req, ['GET', 'POST'])
+    if (notAllowed) return notAllowed
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      },
-    )
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      return json({ error: { code: 'AUTH_REQUIRED', message: 'Unauthorized' } }, 401)
-    }
+    const ctx = await requireUser(req)
+    if (ctx instanceof Response) return ctx
 
     if (req.method === 'GET') {
-      const { data, error } = await supabase
+      const { page, pageSize, from, to } = rangeFromRequest(req, { defaultPageSize: 50 })
+
+      const { data, count, error } = await ctx.supabase
         .from('reading_progress')
-        .select('*')
-        .eq('user_id', user.id)
+        .select('*', { count: 'exact' })
+        .eq('user_id', ctx.user.id)
         .order('last_read_at', { ascending: false })
+        .order('book_id', { ascending: true })
+        .range(from, to)
 
       if (error) {
-        return json({ error: { code: 'READING_PROGRESS_READ_FAILED', message: 'Unable to read reading progress' } }, 500)
-      }
-
-      return json({ data: data ?? [] })
-    }
-
-    if (req.method === 'POST') {
-      const payload = await req.json().catch(() => ({}))
-      const { book_id, current_page, total_pages, progress, chapter_label } = payload
-
-      if (!book_id) {
-        return json({ error: { code: 'INVALID_REQUEST', message: 'book_id is required' } }, 400)
-      }
-
-      const safeCurrentPage = Number(current_page ?? 1)
-      const safeTotalPages = total_pages == null ? null : Number(total_pages)
-      if (!Number.isFinite(safeCurrentPage) || safeCurrentPage < 1) {
-        return json({ error: { code: 'INVALID_REQUEST', message: 'current_page must be >= 1' } }, 400)
-      }
-      if (safeTotalPages != null && (!Number.isFinite(safeTotalPages) || safeTotalPages < 1)) {
-        return json({ error: { code: 'INVALID_REQUEST', message: 'total_pages must be >= 1' } }, 400)
-      }
-
-      const safeProgress = normalizeProgress(progress ?? 0)
-
-      const { data, error } = await supabase
-        .from('reading_progress')
-        .upsert(
-          {
-            user_id: user.id,
-            book_id,
-            current_page: safeCurrentPage,
-            total_pages: safeTotalPages,
-            progress: safeProgress,
-            chapter_label: chapter_label ?? null,
-            last_read_at: new Date().toISOString(),
-          },
-          { onConflict: 'user_id,book_id' },
+        return failFromDbError(
+          'reading-progress',
+          'READING_PROGRESS_READ_FAILED',
+          'Unable to read reading progress',
+          error,
         )
-        .select()
-        .single()
-
-      if (error) {
-        return json({ error: { code: 'READING_PROGRESS_WRITE_FAILED', message: 'Unable to save reading progress' } }, 500)
       }
 
-      return json({ data })
+      return list(paginate(data ?? [], count ?? null, page, pageSize))
     }
 
-    return json({ error: { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed' } }, 405)
+    const payload = await readJsonBody(req)
+    const bookId = requireUuidField(payload, ['book_id', 'bookId'], 'book_id')
+
+    const currentPage = Object.hasOwn(payload, 'current_page') || Object.hasOwn(payload, 'currentPage')
+      ? asInteger('current_page', { min: 1 })(payload.current_page ?? payload.currentPage)
+      : 1
+
+    const totalPages = asOptionalInteger('total_pages', { min: 1 })(
+      payload.total_pages ?? payload.totalPages ?? null,
+    )
+
+    if (totalPages !== null && currentPage > totalPages) {
+      throw new BadRequestError('current_page cannot be greater than total_pages')
+    }
+
+    const progress = resolveProgress(payload)
+
+    const { data, error } = await ctx.supabase
+      .from('reading_progress')
+      .upsert(
+        {
+          user_id: ctx.user.id,
+          book_id: bookId,
+          current_page: currentPage,
+          total_pages: totalPages,
+          progress: progress ?? 0,
+          chapter_label: asOptionalText('chapter_label')(
+            payload.chapter_label ?? payload.chapterLabel ?? null,
+          ),
+          last_read_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,book_id' },
+      )
+      .select()
+      .maybeSingle()
+
+    if (error) {
+      // 23503 is a foreign key violation: the book id does not exist.
+      if (error.code === '23503') {
+        return fail('NOT_FOUND', 'Book not found', 404)
+      }
+
+      return failFromDbError(
+        'reading-progress',
+        'READING_PROGRESS_WRITE_FAILED',
+        'Unable to save reading progress',
+        error,
+      )
+    }
+
+    return ok(data)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: { code: 'READING_PROGRESS_UNEXPECTED_ERROR', message } }, 500)
+    if (error instanceof BadRequestError) {
+      return fail(error.code, error.message, 400)
+    }
+    return failUnexpected('reading-progress', error)
   }
 })

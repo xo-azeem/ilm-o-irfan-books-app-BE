@@ -1,62 +1,36 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
-import { paginate, parsePaginationQuery } from '../_shared/pagination.ts'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
+import { requireUser } from '../_shared/auth.ts'
+import { failFromDbError, failUnexpected, handleOptions, list } from '../_shared/http.ts'
+import { paginate, rangeFromRequest } from '../_shared/pagination.ts'
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const preflight = handleOptions(req)
+  if (preflight) return preflight
 
   try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return json({ error: { code: 'AUTH_REQUIRED', message: 'Authorization header is required' } }, 401)
-    }
+    const ctx = await requireUser(req)
+    if (ctx instanceof Response) return ctx
 
-    const url = new URL(req.url)
-    const { page, pageSize } = parsePaginationQuery(Object.fromEntries(url.searchParams.entries()))
-    const offset = (page - 1) * pageSize
+    const { page, pageSize, from, to } = rangeFromRequest(req)
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } },
-    )
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      return json({ error: { code: 'AUTH_REQUIRED', message: 'Unauthorized' } }, 401)
-    }
-
-    const { data, count, error } = await supabase
+    // Card-sized book payload only. books(*) shipped the full row, including
+    // description and pdf_path, for every saved title.
+    const { data, count, error } = await ctx.supabase
       .from('wishlist')
-      .select('book_id, created_at, book:books(id, title, slug, cover_path, is_premium, genre)', { count: 'exact' })
-      .eq('user_id', user.id)
+      .select(
+        'book_id, created_at, book:books(id, slug, title, cover_path, cover_color, cover_color_dark, genre, is_premium, read_time_minutes)',
+        { count: 'exact' },
+      )
+      .eq('user_id', ctx.user.id)
       .order('created_at', { ascending: false })
-      .range(offset, offset + pageSize - 1)
+      .order('book_id', { ascending: true })
+      .range(from, to)
 
     if (error) {
-      return json({ error: { code: 'WISHLIST_READ_FAILED', message: 'Unable to load wishlist' } }, 500)
+      return failFromDbError('wishlist-list', 'WISHLIST_READ_FAILED', 'Unable to load wishlist', error)
     }
 
-    return json(paginate(data ?? [], count ?? null, page, pageSize))
+    return list(paginate(data ?? [], count ?? null, page, pageSize))
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: { code: 'WISHLIST_UNEXPECTED_ERROR', message } }, 500)
+    return failUnexpected('wishlist-list', error)
   }
 })

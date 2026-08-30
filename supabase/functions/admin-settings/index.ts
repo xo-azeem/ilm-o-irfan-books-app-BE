@@ -1,104 +1,130 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { requireAdmin, requireMethod } from '../_shared/auth.ts'
+import {
+  BadRequestError,
+  fail,
+  failFromDbError,
+  failUnexpected,
+  handleOptions,
+  ok,
+  readJsonBody,
+} from '../_shared/http.ts'
+import {
+  asBoolean,
+  asOptionalText,
+  asOptionalUuid,
+  pickProvided,
+  type FieldSpec,
+} from '../_shared/payload.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
+// maintenance_mode, signup_enabled and allow_pdf_without_entitlement are NOT
+// NULL columns. Writing `payload.x ?? null` for each of them meant any PATCH
+// that did not send all three failed with a not-null violation, so only a
+// full-form save ever worked.
+const EDITABLE_FIELDS: FieldSpec[] = [
+  {
+    column: 'maintenance_mode',
+    aliases: ['maintenance_mode', 'maintenanceMode'],
+    coerce: asBoolean('maintenance_mode'),
+  },
+  {
+    column: 'maintenance_message',
+    aliases: ['maintenance_message', 'maintenanceMessage'],
+    coerce: asOptionalText('maintenance_message'),
+  },
+  {
+    column: 'signup_enabled',
+    aliases: ['signup_enabled', 'signupEnabled'],
+    coerce: asBoolean('signup_enabled'),
+  },
+  {
+    column: 'allow_pdf_without_entitlement',
+    aliases: ['allow_pdf_without_entitlement', 'allowPdfWithoutEntitlement'],
+    coerce: asBoolean('allow_pdf_without_entitlement'),
+  },
+  {
+    column: 'featured_collection_id',
+    aliases: ['featured_collection_id', 'featuredCollectionId'],
+    coerce: asOptionalUuid('featured_collection_id'),
+  },
+  {
+    column: 'support_email',
+    aliases: ['support_email', 'supportEmail'],
+    coerce: asOptionalText('support_email'),
+  },
+  {
+    column: 'min_supported_version',
+    aliases: ['min_supported_version', 'minSupportedVersion'],
+    coerce: asOptionalText('min_supported_version'),
+  },
+]
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const preflight = handleOptions(req)
+  if (preflight) return preflight
 
   try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return json({ error: 'Authorization header is required' }, 401)
-    }
+    const notAllowed = requireMethod(req, ['GET', 'PATCH'])
+    if (notAllowed) return notAllowed
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: { headers: { Authorization: authHeader } },
-      },
-    )
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      return json({ error: 'Unauthorized' }, 401)
-    }
-
-    const admin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    )
-
-    const { data: profile } = await admin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
-
-    if (user.app_metadata?.app_role !== 'admin' && profile?.role !== 'admin') {
-      return json({ error: 'Forbidden' }, 403)
-    }
+    const ctx = await requireAdmin(req)
+    if (ctx instanceof Response) return ctx
 
     if (req.method === 'GET') {
-      const { data, error } = await admin
+      const { data, error } = await ctx.admin
         .from('app_settings')
         .select('*')
         .eq('id', 1)
         .maybeSingle()
 
       if (error) {
-        return json({ error: { code: 'ADMIN_SETTINGS_READ_FAILED', message: 'Unable to load settings' } }, 500)
+        return failFromDbError(
+          'admin-settings',
+          'ADMIN_SETTINGS_READ_FAILED',
+          'Unable to load settings',
+          error,
+        )
       }
 
-      return json({ data: data ?? null })
+      return ok(data ?? null)
     }
 
-    if (req.method === 'PATCH') {
-      const payload = await req.json().catch(() => ({}))
-      const { data, error } = await admin
-        .from('app_settings')
-        .update({
-          maintenance_mode: payload.maintenance_mode ?? payload.maintenanceMode ?? null,
-          maintenance_message: payload.maintenance_message ?? payload.maintenanceMessage ?? null,
-          signup_enabled: payload.signup_enabled ?? payload.signupEnabled ?? null,
-          allow_pdf_without_entitlement:
-            payload.allow_pdf_without_entitlement ?? payload.allowPdfWithoutEntitlement ?? null,
-          featured_collection_id:
-            payload.featured_collection_id ?? payload.featuredCollectionId ?? null,
-          support_email: payload.support_email ?? payload.supportEmail ?? null,
-          min_supported_version:
-            payload.min_supported_version ?? payload.minSupportedVersion ?? null,
-        })
-        .eq('id', 1)
-        .select()
-        .single()
+    const payload = await readJsonBody(req)
+    const update = pickProvided(payload, EDITABLE_FIELDS)
 
-      if (error) {
-        return json({ error: { code: 'ADMIN_SETTINGS_UPDATE_FAILED', message: 'Unable to update settings' } }, 500)
+    if (Object.keys(update).length === 0) {
+      return fail('INVALID_REQUEST', 'No editable settings fields were provided', 400)
+    }
+
+    const { data, error } = await ctx.admin
+      .from('app_settings')
+      .update(update)
+      .eq('id', 1)
+      .select()
+      .maybeSingle()
+
+    if (error) {
+      // 23503: featured_collection_id pointed at a collection that is gone.
+      if (error.code === '23503') {
+        return fail('INVALID_REQUEST', 'featured_collection_id does not match a collection', 400)
       }
 
-      return json({ data })
+      return failFromDbError(
+        'admin-settings',
+        'ADMIN_SETTINGS_UPDATE_FAILED',
+        'Unable to update settings',
+        error,
+      )
     }
 
-    return json({ error: { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed' } }, 405)
+    if (!data) {
+      return fail('NOT_FOUND', 'Settings row not found', 404)
+    }
+
+    return ok(data)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: { code: 'ADMIN_SETTINGS_UNEXPECTED_ERROR', message } }, 500)
+    if (error instanceof BadRequestError) {
+      return fail(error.code, error.message, 400)
+    }
+    return failUnexpected('admin-settings', error)
   }
 })

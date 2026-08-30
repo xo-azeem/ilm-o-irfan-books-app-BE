@@ -1,62 +1,29 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { requireUser } from '../_shared/auth.ts'
+import { failFromDbError, failUnexpected, handleOptions, ok } from '../_shared/http.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
+const PROFILE_COLUMNS =
+  'id, full_name, email, phone, avatar_path, date_of_birth, address_line1, address_line2, city, state, postal_code, country, role, created_at, updated_at'
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const preflight = handleOptions(req)
+  if (preflight) return preflight
 
   try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return json({ error: 'Authorization header is required' }, 401)
-    }
+    const ctx = await requireUser(req)
+    if (ctx instanceof Response) return ctx
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: {
-            Authorization: authHeader,
-          },
-        },
-      },
-    )
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      return json({ error: 'Unauthorized' }, 401)
-    }
-
-    const { data, error } = await supabase
+    const { data, error } = await ctx.supabase
       .from('profiles')
-      .select('*')
-      .eq('id', user.id)
+      .select(PROFILE_COLUMNS)
+      .eq('id', ctx.user.id)
       .maybeSingle()
 
     if (error) {
-      return json({ error: { code: 'PROFILE_READ_FAILED', message: 'Unable to load profile' } }, 500)
+      return failFromDbError('profile-read', 'PROFILE_READ_FAILED', 'Unable to load profile', error)
     }
 
-    return json({ data: data ?? null })
+    return ok(data ?? null)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: { code: 'PROFILE_UNEXPECTED_ERROR', message } }, 500)
+    return failUnexpected('profile-read', error)
   }
 })

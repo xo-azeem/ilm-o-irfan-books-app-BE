@@ -1,55 +1,48 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
+import { anonClient } from '../_shared/auth.ts'
+import { failFromDbError, failUnexpected, handleOptions, ok } from '../_shared/http.ts'
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const preflight = handleOptions(req)
+  if (preflight) return preflight
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    )
+    const supabase = anonClient()
 
     const [collectionsRes, booksRes, categoriesRes] = await Promise.all([
-      supabase.from('collection_summaries').select('*').order('sort_order', { ascending: true }),
-      supabase.from('book_list_items').select('*').order('published_at', { ascending: false }).limit(12),
-      supabase.from('category_with_counts').select('*').order('sort_order', { ascending: true }).limit(10),
+      supabase
+        .from('collection_summaries')
+        .select('*')
+        .order('sort_order', { ascending: true, nullsFirst: true })
+        .limit(20),
+      supabase
+        .from('book_list_items')
+        .select('*')
+        .order('published_at', { ascending: false, nullsFirst: false })
+        .order('id', { ascending: true })
+        .limit(12),
+      supabase
+        .from('category_with_counts')
+        .select('*')
+        .order('sort_order', { ascending: true, nullsFirst: true })
+        .limit(10),
     ])
 
-    if (collectionsRes.error) {
-      return json({ error: { code: 'HOME_COLLECTIONS_READ_FAILED', message: 'Unable to load collections' } }, 500)
+    const failed = [
+      ['collections', collectionsRes.error] as const,
+      ['books', booksRes.error] as const,
+      ['categories', categoriesRes.error] as const,
+    ].find(([, error]) => error)
+
+    if (failed) {
+      return failFromDbError('home-feed', 'HOME_FEED_READ_FAILED', 'Unable to load home feed', failed[1])
     }
 
-    if (booksRes.error) {
-      return json({ error: { code: 'HOME_BOOKS_READ_FAILED', message: 'Unable to load featured books' } }, 500)
-    }
-
-    if (categoriesRes.error) {
-      return json({ error: { code: 'HOME_CATEGORIES_READ_FAILED', message: 'Unable to load categories' } }, 500)
-    }
-
-    return json({
-      data: {
-        collections: collectionsRes.data ?? [],
-        books: booksRes.data ?? [],
-        categories: categoriesRes.data ?? [],
-      },
+    return ok({
+      collections: collectionsRes.data ?? [],
+      books: booksRes.data ?? [],
+      categories: categoriesRes.data ?? [],
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: { code: 'HOME_UNEXPECTED_ERROR', message } }, 500)
+    return failUnexpected('home-feed', error)
   }
 })

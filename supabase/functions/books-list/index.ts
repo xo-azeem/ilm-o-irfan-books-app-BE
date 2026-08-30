@@ -1,50 +1,29 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
-import { paginate, parsePaginationQuery } from '../_shared/pagination.ts'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
+import { anonClient } from '../_shared/auth.ts'
+import { failFromDbError, failUnexpected, handleOptions, list } from '../_shared/http.ts'
+import { paginate, rangeFromRequest } from '../_shared/pagination.ts'
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const preflight = handleOptions(req)
+  if (preflight) return preflight
 
   try {
-    const url = new URL(req.url)
-    const params = Object.fromEntries(url.searchParams.entries())
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    )
+    const { page, pageSize, from, to } = rangeFromRequest(req)
 
-    const { page, pageSize } = parsePaginationQuery(params)
-    const { offset, limit } = {
-      offset: (page - 1) * pageSize,
-      limit: pageSize,
-    }
-
-    const { data, count, error } = await supabase
+    // published_at can be null, so id is the tiebreaker that keeps paging
+    // stable across requests.
+    const { data, count, error } = await anonClient()
       .from('book_list_items')
       .select('*', { count: 'exact' })
       .order('published_at', { ascending: false, nullsFirst: false })
-      .range(offset, offset + limit - 1)
+      .order('id', { ascending: true })
+      .range(from, to)
 
     if (error) {
-      return json({ error: { code: 'BOOKS_READ_FAILED', message: 'Unable to load books' } }, 500)
+      return failFromDbError('books-list', 'BOOKS_READ_FAILED', 'Unable to load books', error)
     }
 
-    return json(paginate(data ?? [], count ?? null, page, pageSize))
+    return list(paginate(data ?? [], count ?? null, page, pageSize))
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: { code: 'BOOKS_UNEXPECTED_ERROR', message } }, 500)
+    return failUnexpected('books-list', error)
   }
 })

@@ -1,41 +1,26 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
+import { anonClient } from '../_shared/auth.ts'
+import { failFromDbError, failUnexpected, handleOptions, ok } from '../_shared/http.ts'
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const preflight = handleOptions(req)
+  if (preflight) return preflight
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    )
-
-    const { data, error } = await supabase
+    // Plan catalogues are a handful of rows by nature, so this stays unpaged
+    // and returns the plain { data } shape the subscription screen expects.
+    const { data, error } = await anonClient()
       .from('plans')
       .select('*')
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
+      .limit(50)
 
     if (error) {
-      return json({ error: { code: 'PLANS_READ_FAILED', message: 'Unable to load plans' } }, 500)
+      return failFromDbError('plans-list', 'PLANS_READ_FAILED', 'Unable to load plans', error)
     }
 
-    return json({ data: data ?? [] })
+    return ok(data ?? [])
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: { code: 'PLANS_UNEXPECTED_ERROR', message } }, 500)
+    return failUnexpected('plans-list', error)
   }
 })

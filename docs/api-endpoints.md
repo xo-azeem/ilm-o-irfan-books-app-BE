@@ -49,6 +49,79 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | `/functions/v1/admin-analytics` | GET | Admin | Top books, reads, downloads, signups |
 | `/functions/v1/admin-settings` | GET/PATCH | Admin | Product flags and app config |
 
+## Deprecated
+
+| Endpoint | Status | Use instead |
+| --- | --- | --- |
+| `/functions/v1/signed-pdf` | `410 DEPRECATED_ENDPOINT` | `/functions/v1/get-signed-pdf` |
+
+## Response envelope
+
+```jsonc
+{ "data": { } }                                  // single object
+{ "data": [ ], "page": 1, "pageSize": 20,        // list
+  "totalCount": 121, "totalPages": 7,
+  "hasNextPage": true, "hasPreviousPage": false }
+{ "error": { "code": "...", "message": "..." } } // any failure
+```
+
+Branch on `error.code`. Messages are for logs and may be reworded without notice. Postgres
+errors are logged server-side and never returned to the client.
+
+### Shared error codes
+
+| Code | Status | Meaning |
+| --- | --- | --- |
+| `AUTH_REQUIRED` | 401 | Missing or invalid `Authorization` header |
+| `FORBIDDEN` | 403 | Authenticated but not an admin |
+| `INVALID_REQUEST` | 400 | Bad or missing field; message names the field |
+| `NOT_FOUND` | 404 | Target row does not exist or is not published |
+| `METHOD_NOT_ALLOWED` | 405 | Wrong HTTP verb; message lists the allowed ones |
+| `UNEXPECTED_ERROR` | 500 | Unhandled failure — check the function logs |
+
+### Endpoint-specific codes
+
+| Code | Status | Endpoint |
+| --- | --- | --- |
+| `PREMIUM_REQUIRED` | 403 | `get-signed-pdf` — no active entitlement |
+| `PDF_NOT_AVAILABLE` | 404 | `get-signed-pdf` — book has no `pdf_path` |
+| `PDF_NOT_IN_STORAGE` | 404 | `get-signed-pdf` — `pdf_path` set but object missing |
+| `DEPRECATED_ENDPOINT` | 410 | `signed-pdf` |
+
+## Premium access
+
+Two independent things grant access to a PDF through `get-signed-pdf`:
+
+1. `profiles.role = 'admin'` — admins read any PDF, published or draft, with no subscription.
+   This is a role check, so it applies to every admin now and in future without per-user setup.
+2. An active row in `entitlements` — `status = 'active'` and `expires_at` either null
+   (never expires) or in the future.
+
+`app_settings.allow_pdf_without_entitlement` is a global override that opens the paywall for
+everyone. It ships **off**.
+
+`entitlements-status` reports all of this:
+
+```jsonc
+{ "data": {
+    "isActive": false,          // the subscription alone
+    "isAdmin": true,            // profiles.role or the app_role JWT claim
+    "canAccessPremium": true,   // isActive || isAdmin  <- gate premium UI on this
+    "entitlement": null } }
+```
+
+Gating on `isActive` alone would show an admin a locked button on a file the backend would
+serve them.
+
+## Request notes
+
+- **Partial updates.** `profile-update`, `admin-settings`, `admin-book-update` and
+  `highlights-upsert` write only the keys present in the body. Send an explicit `null` to
+  clear a field; an empty body returns 400.
+- **Both key styles.** `snake_case` and `camelCase` are accepted (`full_name` / `fullName`).
+- **Reading progress.** Send `progress` (0–1) *or* `progress_percent` (0–100), never both.
+- **Pagination.** `page` / `pageSize` (`limit` is an alias). `pageSize` is capped at 100.
+
 ## Rules for implementation
 
 - Public catalog reads should stay lightweight and paginated.

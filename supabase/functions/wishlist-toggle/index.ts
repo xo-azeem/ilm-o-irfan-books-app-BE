@@ -1,95 +1,79 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
+import { requireMethod, requireUser } from '../_shared/auth.ts'
+import {
+  BadRequestError,
+  fail,
+  failFromDbError,
+  failUnexpected,
+  handleOptions,
+  ok,
+  readJsonBody,
+} from '../_shared/http.ts'
+import { requireUuidField } from '../_shared/payload.ts'
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const preflight = handleOptions(req)
+  if (preflight) return preflight
 
   try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return json({ error: { code: 'AUTH_REQUIRED', message: 'Authorization header is required' } }, 401)
-    }
+    const notAllowed = requireMethod(req, ['POST'])
+    if (notAllowed) return notAllowed
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      },
-    )
+    const ctx = await requireUser(req)
+    if (ctx instanceof Response) return ctx
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    const payload = await readJsonBody(req)
+    const bookId = requireUuidField(payload, ['book_id', 'bookId'], 'book_id')
 
-    if (userError || !user) {
-      return json({ error: { code: 'AUTH_REQUIRED', message: 'Unauthorized' } }, 401)
-    }
-
-    const payload = await req.json().catch(() => ({}))
-    const bookId = payload.book_id ?? payload.bookId
-
-    if (!bookId) {
-      return json({ error: { code: 'INVALID_REQUEST', message: 'book_id is required' } }, 400)
-    }
-
-    const { data: existing, error: checkError } = await supabase
+    // Delete first and look at what came back. That makes the toggle a single
+    // atomic statement: whether the row existed is decided by the database,
+    // not by a separate SELECT that a second tap can race.
+    const { data: removed, error: deleteError } = await ctx.supabase
       .from('wishlist')
-      .select('book_id')
-      .eq('user_id', user.id)
+      .delete()
+      .eq('user_id', ctx.user.id)
       .eq('book_id', bookId)
-      .maybeSingle()
+      .select('book_id')
 
-    if (checkError) {
-      return json({ error: { code: 'WISHLIST_QUERY_FAILED', message: 'Unable to read wishlist state' } }, 500)
+    if (deleteError) {
+      return failFromDbError(
+        'wishlist-toggle',
+        'WISHLIST_DELETE_FAILED',
+        'Unable to remove book from wishlist',
+        deleteError,
+      )
     }
 
-    if (existing) {
-      const { error } = await supabase
-        .from('wishlist')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('book_id', bookId)
+    if (removed && removed.length > 0) {
+      return ok({ wishlisted: false, removed: true, added: false, book_id: bookId })
+    }
 
-      if (error) {
-        return json({ error: { code: 'WISHLIST_DELETE_FAILED', message: 'Unable to remove book from wishlist' } }, 500)
+    // A plain INSERT, not an upsert: `authenticated` holds INSERT, SELECT and
+    // DELETE on wishlist but deliberately no UPDATE (there is nothing in the
+    // row to update), and PostgREST compiles .upsert() to ON CONFLICT DO
+    // UPDATE, which would fail with 42501. A duplicate key here just means a
+    // concurrent tap already added it, which is the outcome we wanted.
+    const { error: insertError } = await ctx.supabase
+      .from('wishlist')
+      .insert({ user_id: ctx.user.id, book_id: bookId })
+
+    if (insertError && insertError.code !== '23505') {
+      if (insertError.code === '23503') {
+        return fail('NOT_FOUND', 'Book not found', 404)
       }
 
-      return json({ data: { removed: true, book_id: bookId } })
-    }
-
-    const { error } = await supabase
-      .from('wishlist')
-      .upsert(
-        { user_id: user.id, book_id: bookId },
-        { onConflict: 'user_id,book_id', ignoreDuplicates: true },
+      return failFromDbError(
+        'wishlist-toggle',
+        'WISHLIST_INSERT_FAILED',
+        'Unable to add book to wishlist',
+        insertError,
       )
-      .select()
-      .maybeSingle()
-
-    if (error) {
-      return json({ error: { code: 'WISHLIST_INSERT_FAILED', message: 'Unable to add book to wishlist' } }, 500)
     }
 
-    return json({ data: { added: true, book_id: bookId } })
+    return ok({ wishlisted: true, added: true, removed: false, book_id: bookId })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: { code: 'WISHLIST_UNEXPECTED_ERROR', message } }, 500)
+    if (error instanceof BadRequestError) {
+      return fail(error.code, error.message, 400)
+    }
+    return failUnexpected('wishlist-toggle', error)
   }
 })

@@ -1,45 +1,32 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
-import { paginate, parsePaginationQuery } from '../_shared/pagination.ts'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
+import { anonClient } from '../_shared/auth.ts'
+import { failFromDbError, failUnexpected, handleOptions, list } from '../_shared/http.ts'
+import { paginate, rangeFromRequest } from '../_shared/pagination.ts'
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const preflight = handleOptions(req)
+  if (preflight) return preflight
 
   try {
-    const url = new URL(req.url)
-    const { page, pageSize } = parsePaginationQuery(Object.fromEntries(url.searchParams.entries()))
-    const offset = (page - 1) * pageSize
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    )
+    const { page, pageSize, from, to } = rangeFromRequest(req, { defaultPageSize: 50 })
 
-    const { data, count, error } = await supabase
+    const { data, count, error } = await anonClient()
       .from('category_with_counts')
       .select('*', { count: 'exact' })
       .order('sort_order', { ascending: true, nullsFirst: true })
-      .range(offset, offset + pageSize - 1)
+      .order('id', { ascending: true })
+      .range(from, to)
 
     if (error) {
-      return json({ error: { code: 'CATEGORIES_READ_FAILED', message: 'Unable to load categories' } }, 500)
+      return failFromDbError(
+        'categories-list',
+        'CATEGORIES_READ_FAILED',
+        'Unable to load categories',
+        error,
+      )
     }
 
-    return json(paginate(data ?? [], count ?? null, page, pageSize))
+    return list(paginate(data ?? [], count ?? null, page, pageSize))
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: { code: 'CATEGORIES_UNEXPECTED_ERROR', message } }, 500)
+    return failUnexpected('categories-list', error)
   }
 })

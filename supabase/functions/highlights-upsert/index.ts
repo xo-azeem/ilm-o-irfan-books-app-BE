@@ -1,80 +1,113 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { requireMethod, requireUser } from '../_shared/auth.ts'
+import {
+  BadRequestError,
+  fail,
+  failFromDbError,
+  failUnexpected,
+  handleOptions,
+  ok,
+  readJsonBody,
+} from '../_shared/http.ts'
+import {
+  asOptionalInteger,
+  asOptionalText,
+  asUuid,
+  pickProvided,
+  requireUuidField,
+  type FieldSpec,
+} from '../_shared/payload.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
+const EDITABLE_FIELDS: FieldSpec[] = [
+  {
+    column: 'page_number',
+    aliases: ['page_number', 'pageNumber'],
+    coerce: asOptionalInteger('page_number', { min: 1 }),
+  },
+  {
+    column: 'text_excerpt',
+    aliases: ['text_excerpt', 'textExcerpt'],
+    coerce: asOptionalText('text_excerpt'),
+  },
+  { column: 'note', aliases: ['note'], coerce: asOptionalText('note') },
+  { column: 'color', aliases: ['color'], coerce: asOptionalText('color') },
+]
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const preflight = handleOptions(req)
+  if (preflight) return preflight
 
   try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return json({ error: 'Authorization header is required' }, 401)
+    const notAllowed = requireMethod(req, ['POST', 'PATCH'])
+    if (notAllowed) return notAllowed
+
+    const ctx = await requireUser(req)
+    if (ctx instanceof Response) return ctx
+
+    const payload = await readJsonBody(req)
+    const highlightId = payload.id === undefined || payload.id === null
+      ? null
+      : asUuid('id')(payload.id)
+
+    // Editing an existing highlight is a partial update, so an edit that only
+    // changes the note must not blank out the excerpt and colour.
+    if (highlightId) {
+      const update = pickProvided(payload, EDITABLE_FIELDS)
+
+      if (Object.keys(update).length === 0) {
+        return fail('INVALID_REQUEST', 'No editable highlight fields were provided', 400)
+      }
+
+      const { data, error } = await ctx.supabase
+        .from('highlights')
+        .update(update)
+        .eq('id', highlightId)
+        .eq('user_id', ctx.user.id)
+        .select()
+        .maybeSingle()
+
+      if (error) {
+        return failFromDbError(
+          'highlights-upsert',
+          'HIGHLIGHT_UPDATE_FAILED',
+          'Unable to update highlight',
+          error,
+        )
+      }
+
+      if (!data) {
+        return fail('NOT_FOUND', 'Highlight not found', 404)
+      }
+
+      return ok(data)
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      },
-    )
+    const bookId = requireUuidField(payload, ['book_id', 'bookId'], 'book_id')
+    const insert = { user_id: ctx.user.id, book_id: bookId, ...pickProvided(payload, EDITABLE_FIELDS) }
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      return json({ error: 'Unauthorized' }, 401)
-    }
-
-    const payload = await req.json().catch(() => ({}))
-    const { id, book_id, page_number, text_excerpt, note, color } = payload
-
-    if (!book_id) {
-      return json({ error: 'book_id is required' }, 400)
-    }
-
-    const row = {
-      user_id: user.id,
-      book_id,
-      page_number: page_number ?? null,
-      text_excerpt: text_excerpt ?? null,
-      note: note ?? null,
-      color: color ?? null,
-    }
-
-    const { data, error } = id
-      ? await supabase
-          .from('highlights')
-          .update(row)
-          .eq('id', id)
-          .eq('user_id', user.id)
-          .select()
-          .single()
-      : await supabase.from('highlights').insert(row).select().single()
+    const { data, error } = await ctx.supabase
+      .from('highlights')
+      .insert(insert)
+      .select()
+      .maybeSingle()
 
     if (error) {
-      return json({ error: { code: 'HIGHLIGHT_SAVE_FAILED', message: 'Unable to save highlight' } }, 500)
+      if (error.code === '23503') {
+        return fail('NOT_FOUND', 'Book not found', 404)
+      }
+
+      return failFromDbError(
+        'highlights-upsert',
+        'HIGHLIGHT_INSERT_FAILED',
+        'Unable to save highlight',
+        error,
+      )
     }
 
-    return json({ data })
+    return ok(data, 201)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: { code: 'HIGHLIGHT_UNEXPECTED_ERROR', message } }, 500)
+    if (error instanceof BadRequestError) {
+      return fail(error.code, error.message, 400)
+    }
+    return failUnexpected('highlights-upsert', error)
   }
 })

@@ -119,6 +119,28 @@ export function parsePaginationQuery(
   }
 }
 
+// Reads page/pageSize off a Request URL and returns everything a PostgREST
+// .range() call needs. Every list endpoint goes through this so the offset
+// arithmetic exists in exactly one place.
+export function rangeFromRequest(
+  req: Request,
+  opts: Partial<PaginationParams> = {},
+): { page: number; pageSize: number; from: number; to: number } {
+  const url = new URL(req.url)
+  const params = Object.fromEntries(url.searchParams.entries())
+
+  const { page, pageSize } = parsePaginationQuery(
+    params,
+    opts.defaultPage ?? 1,
+    opts.defaultPageSize ?? 20,
+    opts.maxPageSize ?? 100,
+  )
+
+  const from = (page - 1) * pageSize
+
+  return { page, pageSize, from, to: from + pageSize - 1 }
+}
+
 // Cursor-based helper for scroll or load-more style APIs.
 export function buildCursorPagination<T>(
   items: T[],

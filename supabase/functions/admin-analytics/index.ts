@@ -1,72 +1,43 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
+import { requireAdmin } from '../_shared/auth.ts'
+import { failFromDbError, failUnexpected, handleOptions, ok } from '../_shared/http.ts'
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const preflight = handleOptions(req)
+  if (preflight) return preflight
 
   try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return json({ error: 'Authorization header is required' }, 401)
-    }
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: { headers: { Authorization: authHeader } },
-      },
-    )
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      return json({ error: 'Unauthorized' }, 401)
-    }
-
-    const admin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    )
-
-    const { data: profile } = await admin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
-
-    if (user.app_metadata?.app_role !== 'admin' && profile?.role !== 'admin') {
-      return json({ error: 'Forbidden' }, 403)
-    }
+    const ctx = await requireAdmin(req)
+    if (ctx instanceof Response) return ctx
 
     const url = new URL(req.url)
-    const days = Number(url.searchParams.get('days') ?? '30')
+    const requested = Number(url.searchParams.get('days') ?? '30')
+    // The function clamps to 1..365 itself; clamping here too keeps a garbage
+    // query string from reaching the database at all.
+    const days = Number.isFinite(requested) ? Math.min(Math.max(Math.trunc(requested), 1), 365) : 30
 
-    const { data, error } = await admin.rpc('admin_analytics', { days })
+    // Two things matter here and both used to be wrong.
+    //
+    // The parameter is named p_days: PostgREST resolves RPC arguments by name,
+    // so sending { days } produced PGRST202 "function not found" on every call.
+    //
+    // And the call goes through the caller's client, not the service-role
+    // client. admin_analytics() is SECURITY DEFINER and gates itself on
+    // is_admin(), which reads auth.jwt() / auth.uid(). The service-role key
+    // carries neither, so it failed that gate with "not allowed" even for a
+    // real admin. requireAdmin above has already authorised this request.
+    const { data, error } = await ctx.supabase.rpc('admin_analytics', { p_days: days })
 
     if (error) {
-      return json({ error: { code: 'ADMIN_ANALYTICS_READ_FAILED', message: 'Unable to load analytics' } }, 500)
+      return failFromDbError(
+        'admin-analytics',
+        'ADMIN_ANALYTICS_READ_FAILED',
+        'Unable to load analytics',
+        error,
+      )
     }
 
-    return json({ data })
+    return ok(data)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: { code: 'ADMIN_ANALYTICS_UNEXPECTED_ERROR', message } }, 500)
+    return failUnexpected('admin-analytics', error)
   }
 })

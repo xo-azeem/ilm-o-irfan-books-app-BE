@@ -1,36 +1,31 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
+import { anonClient } from '../_shared/auth.ts'
+import {
+  BadRequestError,
+  fail,
+  failFromDbError,
+  failUnexpected,
+  handleOptions,
+  ok,
+} from '../_shared/http.ts'
+import { asUuid } from '../_shared/payload.ts'
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const preflight = handleOptions(req)
+  if (preflight) return preflight
 
   try {
     const url = new URL(req.url)
-    const bookId = url.searchParams.get('id') ?? url.pathname.split('/').at(-1)
+    const rawId = url.searchParams.get('id') ?? url.pathname.split('/').at(-1) ?? ''
 
-    if (!bookId) {
-      return json({ error: 'book id is required' }, 400)
+    if (!rawId || rawId === 'book-detail') {
+      return fail('INVALID_REQUEST', 'id is required', 400)
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    )
+    const bookId = asUuid('id')(rawId)
 
-    const { data: book, error: bookError } = await supabase
+    // pdf_path is deliberately not selected. The bytes are only reachable
+    // through get-signed-pdf, which enforces the paywall.
+    const { data: book, error } = await anonClient()
       .from('books')
       .select(
         `
@@ -47,7 +42,6 @@ Deno.serve(async (req) => {
           cover_path,
           cover_color,
           cover_color_dark,
-          pdf_path,
           read_time_minutes,
           tag,
           tags,
@@ -58,23 +52,22 @@ Deno.serve(async (req) => {
         `,
       )
       .eq('id', bookId)
+      .eq('is_published', true)
       .maybeSingle()
 
-    if (bookError) {
-      return json({ error: { code: 'BOOK_DETAIL_READ_FAILED', message: 'Unable to load book details' } }, 500)
+    if (error) {
+      return failFromDbError('book-detail', 'BOOK_READ_FAILED', 'Unable to load book', error)
     }
 
     if (!book) {
-      return json({ error: { code: 'BOOK_NOT_FOUND', message: 'Book not found' } }, 404)
+      return fail('NOT_FOUND', 'Book not found', 404)
     }
 
-    if (!book.is_published) {
-      return json({ error: { code: 'BOOK_UNPUBLISHED', message: 'Book is not published' } }, 404)
-    }
-
-    return json({ data: book })
+    return ok(book)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: { code: 'BOOK_DETAIL_UNEXPECTED_ERROR', message } }, 500)
+    if (error instanceof BadRequestError) {
+      return fail(error.code, error.message, 400)
+    }
+    return failUnexpected('book-detail', error)
   }
 })

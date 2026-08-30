@@ -63,6 +63,62 @@ npm run functions:serve      # local functions (needs Docker + supabase start)
 Only the `:local` variant needs Docker. Always push migrations before regenerating, or the
 output will be missing whatever the new migration adds.
 
+## API contract
+
+Every endpoint returns one of three shapes. The app should have exactly one parser and one
+error handler.
+
+```jsonc
+// single object
+{ "data": { /* ... */ } }
+
+// list (see the pagination contract below)
+{ "data": [ /* ... */ ], "page": 1, "pageSize": 20, "totalCount": 121,
+  "totalPages": 7, "hasNextPage": true, "hasPreviousPage": false }
+
+// failure — ALWAYS this shape, on every status
+{ "error": { "code": "PREMIUM_REQUIRED", "message": "Active subscription required" } }
+```
+
+Branch on `error.code`, never on `error.message` — messages are for logs and may be reworded.
+Raw Postgres errors are never returned to the client; they are logged server-side and reported
+as a stable code.
+
+Codes shared by every endpoint: `AUTH_REQUIRED` (401), `FORBIDDEN` (403), `INVALID_REQUEST`
+(400), `NOT_FOUND` (404), `METHOD_NOT_ALLOWED` (405), `UNEXPECTED_ERROR` (500). Endpoints add
+their own, e.g. `PREMIUM_REQUIRED`, `PDF_NOT_IN_STORAGE`, `DEPRECATED_ENDPOINT`.
+
+### Partial updates
+
+`profile-update`, `admin-settings`, `admin-book-update` and `highlights-upsert` only write the
+fields present in the request body. Sending `{ "full_name": "..." }` leaves the address alone.
+To clear a field, send it explicitly as `null`. An empty body is a 400, not a silent no-op.
+
+### Reading progress scale
+
+`reading_progress.progress` is a fraction between 0 and 1. Send **either**:
+
+- `progress` — `0.0` to `1.0`, or
+- `progress_percent` — `0` to `100`
+
+Sending both, or a value out of range, is a 400. There is no auto-detection: `1` is genuinely
+ambiguous between "finished" and "1% read", and guessing it wrong marks a book complete for a
+reader one page in.
+
+### Notes for the app team
+
+- `wishlist-list` and `downloads-list` return the joined book under `book`, not `books`, and
+  carry only card-sized fields. Call `book-detail` for the full record.
+- `library-overview` returns `{ items, totalCount, hasMore }` per shelf, capped at `limit`
+  (default 20, max 50). Page through `wishlist-list` / `downloads-list` / `reading-progress`
+  for the full lists.
+- `entitlements-status` returns `{ isActive, isAdmin, canAccessPremium, entitlement }`.
+  **Gate premium UI on `canAccessPremium`, not `isActive`.** `isActive` is a truthful report
+  of the subscription alone, and admins have no subscription — but `get-signed-pdf` serves
+  them any PDF regardless. Gating on `isActive` would show an admin a locked button on a file
+  the backend would hand over.
+- `POST /functions/v1/signed-pdf` is gone; it answers 410. Use `get-signed-pdf`.
+
 ## Pagination contract
 
 Pagination means breaking a large dataset into smaller chunks and sending only one chunk at a time to the user. This is how the app can show the first set of books immediately, then load the next set when the user scrolls down or presses Next.
@@ -93,7 +149,21 @@ Backend rules:
 }
 ```
 
-This pattern is used for list APIs such as books, collections, categories, search results, and library screens. For large datasets, prefer cursor-based pagination with a stable sort key such as `created_at` + `id` to avoid expensive `OFFSET` scans. The shared helper lives in `supabase/functions/_shared/pagination.ts` and should be reused by all list endpoints.
+Every list endpoint uses this envelope: `books-list`, `books-search`, `categories-list`,
+`collections-list`, `wishlist-list`, `downloads-list`, `highlights-list`, `reading-progress`
+(GET), and all four admin list endpoints. `plans-list` is the one exception — a plan catalogue
+is a handful of rows, so it returns the plain `{ data: [...] }` shape.
+
+Requests are clamped server-side: `pageSize` is capped at 100, and a non-numeric or negative
+`page` falls back to 1 rather than erroring. `page` beyond the last page returns an empty
+`data` array with the real `totalCount`, not a 404.
+
+Ordering always includes `id` as a final tiebreaker so a row cannot appear on two pages when
+the primary sort key ties or is null.
+
+The shared helper lives in `supabase/functions/_shared/pagination.ts`. For very large offsets,
+`buildCursorPagination` in the same file supports cursor-style paging with a stable sort key,
+which avoids the cost of a deep `OFFSET` scan.
 
 ## Implemented backend phases
 
@@ -105,7 +175,8 @@ Included endpoints:
 
 - `GET /functions/v1/books-list` — paginated list of published books
 - `GET /functions/v1/book-detail?id=<bookId>` — single book detail lookup
-- `GET /functions/v1/books-search?q=<query>` — full-text search by title, genre, or author
+- `GET /functions/v1/books-search?q=<query>` — full-text search over title, author name,
+  description, genre and tags, ranked by relevance
 - `GET /functions/v1/categories-list` — category list with counts
 - `GET /functions/v1/collections-list` — collection and shelf summaries
 - `GET /functions/v1/plans-list` — active premium plans

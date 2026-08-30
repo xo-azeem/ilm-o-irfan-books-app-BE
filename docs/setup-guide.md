@@ -53,8 +53,18 @@ npx supabase db query --file supabase/seed.sql
 
 ### 3. Deploy Edge Functions
 
+Deploy everything at once — this also picks up `supabase/functions/_shared/`, which every
+function now imports:
+
+```bash
+npx supabase functions deploy
+```
+
+Or one at a time:
+
 ```bash
 npx supabase functions deploy get-signed-pdf
+npx supabase functions deploy signed-pdf   # deprecated alias, answers 410
 npx supabase functions deploy revenuecat-webhook
 npx supabase functions deploy home-feed
 npx supabase functions deploy books-list
@@ -171,10 +181,40 @@ Use this if you want to inspect tables locally without Supabase Auth/Storage. **
 
 ### 4. Run the schema + seed
 
-1. Select database `ilm_o_irfan` → open **Query Tool**.
-2. Open and execute `sql/pgadmin/01_full_schema.sql` (F5).
-3. Open and execute `sql/pgadmin/02_seed.sql` (F5).
-4. Refresh **Tables** — you should see catalog data.
+Select database `ilm_o_irfan` → open **Query Tool**, then execute each script with F5 **in
+this order**. They are the pgAdmin twins of `supabase/migrations/`, and each one depends on
+the ones before it — skipping any leaves the database in a half-configured state (no RLS
+hardening, no admin roles, or no search index).
+
+| # | Script | What it adds |
+| --- | --- | --- |
+| 1 | `01_full_schema.sql` | Tables, views, functions, storage buckets |
+| 2 | `02_seed.sql` | Catalog seed data |
+| 3 | `03_harden_grants_rls_indexes.sql` | RLS policies, grants, indexes |
+| 4 | `04_admin_roles.sql` | `profiles.role`, `is_admin()`, admin policies |
+| 5 | `05_remove_dummy_seed_books.sql` | Clears placeholder books |
+| 6 | `06_app_settings.sql` | Product flags singleton |
+| 7 | `07_admin_cms_v2.sql` | Admin CMS views, audit log, analytics |
+| 8 | `08_search_views_and_admin_fixes.sql` | Search index incl. author, `service_role` grants, closed PDF paywall |
+
+Then refresh **Tables** — you should see catalog data.
+
+### Local development accounts
+
+`supabase/seed.sql` creates two sign-in-ready accounts on every `supabase start` / `db reset`,
+mirroring the hosted project. Both use the password `Password123!`.
+
+| Email | Role | Premium access via |
+| --- | --- | --- |
+| `admin@gmail.com` | `admin` | admin role bypass — no subscription needed |
+| `test@gmail.com` | `user` | comped entitlement (promotional, never expires) |
+
+`seed.sql` runs against the **local stack only** — `supabase db push` does not execute it, so
+these accounts cannot reach the hosted project.
+
+> Script 08 is required. `books-search` calls `public.search_books()`, which only exists after
+> it runs, and the admin endpoints cannot read `app_settings` without the `service_role`
+> grants it restores.
 
 Quick check:
 

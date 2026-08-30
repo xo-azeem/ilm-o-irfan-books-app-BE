@@ -12,7 +12,8 @@
     "functions:serve": "npx supabase functions serve",
     "types:generate": "node scripts/gen-types.mjs --linked",
     "types:generate:local": "node scripts/gen-types.mjs --local",
-    "books:import": "node scripts/import-folder-books.mjs"
+    "books:import": "node scripts/import-folder-books.mjs",
+    "test:e2e": "bash scripts/e2e-endpoints.sh"
   },
   "devDependencies": {
     "supabase": "^2.26.0"

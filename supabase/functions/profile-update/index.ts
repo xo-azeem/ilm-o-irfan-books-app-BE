@@ -1,78 +1,100 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { requireMethod, requireUser } from '../_shared/auth.ts'
+import {
+  BadRequestError,
+  fail,
+  failFromDbError,
+  failUnexpected,
+  handleOptions,
+  ok,
+  readJsonBody,
+} from '../_shared/http.ts'
+import { asOptionalText, pickProvided, type FieldSpec } from '../_shared/payload.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+// Only these columns are writable by the owner. role, email, id and the
+// timestamps are deliberately absent.
+const EDITABLE_FIELDS: FieldSpec[] = [
+  { column: 'full_name', aliases: ['full_name', 'fullName'], coerce: asOptionalText('full_name') },
+  { column: 'phone', aliases: ['phone'], coerce: asOptionalText('phone') },
+  {
+    column: 'avatar_path',
+    aliases: ['avatar_path', 'avatarPath'],
+    coerce: asOptionalText('avatar_path'),
+  },
+  { column: 'city', aliases: ['city'], coerce: asOptionalText('city') },
+  { column: 'state', aliases: ['state'], coerce: asOptionalText('state') },
+  { column: 'country', aliases: ['country'], coerce: asOptionalText('country') },
+  {
+    column: 'address_line1',
+    aliases: ['address_line1', 'addressLine1'],
+    coerce: asOptionalText('address_line1'),
+  },
+  {
+    column: 'address_line2',
+    aliases: ['address_line2', 'addressLine2'],
+    coerce: asOptionalText('address_line2'),
+  },
+  {
+    column: 'postal_code',
+    aliases: ['postal_code', 'postalCode'],
+    coerce: asOptionalText('postal_code'),
+  },
+]
 
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
+const PROFILE_COLUMNS =
+  'id, full_name, email, phone, avatar_path, date_of_birth, address_line1, address_line2, city, state, postal_code, country, role, created_at, updated_at'
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const preflight = handleOptions(req)
+  if (preflight) return preflight
 
   try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return json({ error: 'Authorization header is required' }, 401)
+    const notAllowed = requireMethod(req, ['PUT', 'PATCH'])
+    if (notAllowed) return notAllowed
+
+    const ctx = await requireUser(req)
+    if (ctx instanceof Response) return ctx
+
+    const payload = await readJsonBody(req)
+
+    // Only columns the caller actually sent are written. Sending
+    // { full_name } must not null out the address the user saved last week.
+    const update = pickProvided(payload, EDITABLE_FIELDS)
+
+    if (Object.keys(update).length === 0) {
+      return fail('INVALID_REQUEST', 'No editable profile fields were provided', 400)
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      },
-    )
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      return json({ error: 'Unauthorized' }, 401)
-    }
-
-    if (req.method !== 'PUT') {
-      return json({ error: 'Method not allowed' }, 405)
-    }
-
-    const payload = await req.json().catch(() => ({}))
-
-    const { data, error } = await supabase
+    // updated_at is deliberately NOT set here. `authenticated` holds
+    // column-level UPDATE grants on profiles that cover the editable columns
+    // but not updated_at, so writing it fails the whole statement with 42501
+    // "permission denied for table profiles" - which is why this endpoint
+    // returned 500 on every call. The profiles_set_updated_at trigger
+    // maintains the column server-side.
+    const { data, error } = await ctx.supabase
       .from('profiles')
-      .update({
-        full_name: payload.full_name ?? payload.fullName ?? null,
-        phone: payload.phone ?? null,
-        avatar_path: payload.avatar_path ?? payload.avatarPath ?? null,
-        city: payload.city ?? null,
-        state: payload.state ?? null,
-        country: payload.country ?? null,
-        address_line1: payload.address_line1 ?? payload.addressLine1 ?? null,
-        address_line2: payload.address_line2 ?? payload.addressLine2 ?? null,
-        postal_code: payload.postal_code ?? payload.postalCode ?? null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', user.id)
-      .select()
-      .single()
+      .update(update)
+      .eq('id', ctx.user.id)
+      .select(PROFILE_COLUMNS)
+      .maybeSingle()
 
     if (error) {
-      return json({ error: { code: 'PROFILE_UPDATE_FAILED', message: 'Unable to update profile' } }, 500)
+      return failFromDbError(
+        'profile-update',
+        'PROFILE_UPDATE_FAILED',
+        'Unable to update profile',
+        error,
+      )
     }
 
-    return json({ data })
+    if (!data) {
+      return fail('NOT_FOUND', 'Profile not found', 404)
+    }
+
+    return ok(data)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: { code: 'PROFILE_UPDATE_UNEXPECTED_ERROR', message } }, 500)
+    if (error instanceof BadRequestError) {
+      return fail(error.code, error.message, 400)
+    }
+    return failUnexpected('profile-update', error)
   }
 })

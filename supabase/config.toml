@@ -8,7 +8,7 @@ enabled = true
 port = 54321
 schemas = ["public", "storage", "graphql_public"]
 extra_search_path = ["public", "extensions"]
-max_rows = 10000
+max_rows = 1000
 
 [db]
 port = 54322
@@ -68,6 +68,11 @@ policy = "per_worker"
 [functions.get-signed-pdf]
 verify_jwt = true
 
+# Deprecated alias. Left open so callers receive the 410 body rather than a
+# gateway 401 that tells them nothing.
+[functions.signed-pdf]
+verify_jwt = false
+
 [functions.revenuecat-webhook]
 verify_jwt = false
 
@@ -99,9 +104,6 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.reading-progress]
-verify_jwt = true
-
-[functions.reading-progress-upsert]
 verify_jwt = true
 
 [functions.wishlist-list]

@@ -1,74 +1,82 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { requireUser } from '../_shared/auth.ts'
+import { failFromDbError, failUnexpected, handleOptions, ok } from '../_shared/http.ts'
+import { normalizePageSize } from '../_shared/pagination.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
+const BOOK_CARD =
+  'book:books(id, slug, title, cover_path, cover_color, cover_color_dark, genre, is_premium, read_time_minutes)'
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const preflight = handleOptions(req)
+  if (preflight) return preflight
 
   try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return json({ error: 'Authorization header is required' }, 401)
-    }
+    const ctx = await requireUser(req)
+    if (ctx instanceof Response) return ctx
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      },
-    )
+    const url = new URL(req.url)
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      return json({ error: 'Unauthorized' }, 401)
-    }
+    // This screen is a summary of three shelves, so each shelf is capped and
+    // reports its own total. Callers that need the full list page through
+    // wishlist-list / downloads-list / reading-progress instead.
+    const limit = normalizePageSize(url.searchParams.get('limit') ?? undefined, 20, 50)
 
     const [wishlistRes, progressRes, downloadsRes] = await Promise.all([
-      supabase.from('wishlist').select('book_id').eq('user_id', user.id),
-      supabase.from('reading_progress').select('*').eq('user_id', user.id),
-      supabase.from('downloads').select('book_id').eq('user_id', user.id),
+      ctx.supabase
+        .from('wishlist')
+        .select(`book_id, created_at, ${BOOK_CARD}`, { count: 'exact' })
+        .eq('user_id', ctx.user.id)
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      ctx.supabase
+        .from('reading_progress')
+        .select(`book_id, current_page, total_pages, progress, chapter_label, last_read_at, ${BOOK_CARD}`, {
+          count: 'exact',
+        })
+        .eq('user_id', ctx.user.id)
+        .order('last_read_at', { ascending: false })
+        .limit(limit),
+      ctx.supabase
+        .from('downloads')
+        .select(`book_id, status, file_size_bytes, downloaded_at, ${BOOK_CARD}`, { count: 'exact' })
+        .eq('user_id', ctx.user.id)
+        .order('downloaded_at', { ascending: false })
+        .limit(limit),
     ])
 
-    if (wishlistRes.error) {
-      return json({ error: { code: 'LIBRARY_WISHLIST_READ_FAILED', message: 'Unable to load wishlist' } }, 500)
+    const failed = [
+      ['wishlist', wishlistRes.error] as const,
+      ['reading_progress', progressRes.error] as const,
+      ['downloads', downloadsRes.error] as const,
+    ].find(([, error]) => error)
+
+    if (failed) {
+      return failFromDbError(
+        'library-overview',
+        'LIBRARY_READ_FAILED',
+        'Unable to load library',
+        failed[1],
+      )
     }
 
-    if (progressRes.error) {
-      return json({ error: { code: 'LIBRARY_PROGRESS_READ_FAILED', message: 'Unable to load reading progress' } }, 500)
-    }
-
-    if (downloadsRes.error) {
-      return json({ error: { code: 'LIBRARY_DOWNLOADS_READ_FAILED', message: 'Unable to load downloads' } }, 500)
-    }
-
-    return json({
-      data: {
-        wishlist: wishlistRes.data ?? [],
-        readingProgress: progressRes.data ?? [],
-        downloads: downloadsRes.data ?? [],
+    return ok({
+      limit,
+      wishlist: {
+        items: wishlistRes.data ?? [],
+        totalCount: wishlistRes.count ?? 0,
+        hasMore: (wishlistRes.count ?? 0) > (wishlistRes.data?.length ?? 0),
+      },
+      readingProgress: {
+        items: progressRes.data ?? [],
+        totalCount: progressRes.count ?? 0,
+        hasMore: (progressRes.count ?? 0) > (progressRes.data?.length ?? 0),
+      },
+      downloads: {
+        items: downloadsRes.data ?? [],
+        totalCount: downloadsRes.count ?? 0,
+        hasMore: (downloadsRes.count ?? 0) > (downloadsRes.data?.length ?? 0),
       },
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: { code: 'LIBRARY_UNEXPECTED_ERROR', message } }, 500)
+    return failUnexpected('library-overview', error)
   }
 })

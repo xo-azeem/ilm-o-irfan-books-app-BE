@@ -1,52 +1,21 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+// Deprecated alias for get-signed-pdf.
+//
+// This function was a near-copy of get-signed-pdf with its own drifting copy
+// of the paywall logic. It is kept only so already-shipped clients get a clear
+// message instead of a 404, and it deliberately does no auth work of its own:
+// there is nothing here worth protecting.
+//
+// Remove once no app build in the wild calls it.
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { fail, handleOptions } from '../_shared/http.ts'
 
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
+Deno.serve((req) => {
+  const preflight = handleOptions(req)
+  if (preflight) return preflight
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
-
-  try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return json({ error: { code: 'AUTH_REQUIRED', message: 'Authorization header is required' } }, 401)
-    }
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } },
-    )
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      return json({ error: { code: 'AUTH_REQUIRED', message: 'Unauthorized' } }, 401)
-    }
-
-    return json({
-      error: {
-        code: 'DEPRECATED_ENDPOINT',
-        message: 'Use /functions/v1/get-signed-pdf instead of /functions/v1/signed-pdf',
-      },
-      deprecated: true,
-    }, 410)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: { code: 'DEPRECATED_ENDPOINT_ERROR', message } }, 500)
-  }
+  return fail(
+    'DEPRECATED_ENDPOINT',
+    'Use /functions/v1/get-signed-pdf instead of /functions/v1/signed-pdf',
+    410,
+  )
 })

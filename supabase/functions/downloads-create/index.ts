@@ -1,76 +1,76 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { requireMethod, requireUser } from '../_shared/auth.ts'
+import {
+  BadRequestError,
+  fail,
+  failFromDbError,
+  failUnexpected,
+  handleOptions,
+  ok,
+  readJsonBody,
+} from '../_shared/http.ts'
+import { asOptionalInteger, requireUuidField } from '../_shared/payload.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
+const ALLOWED_STATUS = ['pending', 'completed', 'failed']
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  const preflight = handleOptions(req)
+  if (preflight) return preflight
 
   try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return json({ error: 'Authorization header is required' }, 401)
+    const notAllowed = requireMethod(req, ['POST'])
+    if (notAllowed) return notAllowed
+
+    const ctx = await requireUser(req)
+    if (ctx instanceof Response) return ctx
+
+    const payload = await readJsonBody(req)
+    const bookId = requireUuidField(payload, ['book_id', 'bookId'], 'book_id')
+
+    const status = payload.status ?? 'completed'
+
+    // The column has a CHECK constraint; reject here so the caller gets a 400
+    // with a usable message instead of a constraint violation as a 500.
+    if (typeof status !== 'string' || !ALLOWED_STATUS.includes(status)) {
+      throw new BadRequestError(`status must be one of: ${ALLOWED_STATUS.join(', ')}`)
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      },
+    const fileSize = asOptionalInteger('file_size_bytes', { min: 0 })(
+      payload.file_size_bytes ?? payload.fileSizeBytes ?? null,
     )
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      return json({ error: 'Unauthorized' }, 401)
-    }
-
-    const payload = await req.json().catch(() => ({}))
-    const bookId = payload.book_id ?? payload.bookId
-
-    if (!bookId) {
-      return json({ error: 'book_id is required' }, 400)
-    }
-
-    const { data, error } = await supabase
+    const { data, error } = await ctx.supabase
       .from('downloads')
       .upsert(
         {
-          user_id: user.id,
+          user_id: ctx.user.id,
           book_id: bookId,
-          status: payload.status ?? 'completed',
-          file_size_bytes: payload.file_size_bytes ?? null,
+          status,
+          file_size_bytes: fileSize,
           downloaded_at: new Date().toISOString(),
         },
         { onConflict: 'user_id,book_id' },
       )
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
-      return json({ error: { code: 'DOWNLOAD_CREATE_FAILED', message: 'Unable to record download' } }, 500)
+      if (error.code === '23503') {
+        return fail('NOT_FOUND', 'Book not found', 404)
+      }
+
+      return failFromDbError(
+        'downloads-create',
+        'DOWNLOAD_WRITE_FAILED',
+        'Unable to save download',
+        error,
+      )
     }
 
-    return json({ data })
+    return ok(data)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: { code: 'DOWNLOAD_CREATE_UNEXPECTED_ERROR', message } }, 500)
+    if (error instanceof BadRequestError) {
+      return fail(error.code, error.message, 400)
+    }
+    return failUnexpected('downloads-create', error)
   }
 })
