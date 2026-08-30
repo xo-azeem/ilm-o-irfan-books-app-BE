@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      return json({ error: 'Authorization header is required' }, 401)
+      return json({ error: { code: 'AUTH_REQUIRED', message: 'Authorization header is required' } }, 401)
     }
 
     const supabase = createClient(
@@ -39,17 +39,17 @@ Deno.serve(async (req) => {
     } = await supabase.auth.getUser()
 
     if (userError || !user) {
-      return json({ error: 'Unauthorized' }, 401)
+      return json({ error: { code: 'AUTH_REQUIRED', message: 'Unauthorized' } }, 401)
     }
 
     const payload = await req.json().catch(() => ({}))
     const bookId = payload.book_id ?? payload.bookId
 
     if (!bookId) {
-      return json({ error: 'book_id is required' }, 400)
+      return json({ error: { code: 'INVALID_REQUEST', message: 'book_id is required' } }, 400)
     }
 
-    const { data: exists, error: checkError } = await supabase
+    const { data: existing, error: checkError } = await supabase
       .from('wishlist')
       .select('book_id')
       .eq('user_id', user.id)
@@ -57,10 +57,10 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (checkError) {
-      return json({ error: checkError.message }, 500)
+      return json({ error: { code: 'WISHLIST_QUERY_FAILED', message: 'Unable to read wishlist state' } }, 500)
     }
 
-    if (exists) {
+    if (existing) {
       const { error } = await supabase
         .from('wishlist')
         .delete()
@@ -68,24 +68,28 @@ Deno.serve(async (req) => {
         .eq('book_id', bookId)
 
       if (error) {
-        return json({ error: error.message }, 500)
+        return json({ error: { code: 'WISHLIST_DELETE_FAILED', message: 'Unable to remove book from wishlist' } }, 500)
       }
 
       return json({ data: { removed: true, book_id: bookId } })
     }
 
-    const { error } = await supabase.from('wishlist').insert({
-      user_id: user.id,
-      book_id: bookId,
-    })
+    const { error } = await supabase
+      .from('wishlist')
+      .upsert(
+        { user_id: user.id, book_id: bookId },
+        { onConflict: 'user_id,book_id', ignoreDuplicates: true },
+      )
+      .select()
+      .maybeSingle()
 
     if (error) {
-      return json({ error: error.message }, 500)
+      return json({ error: { code: 'WISHLIST_INSERT_FAILED', message: 'Unable to add book to wishlist' } }, 500)
     }
 
     return json({ data: { added: true, book_id: bookId } })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: message }, 500)
+    return json({ error: { code: 'WISHLIST_UNEXPECTED_ERROR', message } }, 500)
   }
 })

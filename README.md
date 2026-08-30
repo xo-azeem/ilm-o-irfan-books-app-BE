@@ -26,7 +26,7 @@ Schema reference: [`docs/schema.md`](docs/schema.md)
 ```text
 supabase/
   migrations/     # schema, RLS, storage
-  functions/      # get-signed-pdf, revenuecat-webhook
+  functions/      # catalog, user, admin, PDF, and webhook Edge Functions
   seed.sql        # baseline categories + plan
 sql/pgadmin/      # run in pgAdmin Query Tool
 docs/             # stack, schema, setup
@@ -103,13 +103,13 @@ The backend is now structured in functional phases for the app's real product fl
 
 Included endpoints:
 
-- `GET /books` — paginated list of published books
-- `GET /books/:id` — single book detail lookup
-- `GET /books/search` — search by title, genre, or author
-- `GET /categories` — category list with counts
-- `GET /collections` — collection and shelf summaries
-- `GET /plans` — active premium plans
-- `GET /home` — home feed with collections, categories, and featured books
+- `GET /functions/v1/books-list` — paginated list of published books
+- `GET /functions/v1/book-detail?id=<bookId>` — single book detail lookup
+- `GET /functions/v1/books-search?q=<query>` — full-text search by title, genre, or author
+- `GET /functions/v1/categories-list` — category list with counts
+- `GET /functions/v1/collections-list` — collection and shelf summaries
+- `GET /functions/v1/plans-list` — active premium plans
+- `GET /functions/v1/home-feed` — home feed with collections, categories, and featured books
 
 These endpoints live under `supabase/functions/` and use the shared pagination helper for list responses.
 
@@ -117,14 +117,14 @@ These endpoints live under `supabase/functions/` and use the shared pagination h
 
 Included endpoints:
 
-- `GET /profile` / `PUT /profile`
-- `GET /reading-progress` / `POST /reading-progress`
-- `GET /wishlist` / `POST /wishlist/:bookId`
-- `GET /downloads` / `POST /downloads`
-- `GET /highlights` / `POST /highlights`
-- `GET /library`
-- `GET /entitlements`
-- `POST /pdf/signed`
+- `GET /functions/v1/profile-read` / `PUT /functions/v1/profile-update`
+- `GET /functions/v1/reading-progress` / `POST /functions/v1/reading-progress`
+- `GET /functions/v1/wishlist-list` / `POST /functions/v1/wishlist-toggle`
+- `GET /functions/v1/downloads-list` / `POST /functions/v1/downloads-create`
+- `GET /functions/v1/highlights-list` / `POST /functions/v1/highlights-upsert`
+- `GET /functions/v1/library-overview`
+- `GET /functions/v1/entitlements-status`
+- `POST /functions/v1/get-signed-pdf`
 
 These are protected by authenticated access and user-scoped data queries.
 
@@ -132,12 +132,12 @@ These are protected by authenticated access and user-scoped data queries.
 
 Included endpoints:
 
-- `GET /admin/books` / `PATCH /admin/books/:id`
-- `GET /admin/users`
-- `GET /admin/analytics`
-- `GET /admin/categories`
-- `GET /admin/collections`
-- `GET /admin/settings` / `PATCH /admin/settings`
+- `GET /functions/v1/admin-books` / `PATCH /functions/v1/admin-book-update`
+- `GET /functions/v1/admin-users`
+- `GET /functions/v1/admin-analytics`
+- `GET /functions/v1/admin-categories`
+- `GET /functions/v1/admin-collections`
+- `GET /functions/v1/admin-settings` / `PATCH /functions/v1/admin-settings`
 
 These endpoints enforce admin checks and use service-role access for privileged backend operations.
 

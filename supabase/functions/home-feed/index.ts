@@ -30,15 +30,15 @@ Deno.serve(async (req) => {
     ])
 
     if (collectionsRes.error) {
-      return json({ error: collectionsRes.error.message }, 500)
+      return json({ error: { code: 'HOME_COLLECTIONS_READ_FAILED', message: 'Unable to load collections' } }, 500)
     }
 
     if (booksRes.error) {
-      return json({ error: booksRes.error.message }, 500)
+      return json({ error: { code: 'HOME_BOOKS_READ_FAILED', message: 'Unable to load featured books' } }, 500)
     }
 
     if (categoriesRes.error) {
-      return json({ error: categoriesRes.error.message }, 500)
+      return json({ error: { code: 'HOME_CATEGORIES_READ_FAILED', message: 'Unable to load categories' } }, 500)
     }
 
     return json({
@@ -50,6 +50,6 @@ Deno.serve(async (req) => {
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: message }, 500)
+    return json({ error: { code: 'HOME_UNEXPECTED_ERROR', message } }, 500)
   }
 })

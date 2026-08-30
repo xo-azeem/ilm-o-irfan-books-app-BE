@@ -61,20 +61,20 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (bookError) {
-      return json({ error: bookError.message }, 500)
+      return json({ error: { code: 'BOOK_DETAIL_READ_FAILED', message: 'Unable to load book details' } }, 500)
     }
 
     if (!book) {
-      return json({ error: 'Book not found' }, 404)
+      return json({ error: { code: 'BOOK_NOT_FOUND', message: 'Book not found' } }, 404)
     }
 
     if (!book.is_published) {
-      return json({ error: 'Book is not published' }, 404)
+      return json({ error: { code: 'BOOK_UNPUBLISHED', message: 'Book is not published' } }, 404)
     }
 
     return json({ data: book })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: message }, 500)
+    return json({ error: { code: 'BOOK_DETAIL_UNEXPECTED_ERROR', message } }, 500)
   }
 })

@@ -4,7 +4,7 @@
 
 create table if not exists public.app_settings (
   id smallint primary key default 1 check (id = 1),
-  allow_pdf_without_entitlement boolean not null default true,
+  allow_pdf_without_entitlement boolean not null default false,
   updated_at timestamptz not null default timezone('utc', now())
 );
 
@@ -14,8 +14,12 @@ before update on public.app_settings
 for each row execute function public.set_updated_at();
 
 insert into public.app_settings (id, allow_pdf_without_entitlement)
-values (1, true)
+values (1, false)
 on conflict (id) do nothing;
+
+update public.app_settings
+set allow_pdf_without_entitlement = false
+where id = 1;
 
 alter table public.app_settings enable row level security;
 

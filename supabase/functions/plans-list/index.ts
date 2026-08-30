@@ -30,12 +30,12 @@ Deno.serve(async (req) => {
       .order('sort_order', { ascending: true })
 
     if (error) {
-      return json({ error: error.message }, 500)
+      return json({ error: { code: 'PLANS_READ_FAILED', message: 'Unable to load plans' } }, 500)
     }
 
     return json({ data: data ?? [] })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: message }, 500)
+    return json({ error: { code: 'PLANS_UNEXPECTED_ERROR', message } }, 500)
   }
 })

@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
         .maybeSingle()
 
       if (error) {
-        return json({ error: error.message }, 500)
+        return json({ error: { code: 'ADMIN_SETTINGS_READ_FAILED', message: 'Unable to load settings' } }, 500)
       }
 
       return json({ data: data ?? null })
@@ -90,15 +90,15 @@ Deno.serve(async (req) => {
         .single()
 
       if (error) {
-        return json({ error: error.message }, 500)
+        return json({ error: { code: 'ADMIN_SETTINGS_UPDATE_FAILED', message: 'Unable to update settings' } }, 500)
       }
 
       return json({ data })
     }
 
-    return json({ error: 'Method not allowed' }, 405)
+    return json({ error: { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed' } }, 405)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: message }, 500)
+    return json({ error: { code: 'ADMIN_SETTINGS_UNEXPECTED_ERROR', message } }, 500)
   }
 })

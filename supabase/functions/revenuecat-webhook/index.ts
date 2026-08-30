@@ -28,12 +28,12 @@ Deno.serve(async (req) => {
     const entitlementId = Deno.env.get('REVENUECAT_ENTITLEMENT_ID') ?? 'premium'
 
     if (!expectedAuth) {
-      return json({ error: 'Webhook authorization is not configured' }, 500)
+      return json({ error: { code: 'WEBHOOK_CONFIG_ERROR', message: 'Webhook authorization is not configured' } }, 500)
     }
 
     const auth = req.headers.get('Authorization')
     if (auth !== expectedAuth) {
-      return json({ error: 'Invalid webhook authorization' }, 401)
+      return json({ error: { code: 'WEBHOOK_AUTH_FAILED', message: 'Invalid webhook authorization' } }, 401)
     }
 
     const payload = await req.json()
@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
 
     const appUserId = event.app_user_id
     if (!appUserId) {
-      return json({ error: 'Missing app_user_id' }, 400)
+      return json({ error: { code: 'INVALID_WEBHOOK_EVENT', message: 'Missing app_user_id' } }, 400)
     }
 
     // RevenueCat app_user_id should be the Supabase auth user UUID
@@ -123,13 +123,13 @@ Deno.serve(async (req) => {
     })
 
     if (error) {
-      return json({ error: error.message }, 500)
+      return json({ error: { code: 'ENTITLEMENT_WRITE_FAILED', message: 'Unable to update entitlement' } }, 500)
     }
 
     return json({ ok: true, userId, status })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: message }, 500)
+    return json({ error: { code: 'WEBHOOK_UNEXPECTED_ERROR', message } }, 500)
   }
 })
 

@@ -69,12 +69,12 @@ Deno.serve(async (req) => {
       : await supabase.from('highlights').insert(row).select().single()
 
     if (error) {
-      return json({ error: error.message }, 500)
+      return json({ error: { code: 'HIGHLIGHT_SAVE_FAILED', message: 'Unable to save highlight' } }, 500)
     }
 
     return json({ data })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: message }, 500)
+    return json({ error: { code: 'HIGHLIGHT_UNEXPECTED_ERROR', message } }, 500)
   }
 })

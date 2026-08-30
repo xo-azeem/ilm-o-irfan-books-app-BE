@@ -8,7 +8,7 @@ enabled = true
 port = 54321
 schemas = ["public", "storage", "graphql_public"]
 extra_search_path = ["public", "extensions"]
-max_rows = 1000
+max_rows = 10000
 
 [db]
 port = 54322
@@ -80,7 +80,7 @@ verify_jwt = false
 [functions.book-detail]
 verify_jwt = false
 
-[functions.search-books]
+[functions.books-search]
 verify_jwt = false
 
 [functions.categories-list]
@@ -149,5 +149,3 @@ verify_jwt = true
 [functions.admin-settings]
 verify_jwt = true
 
-[functions.admin-settings-update]
-verify_jwt = true

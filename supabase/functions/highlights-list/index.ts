@@ -49,12 +49,12 @@ Deno.serve(async (req) => {
       .order('created_at', { ascending: false })
 
     if (error) {
-      return json({ error: error.message }, 500)
+      return json({ error: { code: 'HIGHLIGHTS_READ_FAILED', message: 'Unable to load highlights' } }, 500)
     }
 
     return json({ data: data ?? [] })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: message }, 500)
+    return json({ error: { code: 'HIGHLIGHTS_UNEXPECTED_ERROR', message } }, 500)
   }
 })

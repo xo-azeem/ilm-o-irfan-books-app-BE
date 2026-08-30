@@ -49,15 +49,15 @@ Deno.serve(async (req) => {
     ])
 
     if (wishlistRes.error) {
-      return json({ error: wishlistRes.error.message }, 500)
+      return json({ error: { code: 'LIBRARY_WISHLIST_READ_FAILED', message: 'Unable to load wishlist' } }, 500)
     }
 
     if (progressRes.error) {
-      return json({ error: progressRes.error.message }, 500)
+      return json({ error: { code: 'LIBRARY_PROGRESS_READ_FAILED', message: 'Unable to load reading progress' } }, 500)
     }
 
     if (downloadsRes.error) {
-      return json({ error: downloadsRes.error.message }, 500)
+      return json({ error: { code: 'LIBRARY_DOWNLOADS_READ_FAILED', message: 'Unable to load downloads' } }, 500)
     }
 
     return json({
@@ -69,6 +69,6 @@ Deno.serve(async (req) => {
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: message }, 500)
+    return json({ error: { code: 'LIBRARY_UNEXPECTED_ERROR', message } }, 500)
   }
 })

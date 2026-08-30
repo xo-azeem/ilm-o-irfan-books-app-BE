@@ -39,12 +39,12 @@ Deno.serve(async (req) => {
       .range(offset, offset + limit - 1)
 
     if (error) {
-      return json({ error: error.message }, 500)
+      return json({ error: { code: 'BOOKS_READ_FAILED', message: 'Unable to load books' } }, 500)
     }
 
     return json(paginate(data ?? [], count ?? null, page, pageSize))
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: message }, 500)
+    return json({ error: { code: 'BOOKS_UNEXPECTED_ERROR', message } }, 500)
   }
 })

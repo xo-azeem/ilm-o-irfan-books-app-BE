@@ -56,6 +56,31 @@ npx supabase db query --file supabase/seed.sql
 ```bash
 npx supabase functions deploy get-signed-pdf
 npx supabase functions deploy revenuecat-webhook
+npx supabase functions deploy home-feed
+npx supabase functions deploy books-list
+npx supabase functions deploy book-detail
+npx supabase functions deploy books-search
+npx supabase functions deploy categories-list
+npx supabase functions deploy collections-list
+npx supabase functions deploy plans-list
+npx supabase functions deploy profile-read
+npx supabase functions deploy profile-update
+npx supabase functions deploy reading-progress
+npx supabase functions deploy wishlist-list
+npx supabase functions deploy wishlist-toggle
+npx supabase functions deploy downloads-list
+npx supabase functions deploy downloads-create
+npx supabase functions deploy highlights-list
+npx supabase functions deploy highlights-upsert
+npx supabase functions deploy library-overview
+npx supabase functions deploy entitlements-status
+npx supabase functions deploy admin-books
+npx supabase functions deploy admin-book-update
+npx supabase functions deploy admin-categories
+npx supabase functions deploy admin-collections
+npx supabase functions deploy admin-users
+npx supabase functions deploy admin-analytics
+npx supabase functions deploy admin-settings
 ```
 
 Set secrets (Dashboard → Edge Functions → Secrets, or CLI):

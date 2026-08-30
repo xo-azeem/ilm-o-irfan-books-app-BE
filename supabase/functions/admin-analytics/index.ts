@@ -61,12 +61,12 @@ Deno.serve(async (req) => {
     const { data, error } = await admin.rpc('admin_analytics', { days })
 
     if (error) {
-      return json({ error: error.message }, 500)
+      return json({ error: { code: 'ADMIN_ANALYTICS_READ_FAILED', message: 'Unable to load analytics' } }, 500)
     }
 
     return json({ data })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: message }, 500)
+    return json({ error: { code: 'ADMIN_ANALYTICS_UNEXPECTED_ERROR', message } }, 500)
   }
 })

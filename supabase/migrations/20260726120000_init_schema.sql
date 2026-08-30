@@ -422,9 +422,10 @@ select
   b.currency,
   b.format,
   b.is_premium,
-  b.published_at
+  b.published_at,
+  b.search_vector
 from public.books b
-join public.authors a on a.id = b.author_id
+left join public.authors a on a.id = b.author_id
 where b.is_published = true;
 
 create or replace view public.category_with_counts

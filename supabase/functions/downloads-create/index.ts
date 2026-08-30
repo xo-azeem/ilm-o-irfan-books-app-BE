@@ -65,12 +65,12 @@ Deno.serve(async (req) => {
       .single()
 
     if (error) {
-      return json({ error: error.message }, 500)
+      return json({ error: { code: 'DOWNLOAD_CREATE_FAILED', message: 'Unable to record download' } }, 500)
     }
 
     return json({ data })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: message }, 500)
+    return json({ error: { code: 'DOWNLOAD_CREATE_UNEXPECTED_ERROR', message } }, 500)
   }
 })

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { paginate, parsePaginationQuery } from '../_shared/pagination.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,23 +19,27 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const url = new URL(req.url)
+    const { page, pageSize } = parsePaginationQuery(Object.fromEntries(url.searchParams.entries()))
+    const offset = (page - 1) * pageSize
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
     )
 
-    const { data, error } = await supabase
+    const { data, count, error } = await supabase
       .from('collection_summaries')
-      .select('*')
+      .select('*', { count: 'exact' })
       .order('sort_order', { ascending: true, nullsFirst: true })
+      .range(offset, offset + pageSize - 1)
 
     if (error) {
-      return json({ error: error.message }, 500)
+      return json({ error: { code: 'COLLECTIONS_READ_FAILED', message: 'Unable to load collections' } }, 500)
     }
 
-    return json({ data: data ?? [] })
+    return json(paginate(data ?? [], count ?? null, page, pageSize))
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: message }, 500)
+    return json({ error: { code: 'COLLECTIONS_UNEXPECTED_ERROR', message } }, 500)
   }
 })

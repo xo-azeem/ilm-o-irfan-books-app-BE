@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { paginate, parsePaginationQuery } from '../_shared/pagination.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,15 +21,17 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      return json({ error: 'Authorization header is required' }, 401)
+      return json({ error: { code: 'AUTH_REQUIRED', message: 'Authorization header is required' } }, 401)
     }
+
+    const url = new URL(req.url)
+    const { page, pageSize } = parsePaginationQuery(Object.fromEntries(url.searchParams.entries()))
+    const offset = (page - 1) * pageSize
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: { headers: { Authorization: authHeader } },
-      },
+      { global: { headers: { Authorization: authHeader } } },
     )
 
     const {
@@ -37,7 +40,7 @@ Deno.serve(async (req) => {
     } = await supabase.auth.getUser()
 
     if (userError || !user) {
-      return json({ error: 'Unauthorized' }, 401)
+      return json({ error: { code: 'AUTH_REQUIRED', message: 'Unauthorized' } }, 401)
     }
 
     const admin = createClient(
@@ -52,21 +55,22 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (user.app_metadata?.app_role !== 'admin' && profile?.role !== 'admin') {
-      return json({ error: 'Forbidden' }, 403)
+      return json({ error: { code: 'FORBIDDEN', message: 'Forbidden' } }, 403)
     }
 
-    const { data, error } = await admin
-      .from('category_with_counts')
-      .select('*')
+    const { data, count, error } = await admin
+      .from('admin_category_rows')
+      .select('*', { count: 'exact' })
       .order('sort_order', { ascending: true })
+      .range(offset, offset + pageSize - 1)
 
     if (error) {
-      return json({ error: error.message }, 500)
+      return json({ error: { code: 'ADMIN_CATEGORIES_READ_FAILED', message: 'Unable to load categories' } }, 500)
     }
 
-    return json({ data: data ?? [] })
+    return json(paginate(data ?? [], count ?? null, page, pageSize))
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error'
-    return json({ error: message }, 500)
+    return json({ error: { code: 'ADMIN_CATEGORIES_UNEXPECTED_ERROR', message } }, 500)
   }
 })

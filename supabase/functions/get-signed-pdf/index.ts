@@ -82,15 +82,15 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (bookError) {
-      return json({ error: bookError.message }, 500)
+      return json({ error: { code: 'BOOK_LOOKUP_FAILED', message: 'Unable to load book' } }, 500)
     }
 
     if (!book || (!isAdmin && !book.is_published)) {
-      return json({ error: 'Book not found' }, 404)
+      return json({ error: { code: 'BOOK_NOT_FOUND', message: 'Book not found' } }, 404)
     }
 
     if (!book.pdf_path) {
-      return json({ error: 'PDF not available for this book' }, 404)
+      return json({ error: { code: 'PDF_NOT_AVAILABLE', message: 'PDF not available for this book' } }, 404)
     }
 
     if (!isAdmin && !allowWithoutEntitlement) {
@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
         .maybeSingle()
 
       if (entError) {
-        return json({ error: entError.message }, 500)
+        return json({ error: { code: 'ENTITLEMENT_CHECK_FAILED', message: 'Unable to verify premium access' } }, 500)
       }
 
       const active =
