@@ -187,3 +187,18 @@ verify_jwt = true
 [functions.highlights-delete]
 verify_jwt = true
 
+[functions.admin-book-create]
+verify_jwt = true
+
+[functions.admin-authors]
+verify_jwt = true
+
+[functions.admin-author-create]
+verify_jwt = true
+
+[functions.admin-author-update]
+verify_jwt = true
+
+[functions.admin-author-delete]
+verify_jwt = true
+

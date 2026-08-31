@@ -4,7 +4,7 @@
 **Companion FE:** `D:\ilm-o-irfan-books-app`  
 **Branch (working):** `feat/app-optimization`  
 **Report started:** 2026-08-31  
-**Last updated:** 2026-08-31 (admin EF wrappers + highlights-delete; hosted still blocked)
+**Last updated:** 2026-08-31 (CI + admin create/authors + FE fixtures; hosted still blocked)
 
 This file tracks work done in the “absolute beast backend” stream.  
 Backlog: [`backend-beast-roadmap.md`](./backend-beast-roadmap.md) · Audit: [`backend-audit-remaining-work.md`](./backend-audit-remaining-work.md)
@@ -46,7 +46,8 @@ Backlog: [`backend-beast-roadmap.md`](./backend-beast-roadmap.md) · Audit: [`ba
 3. §2 hosted prep + free-book PDF fix (deploy blocked).
 4. Audit #2 RevenueCat webhook idempotency.
 5. §4 content pipeline + API polish — skipped waiting on project ref per your request.
-6. §5 admin CMS Edge Function wrappers + `highlights-delete` (this update).
+6. §5 admin CMS Edge Function wrappers + `highlights-delete`.
+7. §6 unblocked options: CI scaffolding, `admin-book-create` / authors CRUD, FE fixtures (this update).
 
 ---
 
@@ -142,9 +143,31 @@ Wrapped existing SQL RPCs so day-to-day CMS work does not need raw SQL. All use 
 
 Also: `config.toml` `verify_jwt = true`, `endpoint-manifest.ts`, `api-endpoints.md`, setup-guide deploy list, deploy-checklist inventory.
 
-**Still not present (intentionally later):** `admin-book-create` / `admin-authors` CRUD (no dedicated create-author RPC yet — authors today via import SQL or Dashboard).
+**Still not present (intentionally later):** category/collection write EFs beyond reorder/membership (create category/collection rows still via SQL/Dashboard if needed).
 
 **Not deployed** — still blocked on project ref.
+
+---
+
+## Phase 6 — CI + create/authors + FE fixtures (Done in-repo)
+
+| Item | Detail |
+| --- | --- |
+| `admin-book-create` | POST create book; slug from title; publish requires `pdf_path` |
+| `admin-authors` | GET list via `admin_author_rows` |
+| `admin-author-create` / `update` / `delete` | CRUD; delete blocked if books remain |
+| `scripts/ci-static-check.mjs` | Folders ↔ config.toml ↔ manifest ↔ fixtures |
+| `.github/workflows/static-checks.yml` | Runs `npm run ci:static` on push/PR (no Docker) |
+| `docs/fixtures/*` | home-feed, book-detail, entitlements, signed-pdf, library, profile |
+| `npm run ci:static` | **Verified locally — all checks passed** |
+
+**Still blocked / not in CI:**
+
+| Item | Why |
+| --- | --- |
+| `npm run test:e2e` in GitHub Actions | Needs Docker + local Supabase; workflow only notes skip |
+| Deploy workflow | Needs project secrets / OIDC to Supabase — not added without your credentials |
+| Live fixture regen from hosted | Needs project |
 
 ---
 
@@ -184,7 +207,8 @@ Also: `config.toml` `verify_jwt = true`, `endpoint-manifest.ts`, `api-endpoints.
 | 4 | link → `db:push` → deploy EFs → secrets → smoke | Agent | Needs #1 |
 | 5 | `BOOKS_DIR=… npm run books:import` then storage audit | Agent | Needs #1 + #2 |
 | 6 | Google OAuth + RC sandbox | You + agent | Dashboards |
-| 7 | More admin create/authors EFs / CI / FE wiring | Agent | After #4 or on request |
+| 7 | FE wiring to Supabase/RC | FE repo | Optional parallel track |
+| 8 | Deploy workflow with secrets | Agent | Needs your Supabase CI credentials |
 
 ---
 

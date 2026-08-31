@@ -73,17 +73,22 @@ Deploy list (must all succeed):
 | Public | User | Admin | Special |
 | --- | --- | --- | --- |
 | home-feed | profile-read | admin-books | get-signed-pdf |
-| books-list | profile-update | admin-book-update | signed-pdf (410) |
-| book-detail | reading-progress | admin-book-delete | revenuecat-webhook |
-| books-search | wishlist-list | admin-bulk-update-books | |
-| categories-list | wishlist-toggle | admin-set-book-relations | |
-| collections-list | downloads-list | admin-set-collection-books | |
-| plans-list | downloads-create | admin-reorder | |
-| | highlights-list | admin-set-entitlement | |
-| | highlights-upsert | admin-set-user-role | |
-| | highlights-delete | admin-user-detail | |
-| | library-overview | admin-storage-audit | |
-| | entitlements-status | admin-delete-storage-object | |
+| books-list | profile-update | admin-book-create | signed-pdf (410) |
+| book-detail | reading-progress | admin-book-update | revenuecat-webhook |
+| books-search | wishlist-list | admin-book-delete | |
+| categories-list | wishlist-toggle | admin-authors | |
+| collections-list | downloads-list | admin-author-create | |
+| plans-list | downloads-create | admin-author-update | |
+| | highlights-list | admin-author-delete | |
+| | highlights-upsert | admin-bulk-update-books | |
+| | highlights-delete | admin-set-book-relations | |
+| | library-overview | admin-set-collection-books | |
+| | entitlements-status | admin-reorder | |
+| | | admin-set-entitlement | |
+| | | admin-set-user-role | |
+| | | admin-user-detail | |
+| | | admin-storage-audit | |
+| | | admin-delete-storage-object | |
 | | | admin-dashboard-stats | |
 | | | admin-categories | |
 | | | admin-collections | |

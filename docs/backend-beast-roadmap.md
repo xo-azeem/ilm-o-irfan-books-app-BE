@@ -3,9 +3,8 @@
 **Progress report:** [`backend-work-progress.md`](./backend-work-progress.md)
 
 **Progress:**  
-- §1–§4 code + audit #1/#2/#4 — **done in-repo**  
-- §5 admin EF wrappers — **done in-repo**  
-- Hosted deploy / real import / e2e — **blocked** (no project ref, no Docker, no BOOKS_DIR)
+- §1–§6 code tracks — **done in-repo** (hygiene, deploy prep, webhook, content/API polish, admin EFs, CI, fixtures)  
+- Hosted deploy / real import / Docker e2e — **blocked** (no project ref, no Docker, no BOOKS_DIR)
 
 ---
 
@@ -19,19 +18,19 @@
 
 ## Suggested next
 
-1. **You:** project ref → finish §2 deploy  
+1. **You:** project ref → finish deploy  
 2. **You:** books folder → import  
-3. **Agent:** CI scaffolding / `admin-book-create` / authors CRUD / FE contract fixtures  
+3. **Agent:** only leftover code polish you request (category create EFs, deploy GH Action with secrets, etc.)
 
 ---
 
-## Done checklist (abbreviated)
+## Done checklist
 
-- [x] Hygiene, deploy checklist, free-book PDF, webhook ledger  
-- [x] Seed shelves, harden import, home-feed/library/profile polish, streak lock  
-- [x] Admin RPC wrappers (delete/bulk/relations/collections/reorder/entitlement/role/detail/storage/dashboard)  
-- [x] `highlights-delete`  
+- [x] Hygiene, paywall defaults, free-book PDF, webhook ledger  
+- [x] Seed shelves, harden import, home-feed/library/profile, streak lock  
+- [x] Admin RPC wrappers + book/author create CRUD + highlights-delete  
+- [x] CI static checks + FE response fixtures  
 - [ ] Hosted deploy + smoke  
 - [ ] Real books + storage audit  
 - [ ] Google OAuth + RC sandbox  
-- [ ] CI + merge to `main`
+- [ ] Merge to `main`

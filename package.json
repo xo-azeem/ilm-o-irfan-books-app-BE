@@ -16,7 +16,8 @@
     "types:generate": "node scripts/gen-types.mjs --linked",
     "types:generate:local": "node scripts/gen-types.mjs --local",
     "books:import": "node scripts/import-folder-books.mjs",
-    "test:e2e": "bash scripts/e2e-endpoints.sh"
+    "test:e2e": "bash scripts/e2e-endpoints.sh",
+    "ci:static": "node scripts/ci-static-check.mjs"
   },
   "devDependencies": {
     "supabase": "^2.26.0"

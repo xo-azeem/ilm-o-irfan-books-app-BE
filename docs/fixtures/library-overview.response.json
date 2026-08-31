@@ -1,0 +1,10 @@
+{
+  "data": {
+    "limit": 20,
+    "wishlist": { "items": [], "totalCount": 0, "hasMore": false },
+    "readingProgress": { "items": [], "totalCount": 0, "hasMore": false },
+    "finished": { "items": [], "totalCount": 0, "hasMore": false },
+    "downloads": { "items": [], "totalCount": 0, "hasMore": false },
+    "highlights": { "items": [], "totalCount": 0, "hasMore": false }
+  }
+}

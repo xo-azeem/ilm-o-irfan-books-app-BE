@@ -1,0 +1,9 @@
+{
+  "data": {
+    "bookId": "aaaaaaaa-0000-0000-0000-000000000001",
+    "title": "Ihya Ulum al-Din",
+    "signedUrl": "https://PROJECT.supabase.co/storage/v1/object/sign/pdfs/ihya.pdf?token=example",
+    "expiresIn": 300,
+    "fileSizeBytes": 1048576
+  }
+}

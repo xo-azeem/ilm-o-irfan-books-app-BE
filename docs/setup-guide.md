@@ -98,6 +98,11 @@ npx supabase functions deploy admin-collections
 npx supabase functions deploy admin-users
 npx supabase functions deploy admin-analytics
 npx supabase functions deploy admin-settings
+npx supabase functions deploy admin-book-create
+npx supabase functions deploy admin-authors
+npx supabase functions deploy admin-author-create
+npx supabase functions deploy admin-author-update
+npx supabase functions deploy admin-author-delete
 npx supabase functions deploy admin-book-delete
 npx supabase functions deploy admin-bulk-update-books
 npx supabase functions deploy admin-set-book-relations

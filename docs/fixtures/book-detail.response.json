@@ -1,0 +1,20 @@
+{
+  "data": {
+    "id": "aaaaaaaa-0000-0000-0000-000000000001",
+    "slug": "ihya",
+    "title": "Ihya Ulum al-Din",
+    "description": "A revival of the religious sciences.",
+    "is_premium": true,
+    "is_published": true,
+    "price_cents": 0,
+    "currency": "PKR",
+    "cover_path": "covers/ihya.webp",
+    "pdf_path": "pdfs/ihya.pdf",
+    "author": {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "name": "Imam Al Ghazali",
+      "slug": "imam-ghazali",
+      "avatar_path": null
+    }
+  }
+}

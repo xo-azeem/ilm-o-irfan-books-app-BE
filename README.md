@@ -21,7 +21,8 @@ Design & cost notes: [`docs/backend-stack.md`](docs/backend-stack.md)
 Schema reference: [`docs/schema.md`](docs/schema.md)  
 **Setup + pgAdmin steps:** [`docs/setup-guide.md`](docs/setup-guide.md)  
 **Beast backlog:** [`docs/backend-beast-roadmap.md`](docs/backend-beast-roadmap.md)  
-**Work progress report:** [`docs/backend-work-progress.md`](docs/backend-work-progress.md)
+**Work progress report:** [`docs/backend-work-progress.md`](docs/backend-work-progress.md)  
+**FE fixtures:** [`docs/fixtures/`](docs/fixtures/)
 
 ## Repo layout
 
@@ -67,8 +68,10 @@ npm run functions:deploy     # deploy all Edge Functions to linked project
 npm run functions:list       # list deployed functions
 npm run books:import         # BOOKS_DIR=D:/Books required (DRY_RUN=1 supported)
 npm run test:e2e             # bash e2e against local stack (Git Bash / WSL on Windows)
+npm run ci:static            # folder/manifest/fixture checks (no Docker)
 ```
 
+API response fixtures for the FE: [`docs/fixtures/`](docs/fixtures/).  
 Full hosted steps: [`docs/ops/deploy-checklist.md`](docs/ops/deploy-checklist.md).
 
 `types:generate` needs CLI auth — `npx supabase login` once, or set `SUPABASE_ACCESS_TOKEN`.

@@ -1,0 +1,27 @@
+name: Backend static checks
+
+on:
+  push:
+    branches: [main, dev, 'feat/**']
+  pull_request:
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Static contract checks
+        run: npm run ci:static
+
+      # Full e2e needs Docker + supabase start — not run here until self-hosted runners or services are added.
+      - name: Note on e2e
+        run: echo "npm run test:e2e requires Docker; skipped in this workflow."
