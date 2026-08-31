@@ -65,7 +65,7 @@ npm run types:generate:local # types from the local Docker stack instead
 npm run functions:serve      # local functions (needs Docker + supabase start)
 npm run functions:deploy     # deploy all Edge Functions to linked project
 npm run functions:list       # list deployed functions
-npm run books:import         # generate/import books from BOOKS_DIR
+npm run books:import         # BOOKS_DIR=D:/Books required (DRY_RUN=1 supported)
 npm run test:e2e             # bash e2e against local stack (Git Bash / WSL on Windows)
 ```
 

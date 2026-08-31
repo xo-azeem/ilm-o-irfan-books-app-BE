@@ -12,7 +12,7 @@ The Edge Function endpoint base is `/functions/v1/...`.
 
 | Endpoint | Method | Auth | Purpose |
 | --- | --- | --- | --- |
-| `/functions/v1/home-feed` | GET | Public | Hero content, featured shelves, and quick catalog cards |
+| `/functions/v1/home-feed` | GET | Public | Collections, categories, newest books, plus `shelves.hero` / `trending` / `newArrivals` and `featuredCollectionId` |
 | `/functions/v1/books-list` | GET | Public | Paginated published books |
 | `/functions/v1/book-detail?id=<bookId>` | GET | Public | Book detail with author and metadata |
 | `/functions/v1/books-search?q=<query>` | GET | Public | Search by text using the Postgres full-text index |
@@ -24,8 +24,8 @@ The Edge Function endpoint base is `/functions/v1/...`.
 
 | Endpoint | Method | Auth | Purpose |
 | --- | --- | --- | --- |
-| `/functions/v1/profile-read` | GET | User | Read profile |
-| `/functions/v1/profile-update` | PUT | User | Edit profile |
+| `/functions/v1/profile-read` | GET | User | Own profile + `streak` (`current_streak`, `longest_streak`, `last_read_date`) |
+| `/functions/v1/profile-update` | PUT/PATCH | User | Partial contact fields including `date_of_birth` (YYYY-MM-DD); email/role not writable |
 | `/functions/v1/reading-progress` | GET/POST | User | Fetch and save progress |
 | `/functions/v1/wishlist-list` | GET | User | List saved books |
 | `/functions/v1/wishlist-toggle` | POST | User | Save or remove favorite books |
@@ -33,7 +33,7 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | `/functions/v1/downloads-create` | POST | User | Record a completed download |
 | `/functions/v1/highlights-list` | GET | User | User notes / highlights |
 | `/functions/v1/highlights-upsert` | POST | User | Upsert note data |
-| `/functions/v1/library-overview` | GET | User | Combined shelves for saved, read, downloaded items |
+| `/functions/v1/library-overview` | GET | User | Combined shelves: wishlist, in-progress, finished (`progress >= 0.99`), downloads, highlights |
 | `/functions/v1/entitlements-status` | GET | User | Current premium state |
 | `/functions/v1/get-signed-pdf` | POST | User | Signed PDF URL for premium or allowed access |
 

@@ -40,6 +40,7 @@ Use this for the real app (Auth, Storage, Edge Functions, RLS).
    - contents of `supabase/migrations/20260830120000_admin_cms_v2.sql`
    - contents of `supabase/migrations/20260831130000_search_views_and_admin_fixes.sql`
    - contents of `supabase/migrations/20260831140000_revenuecat_events_idempotency.sql`
+   - contents of `supabase/migrations/20260831150000_lock_reading_streaks.sql`
    - contents of `supabase/seed.sql`
 
 Prefer **Option 2b** (`db push`) so migration history stays consistent.

@@ -53,6 +53,31 @@ export function asOptionalText(label: string) {
   }
 }
 
+/** Accepts YYYY-MM-DD or null/empty to clear. */
+export function asOptionalDate(label: string) {
+  return (value: unknown): string | null => {
+    if (value === null || value === undefined || value === '') {
+      return null
+    }
+
+    if (typeof value !== 'string') {
+      throw new BadRequestError(`${label} must be a date string (YYYY-MM-DD)`)
+    }
+
+    const trimmed = value.trim()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      throw new BadRequestError(`${label} must be YYYY-MM-DD`)
+    }
+
+    const ms = Date.parse(`${trimmed}T00:00:00.000Z`)
+    if (!Number.isFinite(ms)) {
+      throw new BadRequestError(`${label} must be a valid calendar date`)
+    }
+
+    return trimmed
+  }
+}
+
 export function asBoolean(label: string) {
   return (value: unknown): boolean => {
     if (typeof value === 'boolean') {

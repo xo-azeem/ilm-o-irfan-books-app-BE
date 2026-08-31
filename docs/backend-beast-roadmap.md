@@ -1,87 +1,43 @@
 # Ilm o Irfan — Absolute Beast Backend Roadmap
 
-Goal: production-grade Supabase backend that is secure, operable, content-ready, observable, and ready for the React Native app to plug into without mocks.
-
-**Source of truth today:** `feat/app-optimization` / `origin/dev` (same tip).  
-**Companion FE:** `D:\ilm-o-irfan-books-app`  
-**Progress report:** [`docs/backend-work-progress.md`](./backend-work-progress.md)
+**Progress report (source of truth for what ran):** [`backend-work-progress.md`](./backend-work-progress.md)
 
 **Progress:**  
-- §1 doc/path/env hygiene — **done**  
-- §2 hosted infra — **prep done in-repo**; blocked on your Supabase **project ref**  
-- Audit #2 webhook idempotency — **done in-repo** (sandbox verify after deploy)
+- §1 hygiene — **done**  
+- §2 hosted — **prep done**; **blocked** (no project ref / no Docker)  
+- Audit #2 webhook — **done in-repo**  
+- §4 content + API polish — **code done**; **data import blocked** (no BOOKS_DIR / no linked project)
 
 ---
 
-## Status legend
+## Blocked right now (not by agent choice)
 
-- [x] Done
-- [ ] Still needed
-- [~] Partial / ops outside git
+1. Hosted link/push/deploy — need your Supabase **project ref** + CLI login  
+2. Local stack / e2e — need **Docker**  
+3. Real catalog ingest — need **BOOKS_DIR** with PDFs + `.env` service role  
 
----
-
-## 1. Branch & repo hygiene
-
-- [ ] Merge `dev` → `main` when release-ready
-- [ ] Align or delete stale remotes (ops)
-- [x] Paths, Cursor rules, README, setup-guide, `.env.example`, checklist honesty
-- [ ] Tag releases / protect `main`
+See progress report for the full “not happening / why” table.
 
 ---
 
-## 2. Hosted infrastructure
+## Suggested next (pick one)
 
-- [x] `docs/ops/deploy-checklist.md`
-- [x] npm scripts: `link`, `functions:deploy`, `functions:list`
-- [x] Migration docs complete
-- [x] Paywall-safe defaults
-- [x] Free-book PDF auth fixed
-- [x] RevenueCat webhook idempotency migration + EF
-- [ ] **Create / confirm staging Supabase project** (needs you)
-- [ ] **Create / confirm production Supabase project** (needs you)
-- [ ] `supabase login` + link + `db:push` + `functions:deploy` + secrets
-- [ ] First admin + Storage verify + smoke
+1. **You:** send project ref → agent finishes §2 deploy  
+2. **You:** put books on disk + `.env` → agent runs import  
+3. **Agent:** continue unblocked code (admin EF wrappers, highlights-delete, CI scaffolding)
 
 ---
 
-## 3. Auth (production-ready)
+## Checklist (abbreviated)
 
-- [~] Email/password enabled
-- [ ] Google OAuth + RN deep links
-- [ ] Branded email templates
-- [ ] Launch confirmations policy
-
----
-
-## 4. Content pipeline — NEXT (if no project ref yet)
-
-- [ ] Seed hero/trending/new-arrivals collections
-- [ ] Harden `books:import`
-- [ ] Upload covers/PDFs + publish + `admin_storage_audit()`
-
----
-
-## 5. Billing & entitlements
-
-- [x] Webhook idempotency / order-safety (in-repo)
-- [ ] RevenueCat project + sandbox event matrix (after hosted)
-- [x] Keep entitlements client-write-proof
-
----
-
-## 6–11. Remaining (after hosted is live)
-
-API polish, admin EF wrappers, CI, FE contract — see [`backend-audit-remaining-work.md`](./backend-audit-remaining-work.md).
-
----
-
-## Suggested order (remaining)
-
-1. ~~Doc/path hygiene~~ **DONE**
-2. ~~Deploy prep + PDF free-book fix~~ **DONE in-repo**
-3. ~~Webhook idempotency~~ **DONE in-repo**
-4. **You:** project ref → link/push/deploy **or** agent continues **§4 content pipeline**
-5. Auth Google + first admin
-6. Billing sandbox verify
-7. API polish + admin EFs + CI + merge to `main`
+- [x] Paths / env paywall / docs honesty  
+- [x] Deploy checklist + npm deploy scripts  
+- [x] Free-book PDF auth  
+- [x] RevenueCat event ledger + order-safe apply  
+- [x] Seed home shelves + featured collection  
+- [x] Harden `books:import`  
+- [x] `home-feed` shelves / `profile` DOB+streak / `library-overview` finished+highlights / streak lock  
+- [ ] Hosted deploy + smoke  
+- [ ] Real book upload + storage audit  
+- [ ] Google OAuth + RC sandbox  
+- [ ] Admin EF wrappers / CI / merge to `main`

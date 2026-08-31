@@ -146,7 +146,7 @@ grant, which is why that grant is labelled promotional.
 - pgAdmin exploration only (not production source of truth), in order:
   `01_full_schema.sql` → `03_harden_grants_rls_indexes.sql` → `04_admin_roles.sql` →
   `06_app_settings.sql` → `07_admin_cms_v2.sql` → `08_search_views_and_admin_fixes.sql` →
-  `09_revenuecat_events_idempotency.sql` →
+  `09_revenuecat_events_idempotency.sql` → `10_lock_reading_streaks.sql` →
   `02_seed.sql` (and optionally `05_remove_dummy_seed_books.sql` if old dummy rows exist)
 - After applying, regenerate typings: `npm run types:generate`
 - Hosted deploy steps: [`docs/ops/deploy-checklist.md`](./ops/deploy-checklist.md)

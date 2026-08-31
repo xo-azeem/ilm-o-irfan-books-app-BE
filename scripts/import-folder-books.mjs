@@ -1,19 +1,45 @@
 /**
- * Import books from D:\Projects\Books into the linked Supabase project.
- * PDF filename: "<title> - <author>.pdf"
- * Folder name is used as the display title.
+ * Import books from a local folder into a linked Supabase project.
  *
- * Usage: node scripts/import-folder-books.mjs
+ * Folder layout (one book per directory):
+ *   BOOKS_DIR/<Book Title>/
+ *     <title> - <author>.pdf
+ *     cover.webp|jpg|png          (optional)
+ *     meta.json                   (optional: { "isPremium": true, "categorySlug": "history", "genre": "History" })
+ *
+ * Env:
+ *   BOOKS_DIR          required path to the books root (no silent wrong default)
+ *   DEFAULT_IS_PREMIUM true|false (default false)
+ *   DRY_RUN=1          scan + write SQL only; skip Storage upload and db query
+ *   SQL_ONLY=1         same as DRY_RUN but still requires no .env for upload
+ *
+ * Usage:
+ *   BOOKS_DIR=D:/Books npm run books:import
+ *   BOOKS_DIR=D:/Books DRY_RUN=1 npm run books:import
  */
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = join(fileURLToPath(new URL('..', import.meta.url)))
-const BOOKS_DIR = process.env.BOOKS_DIR || 'D:/Projects/Books'
 const SQL_PATH = join(ROOT, 'scripts', '.import-books.sql')
+const DRY_RUN = process.env.DRY_RUN === '1' || process.env.SQL_ONLY === '1'
+const DEFAULT_IS_PREMIUM = ['true', '1', 'yes', 'on'].includes(
+  (process.env.DEFAULT_IS_PREMIUM ?? 'false').trim().toLowerCase(),
+)
+
+const REQUIRED_COLLECTION_SLUGS = ['home-hero', 'trending', 'new-arrivals']
+
+const SEEDED_CATEGORY_SLUGS = new Set([
+  'quranic-studies',
+  'spirituality',
+  'history',
+  'fiqh-law',
+  'hadith',
+  'arabic',
+])
 
 const COVER_COLORS = [
   ['#1B4332', '#081C15'],
@@ -31,6 +57,29 @@ const HISTORY_SLUGS = new Set([
   'talash-e-hind',
   'urdu-novel-ki-tareekh',
 ])
+
+function resolveBooksDir() {
+  const fromEnv = process.env.BOOKS_DIR?.trim()
+  if (fromEnv) {
+    if (!existsSync(fromEnv)) {
+      throw new Error(`BOOKS_DIR does not exist: ${fromEnv}`)
+    }
+    return fromEnv
+  }
+
+  const candidates = ['D:/Books', 'D:/ilm-o-irfan-books-app/Books', 'D:/Projects/Books']
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      console.warn(`BOOKS_DIR not set; using discovered path ${candidate}`)
+      return candidate
+    }
+  }
+
+  throw new Error(
+    'BOOKS_DIR is required. Example: BOOKS_DIR=D:/Books npm run books:import\n' +
+      'Expected layout: BOOKS_DIR/<title>/<title> - <author>.pdf (+ optional cover.webp)',
+  )
+}
 
 function slugify(input) {
   return String(input)
@@ -77,18 +126,55 @@ function mimeForExt(ext) {
   }
 }
 
-function scanBooks() {
-  const folders = readdirSync(BOOKS_DIR, { withFileTypes: true }).filter(d => d.isDirectory())
+function readMeta(folderPath) {
+  const metaPath = join(folderPath, 'meta.json')
+  if (!existsSync(metaPath)) return {}
+  try {
+    return JSON.parse(readFileSync(metaPath, 'utf8'))
+  } catch (error) {
+    throw new Error(`Invalid meta.json in ${folderPath}: ${error.message}`)
+  }
+}
+
+function resolveCategory(slug, meta) {
+  if (typeof meta.categorySlug === 'string' && meta.categorySlug.trim()) {
+    return slugify(meta.categorySlug)
+  }
+  if (HISTORY_SLUGS.has(slug)) return 'history'
+  return 'spirituality'
+}
+
+function resolveGenre(slug, meta, categorySlug) {
+  if (typeof meta.genre === 'string' && meta.genre.trim()) return meta.genre.trim()
+  if (HISTORY_SLUGS.has(slug)) return 'History'
+  const labels = {
+    'quranic-studies': 'Quranic Studies',
+    spirituality: 'Spirituality',
+    history: 'History',
+    'fiqh-law': 'Fiqh & Law',
+    hadith: 'Hadith',
+    arabic: 'Arabic',
+  }
+  return labels[categorySlug] ?? 'Spirituality'
+}
+
+function scanBooks(booksDir) {
+  const folders = readdirSync(booksDir, { withFileTypes: true }).filter((d) => d.isDirectory())
+  if (folders.length === 0) {
+    throw new Error(`No book folders found in ${booksDir}`)
+  }
+
   const books = []
 
   for (const dir of folders) {
-    const folderPath = join(BOOKS_DIR, dir.name)
+    const folderPath = join(booksDir, dir.name)
     const files = readdirSync(folderPath)
-    const pdfName = files.find(f => f.toLowerCase().endsWith('.pdf'))
+    const pdfName = files.find((f) => f.toLowerCase().endsWith('.pdf'))
     if (!pdfName) {
       throw new Error(`No PDF in ${dir.name}`)
     }
-    const coverName = files.find(f => /^cover\.(webp|jpg|jpeg|png)$/i.test(f))
+    const coverName = files.find((f) => /^cover\.(webp|jpg|jpeg|png)$/i.test(f))
+    const meta = readMeta(folderPath)
     const { author } = parsePdfName(pdfName)
     const slug = slugify(dir.name)
     const pdfPath = join(folderPath, pdfName)
@@ -96,7 +182,18 @@ function scanBooks() {
     const coverPath = coverName ? join(folderPath, coverName) : null
     const coverExt = coverName ? extname(coverName).toLowerCase() : null
     const [coverColor, coverColorDark] =
-      COVER_COLORS[Math.abs(Number.parseInt(createHash('sha1').update(slug).digest('hex').slice(0, 8), 16)) % COVER_COLORS.length]
+      COVER_COLORS[
+        Math.abs(Number.parseInt(createHash('sha1').update(slug).digest('hex').slice(0, 8), 16)) %
+          COVER_COLORS.length
+      ]
+
+    const categorySlug = resolveCategory(slug, meta)
+    const isPremium =
+      typeof meta.isPremium === 'boolean'
+        ? meta.isPremium
+        : typeof meta.is_premium === 'boolean'
+          ? meta.is_premium
+          : DEFAULT_IS_PREMIUM
 
     books.push({
       folder: dir.name,
@@ -112,8 +209,9 @@ function scanBooks() {
       pdfObject: `${slug}.pdf`,
       coverColor,
       coverColorDark,
-      genre: HISTORY_SLUGS.has(slug) ? 'History' : 'Literature',
-      categorySlug: HISTORY_SLUGS.has(slug) ? 'history' : 'literature',
+      genre: resolveGenre(slug, meta, categorySlug),
+      categorySlug,
+      isPremium,
       readTimeMinutes: Math.max(45, Math.round(pdfStat.size / (40 * 1024))),
     })
   }
@@ -122,17 +220,39 @@ function scanBooks() {
 }
 
 function buildSql(books) {
-  const authors = [...new Map(books.map(b => [b.authorSlug, b.author])).entries()]
+  const authors = [...new Map(books.map((b) => [b.authorSlug, b.author])).entries()]
+  const extraCategories = [
+    ...new Set(books.map((b) => b.categorySlug).filter((slug) => !SEEDED_CATEGORY_SLUGS.has(slug))),
+  ]
+
   const lines = []
   lines.push('-- Generated by scripts/import-folder-books.mjs')
-  lines.push("insert into public.categories (slug, label, icon_key, accent, accent_dark, sort_order)")
-  lines.push("values ('literature', 'Literature', 'book', '#7CB518', '#C6F542', 7)")
-  lines.push('on conflict (slug) do nothing;')
+  lines.push('-- Ensures home shelves exist before membership inserts.')
+  lines.push(`insert into public.collections (slug, title, subtitle, accent, kind, sort_order, is_published) values
+  ('home-hero', 'Featured', 'Start here', '#2E7D32', 'hero', 1, true),
+  ('trending', 'Trending now', 'Popular with readers', '#C9940A', 'shelf', 2, true),
+  ('new-arrivals', 'New arrivals', 'Recently added', '#4A9E5C', 'shelf', 3, true)
+on conflict (slug) do update set
+  title = excluded.title,
+  is_published = true;`)
   lines.push('')
+
+  for (const slug of extraCategories) {
+    lines.push(
+      `insert into public.categories (slug, label, icon_key, accent, accent_dark, sort_order)
+values (${sqlStr(slug)}, ${sqlStr(slug.replace(/-/g, ' '))}, 'book', '#7CB518', '#C6F542', 90)
+on conflict (slug) do nothing;`,
+    )
+    lines.push('')
+  }
+
   lines.push('insert into public.authors (slug, name, bio) values')
   lines.push(
     authors
-      .map(([slug, name], i) => `  (${sqlStr(slug)}, ${sqlStr(name)}, ${sqlStr(`Author of titles in the Ilm o Irfan catalog.`)})`)
+      .map(
+        ([slug, name]) =>
+          `  (${sqlStr(slug)}, ${sqlStr(name)}, ${sqlStr('Author of titles in the Ilm o Irfan catalog.')})`,
+      )
       .join(',\n'),
   )
   lines.push('on conflict (slug) do update set name = excluded.name;')
@@ -167,7 +287,7 @@ select
   ${book.readTimeMinutes},
   'New',
   array[${sqlStr(book.genre.toLowerCase())}, ${sqlStr(book.authorSlug)}],
-  false,
+  ${book.isPremium},
   true,
   timezone('utc', now()) - (${publishedOffset} * interval '1 hour')
 from public.authors a
@@ -197,26 +317,37 @@ on conflict do nothing;`)
     lines.push('')
   }
 
-  lines.push(`insert into public.collection_books (collection_id, book_id, sort_order)
-select col.id, b.id, row_number() over (order by b.published_at desc)
+  const slugList = books.map((b) => sqlStr(b.slug)).join(', ')
+
+  for (const collectionSlug of REQUIRED_COLLECTION_SLUGS) {
+    const orderExpr =
+      collectionSlug === 'trending'
+        ? 'row_number() over (order by b.rating desc nulls last, b.title)'
+        : 'row_number() over (order by b.published_at desc nulls last, b.title)'
+
+    lines.push(`insert into public.collection_books (collection_id, book_id, sort_order)
+select col.id, b.id, ${orderExpr}
 from public.collections col
-join public.books b on b.slug in (${books.map(b => sqlStr(b.slug)).join(', ')})
-where col.slug = 'new-arrivals'
+join public.books b on b.slug in (${slugList})
+where col.slug = ${sqlStr(collectionSlug)}
 on conflict do nothing;`)
-  lines.push('')
-  lines.push(`insert into public.collection_books (collection_id, book_id, sort_order)
-select col.id, b.id, row_number() over (order by b.rating desc, b.title)
-from public.collections col
-join public.books b on b.slug in (${books.map(b => sqlStr(b.slug)).join(', ')})
-where col.slug = 'trending'
-on conflict do nothing;`)
+    lines.push('')
+  }
+
+  lines.push(`-- Publish checklist hint (informational)
+-- select slug, is_published, pdf_path, cover_path from public.books
+-- where slug in (${slugList});`)
 
   return `${lines.join('\n')}\n`
 }
 
 function loadEnv() {
+  const envPath = join(ROOT, '.env')
+  if (!existsSync(envPath)) {
+    throw new Error('Missing .env (copy from .env.example). Required for Storage upload + db query.')
+  }
   const env = {}
-  for (const line of readFileSync(join(ROOT, '.env'), 'utf8').split(/\r?\n/)) {
+  for (const line of readFileSync(envPath, 'utf8').split(/\r?\n/)) {
     const trimmed = line.trim()
     if (!trimmed || trimmed.startsWith('#')) continue
     const i = trimmed.indexOf('=')
@@ -253,10 +384,23 @@ async function uploadObject(env, bucket, objectPath, localPath, contentType) {
   }
 }
 
-const books = scanBooks()
-console.log(`Found ${books.length} books in ${BOOKS_DIR}`)
+const booksDir = resolveBooksDir()
+const books = scanBooks(booksDir)
+console.log(`Found ${books.length} books in ${booksDir}`)
 for (const book of books) {
-  console.log(`- ${book.title} / ${book.author}${book.coverObject ? '' : ' (no cover)'}`)
+  console.log(
+    `- ${book.title} / ${book.author} [${book.categorySlug}] premium=${book.isPremium}${
+      book.coverObject ? '' : ' (no cover)'
+    }`,
+  )
+}
+
+writeFileSync(SQL_PATH, buildSql(books), 'utf8')
+console.log(`Wrote catalog SQL → ${SQL_PATH}`)
+
+if (DRY_RUN) {
+  console.log('DRY_RUN/SQL_ONLY set — skipping Storage upload and db query.')
+  process.exit(0)
 }
 
 const env = loadEnv()
@@ -279,7 +423,5 @@ for (const book of books) {
   }
 }
 
-writeFileSync(SQL_PATH, buildSql(books), 'utf8')
-console.log(`Wrote catalog SQL`)
 supabase(['db', 'query', '--linked', '--file', SQL_PATH])
-console.log('Import finished.')
+console.log('Import finished. Run admin_storage_audit() after deploy to verify paths.')
