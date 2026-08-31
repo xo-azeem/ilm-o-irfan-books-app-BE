@@ -90,17 +90,20 @@ errors are logged server-side and never returned to the client.
 
 ## Premium access
 
-Two independent things grant access to a PDF through `get-signed-pdf`:
+Access to a PDF through `get-signed-pdf` is granted when **any** of the following is true:
 
-1. `profiles.role = 'admin'` — admins read any PDF, published or draft, with no subscription.
-   This is a role check, so it applies to every admin now and in future without per-user setup.
-2. An active row in `entitlements` — `status = 'active'` and `expires_at` either null
-   (never expires) or in the future.
+1. `profiles.role = 'admin'` (or JWT `app_metadata.app_role = 'admin'`) — admins read any
+   PDF, published or draft, with no subscription.
+2. The book is **free** (`books.is_premium = false`) and published — any signed-in user.
+3. The book is **premium** (`is_premium = true`) and the user has an active entitlement
+   (`status = 'active'` and `expires_at` null or in the future).
+4. Global bypass is on: env `ALLOW_PDF_WITHOUT_ENTITLEMENT` or
+   `app_settings.allow_pdf_without_entitlement` (ships **off**; never enable on production).
 
-`app_settings.allow_pdf_without_entitlement` is a global override that opens the paywall for
-everyone. It ships **off**.
+`PREMIUM_REQUIRED` is returned only for **premium** books when the caller is not an admin
+and bypass is off.
 
-`entitlements-status` reports all of this:
+`entitlements-status` reports:
 
 ```jsonc
 { "data": {
@@ -111,7 +114,7 @@ everyone. It ships **off**.
 ```
 
 Gating on `isActive` alone would show an admin a locked button on a file the backend would
-serve them.
+serve them. Free books do not need `canAccessPremium` to open.
 
 ## Request notes
 

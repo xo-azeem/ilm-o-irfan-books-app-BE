@@ -4,7 +4,8 @@
 //   - JWT / profile role is admin
 //   - ALLOW_PDF_WITHOUT_ENTITLEMENT env is on (true/1/yes/on)
 //   - app_settings.allow_pdf_without_entitlement is on
-//   - the user has an active entitlement
+//   - the book is free (is_premium = false) and published
+//   - the book is premium and the user has an active entitlement
 
 import { requireMethod, requireUser, serviceClient } from '../_shared/auth.ts'
 import {
@@ -49,7 +50,7 @@ Deno.serve(async (req) => {
         .maybeSingle(),
       admin
         .from('books')
-        .select('id, title, pdf_path, is_published, file_size_bytes')
+        .select('id, title, pdf_path, is_published, is_premium, file_size_bytes')
         .eq('id', bookId)
         .maybeSingle(),
     ])
@@ -81,7 +82,11 @@ Deno.serve(async (req) => {
       return fail('PDF_NOT_AVAILABLE', 'PDF not available for this book', 404)
     }
 
-    if (!isAdmin && !allowWithoutEntitlement) {
+    // Free published books are available to any signed-in user.
+    // Premium books require admin, global bypass, or an active entitlement.
+    const requiresEntitlement = book.is_premium === true
+
+    if (!isAdmin && !allowWithoutEntitlement && requiresEntitlement) {
       const { data: entitlement, error: entError } = await admin
         .from('entitlements')
         .select('status, expires_at')

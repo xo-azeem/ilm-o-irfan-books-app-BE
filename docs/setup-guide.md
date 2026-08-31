@@ -278,9 +278,10 @@ PDFs are only served via **`get-signed-pdf`**. A signed-in user can open a book 
 - they are an **admin** (`profiles.role` / JWT `app_metadata.app_role`)
 - **`ALLOW_PDF_WITHOUT_ENTITLEMENT`** Edge Function env is `true` / `1` / `yes` / `on`
 - **`app_settings.allow_pdf_without_entitlement`** is on (Admin → Overview switch)
-- they have an **active entitlement**
+- the book is **free** (`is_premium = false`) and published
+- the book is **premium** and they have an **active entitlement**
 
-Admins may also preview unpublished drafts. Turn the switch and env **off** before a public release.
+Admins may also preview unpublished drafts. Turn the bypass switch and env **off** before a public release.
 
 ### Promote the first admin
 

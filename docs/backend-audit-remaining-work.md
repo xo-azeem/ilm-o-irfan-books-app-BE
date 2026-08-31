@@ -14,15 +14,7 @@ The remaining work is primarily release hardening and runtime verification. Four
 
 ### 1. Correct PDF authorization
 
-**Risk:** `get-signed-pdf` currently performs entitlement checks for non-admin users without first checking whether the book is premium. This can prevent users from opening legitimate free books.
-
-**Required work:**
-
-- Select and evaluate `books.is_premium` in the PDF handler.
-- Require an active entitlement only when `is_premium = true`.
-- Preserve admin access to published and draft PDFs.
-- Keep the global no-entitlement override disabled by default.
-- Test free, premium, draft, missing-PDF, expired-entitlement, and admin cases.
+**Status:** Fixed in `get-signed-pdf` — entitlement is required only when `books.is_premium = true`. Free published books are available to any signed-in user. Admin + global bypass behavior unchanged. E2E paywall section covers free vs premium.
 
 **Owner:** `supabase/functions/get-signed-pdf/index.ts`
 
@@ -47,31 +39,17 @@ The remaining work is primarily release hardening and runtime verification. Four
 
 ### 3. Make the migration path complete and reproducible
 
-**Risk:** Manual setup documentation does not consistently list the latest migrations. A database created from the documented list may be missing search, admin-view, and PDF access fixes.
+**Status:** Docs updated — `docs/setup-guide.md` Option 2a lists all migrations through search/admin fixes; `docs/schema.md` lists pgAdmin `08_…`; canonical path is `db push`. Hosted steps in `docs/ops/deploy-checklist.md`.
 
-**Required work:**
+**Remaining:** Run `db push` against a real empty/staging project to confirm history (needs project ref).
 
-- Treat `supabase/migrations/` as the canonical schema source.
-- Update `docs/setup-guide.md` and `docs/schema.md` through:
-  - `20260826220000_app_settings_pdf_access.sql`
-  - `20260830120000_admin_cms_v2.sql`
-  - `20260831130000_search_views_and_admin_fixes.sql`
-- Keep the pgAdmin one-shot workflow synchronized, or clearly mark it as non-production/schema-exploration only.
-- Test the full migration chain against an empty database.
-- Verify migration history and repeatability before staging deployment.
+**Owner:** `docs/setup-guide.md`, `docs/schema.md`, `docs/ops/deploy-checklist.md`
 
 ### 4. Close the production PDF bypass
 
-**Risk:** `.env.example` currently shows `ALLOW_PDF_WITHOUT_ENTITLEMENT=true`. Copying this value into a production environment would make premium PDFs freely accessible.
+**Status:** Fixed — `.env.example` defaults `ALLOW_PDF_WITHOUT_ENTITLEMENT=false` with an explicit production warning. Setup-guide secrets example sets `false`. Deploy checklist requires closed paywall on staging/prod.
 
-**Required work:**
-
-- Change the example value to `false`, or remove it from production-facing configuration examples.
-- Add an explicit deployment check that rejects the bypass in production.
-- Keep the database setting `app_settings.allow_pdf_without_entitlement` off in production.
-- Document separate development/staging configuration clearly.
-
-**Owner:** `.env.example`, `supabase/functions/get-signed-pdf/index.ts`, deployment documentation.
+**Owner:** `.env.example`, `docs/setup-guide.md`, `docs/ops/deploy-checklist.md`
 
 ## High-Priority Hardening
 

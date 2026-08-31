@@ -58,15 +58,20 @@ npm run supabase:start       # local Docker stack
 npm run supabase:stop
 npm run db:reset             # local: migrations + seed
 npm run db:push              # push migrations to the linked project
+npm run link                 # supabase link --project-ref … (interactive)
 npm run types:generate       # types from the linked project (run AFTER db:push)
 npm run types:generate:local # types from the local Docker stack instead
 npm run functions:serve      # local functions (needs Docker + supabase start)
+npm run functions:deploy     # deploy all Edge Functions to linked project
+npm run functions:list       # list deployed functions
 npm run books:import         # generate/import books from BOOKS_DIR
 npm run test:e2e             # bash e2e against local stack (Git Bash / WSL on Windows)
 ```
 
+Full hosted steps: [`docs/ops/deploy-checklist.md`](docs/ops/deploy-checklist.md).
+
 `types:generate` needs CLI auth — `npx supabase login` once, or set `SUPABASE_ACCESS_TOKEN`.
-Only the `:local` variant needs Docker. Always push migrations before regenerating, or the
+Only the `:local` / `supabase:start` / `test:e2e` paths need Docker. Always push migrations before regenerating, or the
 output will be missing whatever the new migration adds.
 
 ## API contract
