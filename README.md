@@ -19,7 +19,8 @@ Supabase + PostgreSQL backend for the **Ilm o Irfan** React Native e-book app.
 
 Design & cost notes: [`docs/backend-stack.md`](docs/backend-stack.md)  
 Schema reference: [`docs/schema.md`](docs/schema.md)  
-**Setup + pgAdmin steps:** [`docs/setup-guide.md`](docs/setup-guide.md)
+**Setup + pgAdmin steps:** [`docs/setup-guide.md`](docs/setup-guide.md)  
+**Beast backlog:** [`docs/backend-beast-roadmap.md`](docs/backend-beast-roadmap.md)
 
 ## Repo layout
 
