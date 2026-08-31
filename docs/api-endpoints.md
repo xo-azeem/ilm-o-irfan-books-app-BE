@@ -33,6 +33,7 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | `/functions/v1/downloads-create` | POST | User | Record a completed download |
 | `/functions/v1/highlights-list` | GET | User | User notes / highlights |
 | `/functions/v1/highlights-upsert` | POST | User | Upsert note data |
+| `/functions/v1/highlights-delete` | POST | User | Delete one highlight by id |
 | `/functions/v1/library-overview` | GET | User | Combined shelves: wishlist, in-progress, finished (`progress >= 0.99`), downloads, highlights |
 | `/functions/v1/entitlements-status` | GET | User | Current premium state |
 | `/functions/v1/get-signed-pdf` | POST | User | Signed PDF URL for premium or allowed access |
@@ -43,6 +44,17 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | --- | --- | --- | --- |
 | `/functions/v1/admin-books` | GET | Admin | Catalog admin list with counts |
 | `/functions/v1/admin-book-update` | PATCH | Admin | Update metadata, publish state, premium state |
+| `/functions/v1/admin-book-delete` | POST | Admin | Delete books; returns cover/pdf paths to purge |
+| `/functions/v1/admin-bulk-update-books` | POST | Admin | Bulk publish / premium |
+| `/functions/v1/admin-set-book-relations` | POST | Admin | Set category + collection membership for a book |
+| `/functions/v1/admin-set-collection-books` | POST | Admin | Replace ordered books in a collection |
+| `/functions/v1/admin-reorder` | POST | Admin | Reorder categories or collections |
+| `/functions/v1/admin-set-entitlement` | POST | Admin | Comp / adjust entitlement (promotional) |
+| `/functions/v1/admin-set-user-role` | POST | Admin | Promote / demote admin |
+| `/functions/v1/admin-user-detail` | GET | Admin | `?id=` user detail payload |
+| `/functions/v1/admin-storage-audit` | GET | Admin | Orphans + broken book paths |
+| `/functions/v1/admin-delete-storage-object` | POST | Admin | Delete orphan cover/pdf |
+| `/functions/v1/admin-dashboard-stats` | GET | Admin | CMS dashboard counters |
 | `/functions/v1/admin-categories` | GET | Admin | Category management data |
 | `/functions/v1/admin-collections` | GET | Admin | Collection membership/admin list |
 | `/functions/v1/admin-users` | GET | Admin | User directory and dashboards |

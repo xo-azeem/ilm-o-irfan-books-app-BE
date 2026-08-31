@@ -1,43 +1,37 @@
 # Ilm o Irfan — Absolute Beast Backend Roadmap
 
-**Progress report (source of truth for what ran):** [`backend-work-progress.md`](./backend-work-progress.md)
+**Progress report:** [`backend-work-progress.md`](./backend-work-progress.md)
 
 **Progress:**  
-- §1 hygiene — **done**  
-- §2 hosted — **prep done**; **blocked** (no project ref / no Docker)  
-- Audit #2 webhook — **done in-repo**  
-- §4 content + API polish — **code done**; **data import blocked** (no BOOKS_DIR / no linked project)
+- §1–§4 code + audit #1/#2/#4 — **done in-repo**  
+- §5 admin EF wrappers — **done in-repo**  
+- Hosted deploy / real import / e2e — **blocked** (no project ref, no Docker, no BOOKS_DIR)
 
 ---
 
-## Blocked right now (not by agent choice)
+## Blocked (not by agent choice)
 
-1. Hosted link/push/deploy — need your Supabase **project ref** + CLI login  
+1. Hosted link/push/deploy — need **project ref** + CLI login  
 2. Local stack / e2e — need **Docker**  
-3. Real catalog ingest — need **BOOKS_DIR** with PDFs + `.env` service role  
-
-See progress report for the full “not happening / why” table.
+3. Real catalog ingest — need **BOOKS_DIR** + `.env`  
 
 ---
 
-## Suggested next (pick one)
+## Suggested next
 
-1. **You:** send project ref → agent finishes §2 deploy  
-2. **You:** put books on disk + `.env` → agent runs import  
-3. **Agent:** continue unblocked code (admin EF wrappers, highlights-delete, CI scaffolding)
+1. **You:** project ref → finish §2 deploy  
+2. **You:** books folder → import  
+3. **Agent:** CI scaffolding / `admin-book-create` / authors CRUD / FE contract fixtures  
 
 ---
 
-## Checklist (abbreviated)
+## Done checklist (abbreviated)
 
-- [x] Paths / env paywall / docs honesty  
-- [x] Deploy checklist + npm deploy scripts  
-- [x] Free-book PDF auth  
-- [x] RevenueCat event ledger + order-safe apply  
-- [x] Seed home shelves + featured collection  
-- [x] Harden `books:import`  
-- [x] `home-feed` shelves / `profile` DOB+streak / `library-overview` finished+highlights / streak lock  
+- [x] Hygiene, deploy checklist, free-book PDF, webhook ledger  
+- [x] Seed shelves, harden import, home-feed/library/profile polish, streak lock  
+- [x] Admin RPC wrappers (delete/bulk/relations/collections/reorder/entitlement/role/detail/storage/dashboard)  
+- [x] `highlights-delete`  
 - [ ] Hosted deploy + smoke  
-- [ ] Real book upload + storage audit  
+- [ ] Real books + storage audit  
 - [ ] Google OAuth + RC sandbox  
-- [ ] Admin EF wrappers / CI / merge to `main`
+- [ ] CI + merge to `main`

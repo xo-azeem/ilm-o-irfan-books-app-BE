@@ -4,7 +4,7 @@
 **Companion FE:** `D:\ilm-o-irfan-books-app`  
 **Branch (working):** `feat/app-optimization`  
 **Report started:** 2026-08-31  
-**Last updated:** 2026-08-31 (content pipeline + API polish; hosted still blocked)
+**Last updated:** 2026-08-31 (admin EF wrappers + highlights-delete; hosted still blocked)
 
 This file tracks work done in the “absolute beast backend” stream.  
 Backlog: [`backend-beast-roadmap.md`](./backend-beast-roadmap.md) · Audit: [`backend-audit-remaining-work.md`](./backend-audit-remaining-work.md)
@@ -35,7 +35,7 @@ Backlog: [`backend-beast-roadmap.md`](./backend-beast-roadmap.md) · Audit: [`ba
 | Merging to `main` / deleting stale remote branches | Ops decision — not done without your explicit ask |
 | Regenerating `types/database.ts` from hosted schema | Needs linked project after migrations are pushed |
 
-**Unblocked work continued anyway** (below): seed shelves, import script, home-feed/library/profile APIs, streak lock, docs.
+**Unblocked work continued anyway** (below): seed shelves, import script, home-feed/library/profile APIs, streak lock, admin CMS Edge Function wrappers, docs.
 
 ---
 
@@ -45,7 +45,8 @@ Backlog: [`backend-beast-roadmap.md`](./backend-beast-roadmap.md) · Audit: [`ba
 2. §1 doc/path/env hygiene.
 3. §2 hosted prep + free-book PDF fix (deploy blocked).
 4. Audit #2 RevenueCat webhook idempotency.
-5. §4 content pipeline + API polish (this update) — skipped waiting on project ref per your request.
+5. §4 content pipeline + API polish — skipped waiting on project ref per your request.
+6. §5 admin CMS Edge Function wrappers + `highlights-delete` (this update).
 
 ---
 
@@ -116,7 +117,34 @@ See earlier branch map: product backend lives on `feat/app-optimization` / `dev`
 
 ### 4.4 Content upload / publish / storage audit (Blocked)
 
-Cannot upload PDFs or run `admin_storage_audit()` without hosted/local stack + book files.
+Cannot upload PDFs or run `admin_storage_audit()` against a live project without hosted/local stack + book files.
+
+---
+
+## Phase 5 — Admin CMS Edge Function wrappers (Done in-repo)
+
+Wrapped existing SQL RPCs so day-to-day CMS work does not need raw SQL. All use `ctx.supabase` (user JWT) so `is_admin()` works — same pattern as `admin-analytics`.
+
+| Function | RPC / behavior |
+| --- | --- |
+| `admin-book-delete` | `admin_delete_books` |
+| `admin-bulk-update-books` | `admin_bulk_update_books` |
+| `admin-set-book-relations` | `admin_set_book_relations` (preserves omitted side) |
+| `admin-set-collection-books` | `admin_set_collection_books` |
+| `admin-reorder` | `admin_reorder` |
+| `admin-set-entitlement` | `admin_set_entitlement` |
+| `admin-set-user-role` | `admin_set_user_role` |
+| `admin-user-detail` | `admin_user_detail` |
+| `admin-storage-audit` | `admin_storage_audit` |
+| `admin-delete-storage-object` | `admin_delete_storage_object` |
+| `admin-dashboard-stats` | `admin_dashboard_stats` |
+| `highlights-delete` | Direct RLS delete for current user |
+
+Also: `config.toml` `verify_jwt = true`, `endpoint-manifest.ts`, `api-endpoints.md`, setup-guide deploy list, deploy-checklist inventory.
+
+**Still not present (intentionally later):** `admin-book-create` / `admin-authors` CRUD (no dedicated create-author RPC yet — authors today via import SQL or Dashboard).
+
+**Not deployed** — still blocked on project ref.
 
 ---
 
@@ -156,7 +184,7 @@ Cannot upload PDFs or run `admin_storage_audit()` without hosted/local stack + b
 | 4 | link → `db:push` → deploy EFs → secrets → smoke | Agent | Needs #1 |
 | 5 | `BOOKS_DIR=… npm run books:import` then storage audit | Agent | Needs #1 + #2 |
 | 6 | Google OAuth + RC sandbox | You + agent | Dashboards |
-| 7 | More admin EF wrappers / CI / FE wiring | Agent | After #4 or on request |
+| 7 | More admin create/authors EFs / CI / FE wiring | Agent | After #4 or on request |
 
 ---
 

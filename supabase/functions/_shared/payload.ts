@@ -176,3 +176,50 @@ export function requireUuidField(
 
   return asUuid(label)(payload[key])
 }
+
+export function asUuidArray(label: string) {
+  const inner = asUuid(`${label} item`)
+
+  return (value: unknown): string[] => {
+    if (!Array.isArray(value)) {
+      throw new BadRequestError(`${label} must be an array of UUIDs`)
+    }
+
+    if (value.length === 0) {
+      throw new BadRequestError(`${label} must not be empty`)
+    }
+
+    return value.map((item) => inner(item))
+  }
+}
+
+/** Empty array allowed; omit/null → null (for optional relation clears). */
+export function asOptionalUuidArray(label: string) {
+  const item = asUuid(`${label} item`)
+
+  return (value: unknown): string[] | null => {
+    if (value === null || value === undefined) {
+      return null
+    }
+
+    if (!Array.isArray(value)) {
+      throw new BadRequestError(`${label} must be an array of UUIDs`)
+    }
+
+    return value.map((entry) => item(entry))
+  }
+}
+
+export function requireUuidArrayField(
+  payload: Record<string, unknown>,
+  aliases: string[],
+  label: string,
+): string[] {
+  const key = aliases.find((alias) => payload[alias] !== undefined && payload[alias] !== null)
+
+  if (key === undefined) {
+    throw new BadRequestError(`${label} is required`)
+  }
+
+  return asUuidArray(label)(payload[key])
+}

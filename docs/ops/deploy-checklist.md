@@ -74,15 +74,22 @@ Deploy list (must all succeed):
 | --- | --- | --- | --- |
 | home-feed | profile-read | admin-books | get-signed-pdf |
 | books-list | profile-update | admin-book-update | signed-pdf (410) |
-| book-detail | reading-progress | admin-categories | revenuecat-webhook |
-| books-search | wishlist-list | admin-collections | |
-| categories-list | wishlist-toggle | admin-users | |
-| collections-list | downloads-list | admin-analytics | |
-| plans-list | downloads-create | admin-settings | |
-| | highlights-list | | |
-| | highlights-upsert | | |
-| | library-overview | | |
-| | entitlements-status | | |
+| book-detail | reading-progress | admin-book-delete | revenuecat-webhook |
+| books-search | wishlist-list | admin-bulk-update-books | |
+| categories-list | wishlist-toggle | admin-set-book-relations | |
+| collections-list | downloads-list | admin-set-collection-books | |
+| plans-list | downloads-create | admin-reorder | |
+| | highlights-list | admin-set-entitlement | |
+| | highlights-upsert | admin-set-user-role | |
+| | highlights-delete | admin-user-detail | |
+| | library-overview | admin-storage-audit | |
+| | entitlements-status | admin-delete-storage-object | |
+| | | admin-dashboard-stats | |
+| | | admin-categories | |
+| | | admin-collections | |
+| | | admin-users | |
+| | | admin-analytics | |
+| | | admin-settings | |
 
 - [ ] `npx supabase functions list` shows all expected functions
 

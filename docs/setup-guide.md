@@ -98,6 +98,18 @@ npx supabase functions deploy admin-collections
 npx supabase functions deploy admin-users
 npx supabase functions deploy admin-analytics
 npx supabase functions deploy admin-settings
+npx supabase functions deploy admin-book-delete
+npx supabase functions deploy admin-bulk-update-books
+npx supabase functions deploy admin-set-book-relations
+npx supabase functions deploy admin-set-collection-books
+npx supabase functions deploy admin-reorder
+npx supabase functions deploy admin-set-entitlement
+npx supabase functions deploy admin-set-user-role
+npx supabase functions deploy admin-user-detail
+npx supabase functions deploy admin-storage-audit
+npx supabase functions deploy admin-delete-storage-object
+npx supabase functions deploy admin-dashboard-stats
+npx supabase functions deploy highlights-delete
 ```
 
 Set secrets (Dashboard → Edge Functions → Secrets, or CLI):
