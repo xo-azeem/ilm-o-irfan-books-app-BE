@@ -4,11 +4,12 @@ Goal: production-grade Supabase backend that is secure, operable, content-ready,
 
 **Source of truth today:** `feat/app-optimization` / `origin/dev` (same tip).  
 **Companion FE:** `D:\ilm-o-irfan-books-app`  
-**Do not build from:** docs-only `main` until `dev` is merged.
+**Progress report:** [`docs/backend-work-progress.md`](./backend-work-progress.md)
 
 **Progress:**  
 - §1 doc/path/env hygiene — **done**  
-- §2 hosted infra — **prep done in-repo**; blocked on your Supabase **project ref** (Docker not installed on this machine for local Path C)
+- §2 hosted infra — **prep done in-repo**; blocked on your Supabase **project ref**  
+- Audit #2 webhook idempotency — **done in-repo** (sandbox verify after deploy)
 
 ---
 
@@ -31,22 +32,16 @@ Goal: production-grade Supabase backend that is secure, operable, content-ready,
 
 ## 2. Hosted infrastructure
 
-- [x] `docs/ops/deploy-checklist.md` (full A–I steps, no secrets in git)
+- [x] `docs/ops/deploy-checklist.md`
 - [x] npm scripts: `link`, `functions:deploy`, `functions:list`
-- [x] Migration docs complete (setup-guide + schema.md + pgAdmin `08_`)
-- [x] Paywall-safe defaults documented for deploy
-- [x] Release blocker: free-book PDF auth fixed in `get-signed-pdf` + e2e cases
+- [x] Migration docs complete
+- [x] Paywall-safe defaults
+- [x] Free-book PDF auth fixed
+- [x] RevenueCat webhook idempotency migration + EF
 - [ ] **Create / confirm staging Supabase project** (needs you)
 - [ ] **Create / confirm production Supabase project** (needs you)
-- [ ] `supabase login` + `npm run link -- --project-ref …`
-- [ ] `npm run db:push` on staging then prod
-- [ ] `npm run functions:deploy` + `functions:list` verify
-- [ ] Set secrets with paywall **false**
-- [ ] Confirm `app_settings.allow_pdf_without_entitlement = false`
-- [ ] Promote first admin + re-login
-- [ ] Verify Storage buckets/policies
-- [ ] Private ops note (password manager — not git)
-- [ ] Local Docker Path C (optional; Docker not installed here)
+- [ ] `supabase login` + link + `db:push` + `functions:deploy` + secrets
+- [ ] First admin + Storage verify + smoke
 
 ---
 
@@ -56,11 +51,10 @@ Goal: production-grade Supabase backend that is secure, operable, content-ready,
 - [ ] Google OAuth + RN deep links
 - [ ] Branded email templates
 - [ ] Launch confirmations policy
-- [ ] Signup metadata + admin claim test matrix
 
 ---
 
-## 4. Content pipeline
+## 4. Content pipeline — NEXT (if no project ref yet)
 
 - [ ] Seed hero/trending/new-arrivals collections
 - [ ] Harden `books:import`
@@ -70,24 +64,24 @@ Goal: production-grade Supabase backend that is secure, operable, content-ready,
 
 ## 5. Billing & entitlements
 
-- [ ] RevenueCat project + webhook + sandbox event matrix
-- [ ] Webhook idempotency / order-safety (audit blocker #2 — still open)
-- [ ] Keep entitlements client-write-proof
+- [x] Webhook idempotency / order-safety (in-repo)
+- [ ] RevenueCat project + sandbox event matrix (after hosted)
+- [x] Keep entitlements client-write-proof
 
 ---
 
 ## 6–11. Remaining (after hosted is live)
 
-API polish, admin EF wrappers, CI, FE contract — see prior full roadmap / `docs/backend-audit-remaining-work.md`.
+API polish, admin EF wrappers, CI, FE contract — see [`backend-audit-remaining-work.md`](./backend-audit-remaining-work.md).
 
 ---
 
 ## Suggested order (remaining)
 
 1. ~~Doc/path hygiene~~ **DONE**
-2. ~~Deploy prep (checklist, scripts, PDF free-book fix)~~ **DONE in-repo**
-3. **You:** create Supabase project → send **project ref** → we link/push/deploy/secrets/smoke
-4. Auth email + Google + first admin
-5. Content import + Storage
-6. Billing sandbox + webhook hardening
+2. ~~Deploy prep + PDF free-book fix~~ **DONE in-repo**
+3. ~~Webhook idempotency~~ **DONE in-repo**
+4. **You:** project ref → link/push/deploy **or** agent continues **§4 content pipeline**
+5. Auth Google + first admin
+6. Billing sandbox verify
 7. API polish + admin EFs + CI + merge to `main`

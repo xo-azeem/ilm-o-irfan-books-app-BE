@@ -49,10 +49,13 @@ Note: `seed.sql` local auth users are intended for Docker `db reset`. On hosted,
 
 - [ ] Categories + `premium_monthly` plan present
 - [ ] `app_settings` row `id = 1` exists with `allow_pdf_without_entitlement = false`
+- [ ] Migration `20260831140000_revenuecat_events_idempotency.sql` applied (`revenuecat_events` table exists)
 
 ```sql
 select allow_pdf_without_entitlement from public.app_settings where id = 1;
 -- expect: false
+select to_regclass('public.revenuecat_events');
+-- expect: revenuecat_events
 ```
 
 ---

@@ -20,22 +20,18 @@ The remaining work is primarily release hardening and runtime verification. Four
 
 ### 2. Make RevenueCat webhooks idempotent and order-safe
 
-**Risk:** A duplicate or delayed RevenueCat event can overwrite a newer entitlement state. The webhook also trusts `app_user_id` without validating its format or user existence.
+**Status:** Fixed.
 
-**Required work:**
+- Migration `20260831140000_revenuecat_events_idempotency.sql` (+ pgAdmin `09_…`)
+  - Table `revenuecat_events` (unique event id, service role only)
+  - Columns `entitlements.last_revenuecat_event_id` / `last_revenuecat_event_at`
+  - RPC `apply_revenuecat_entitlement()` — race-safe upsert that skips older events
+- `revenuecat-webhook` validates event UUID, Auth UUID `app_user_id`, profile existence,
+  `event_timestamp_ms`; duplicate → 200; stale → 200 ignored; uses shared error envelope
 
-- Require and validate a stable RevenueCat event identifier.
-- Validate `app_user_id` as a UUID.
-- Confirm that the user exists before writing an entitlement.
-- Persist processed event IDs in a dedicated table with a unique constraint.
-- Reject duplicate events safely.
-- Store event timestamps and ignore stale events.
-- Keep malformed and internal failures in the structured error envelope.
-- Add tests for duplicate, stale, unknown-user, malformed, active, expired, and cancellation events.
+**Remaining:** Live sandbox matrix against RevenueCat after hosted deploy (needs project + RC project).
 
-**Recommended database design:** Add a dedicated `revenuecat_events` table rather than storing only one event ID on `entitlements`, because one user can produce many valid events.
-
-**Owner:** `supabase/functions/revenuecat-webhook/index.ts` plus a new forward-only migration.
+**Owner:** `supabase/functions/revenuecat-webhook/index.ts` + migration above
 
 ### 3. Make the migration path complete and reproducible
 

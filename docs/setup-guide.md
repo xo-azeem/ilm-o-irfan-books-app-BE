@@ -39,6 +39,7 @@ Use this for the real app (Auth, Storage, Edge Functions, RLS).
    - contents of `supabase/migrations/20260826220000_app_settings_pdf_access.sql`
    - contents of `supabase/migrations/20260830120000_admin_cms_v2.sql`
    - contents of `supabase/migrations/20260831130000_search_views_and_admin_fixes.sql`
+   - contents of `supabase/migrations/20260831140000_revenuecat_events_idempotency.sql`
    - contents of `supabase/seed.sql`
 
 Prefer **Option 2b** (`db push`) so migration history stays consistent.
@@ -301,6 +302,12 @@ That user must **sign out and sign back in** so the JWT picks up `app_metadata.a
 2. Webhook URL: `https://YOUR_PROJECT_REF.supabase.co/functions/v1/revenuecat-webhook`
 3. Authorization header must match `REVENUECAT_WEBHOOK_AUTH`.
 4. Set RevenueCat `app_user_id` = Supabase Auth user UUID so entitlements map correctly.
+5. Each event must include a stable `event.id` (UUID) and `event_timestamp_ms`.
+6. Behaviour:
+   - Duplicate `event.id` → `200` `{ data: { duplicate: true } }` (no double-apply)
+   - Older than last applied event → ledger kept, entitlement unchanged → `200` `{ data: { stale: true } }`
+   - Unknown / non-UUID `app_user_id` → `400`
+   - Applied updates go through `apply_revenuecat_entitlement()` (race-safe)
 
 ---
 

@@ -49,6 +49,15 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | `/functions/v1/admin-analytics` | GET | Admin | Top books, reads, downloads, signups |
 | `/functions/v1/admin-settings` | GET/PATCH | Admin | Product flags and app config |
 
+## Webhooks
+
+| Endpoint | Method | Auth | Purpose |
+| --- | --- | --- | --- |
+| `/functions/v1/revenuecat-webhook` | POST | Shared secret (`REVENUECAT_WEBHOOK_AUTH`) | Idempotent entitlement sync |
+
+Requires `event.id` (UUID), `app_user_id` (Supabase Auth UUID), `type`, and `event_timestamp_ms`.
+Duplicates return `200` with `data.duplicate`; stale events return `200` with `data.stale`.
+
 ## Deprecated
 
 | Endpoint | Status | Use instead |
@@ -83,10 +92,14 @@ errors are logged server-side and never returned to the client.
 
 | Code | Status | Endpoint |
 | --- | --- | --- |
-| `PREMIUM_REQUIRED` | 403 | `get-signed-pdf` — no active entitlement |
+| `PREMIUM_REQUIRED` | 403 | `get-signed-pdf` — premium book, no active entitlement |
 | `PDF_NOT_AVAILABLE` | 404 | `get-signed-pdf` — book has no `pdf_path` |
 | `PDF_NOT_IN_STORAGE` | 404 | `get-signed-pdf` — `pdf_path` set but object missing |
 | `DEPRECATED_ENDPOINT` | 410 | `signed-pdf` |
+| `WEBHOOK_AUTH_FAILED` | 401 | `revenuecat-webhook` — bad Authorization |
+| `INVALID_WEBHOOK_EVENT` | 400 | `revenuecat-webhook` — missing/invalid id, user, type, or timestamp |
+| `USER_NOT_FOUND` | 400 | `revenuecat-webhook` — no profile for `app_user_id` |
+| `WEBHOOK_CONFIG_ERROR` | 500 | `revenuecat-webhook` — secret not configured |
 
 ## Premium access
 
