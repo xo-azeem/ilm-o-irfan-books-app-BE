@@ -1,0 +1,3 @@
+-- Intentionally empty no-op.
+-- Kept so migration history stays continuous for projects that already recorded this version.
+-- Do not delete this file after it has been applied on any environment.

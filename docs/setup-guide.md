@@ -6,11 +6,11 @@ This repo is the **Supabase** backend for Ilm o Irfan. PostgreSQL is the databas
 
 | Path | Purpose |
 | --- | --- |
-| `supabase/migrations/` | Production schema, RLS, storage buckets |
-| `supabase/functions/` | `get-signed-pdf`, `revenuecat-webhook` |
-| `supabase/seed.sql` | Baseline categories and subscription plan |
+| `supabase/migrations/` | Production schema, RLS, storage buckets, admin CMS, search |
+| `supabase/functions/` | Full app/admin API (~28 Edge Functions): catalog, library, PDF, webhook, admin |
+| `supabase/seed.sql` | Baseline categories, subscription plan, local-only test users |
 | `sql/pgadmin/` | Same schema/seed for running in pgAdmin Query Tool |
-| `.env.example` | Keys / connection placeholders |
+| `.env.example` | Keys / connection placeholders (paywall bypass defaults **off**) |
 
 ---
 
@@ -29,19 +29,24 @@ Use this for the real app (Auth, Storage, Edge Functions, RLS).
 **Option 2a — Dashboard SQL (fastest first time)**
 
 1. In Supabase: **SQL Editor** → New query.
-2. Paste and run, in order:
+2. Paste and run, in order (skip the empty stub `20260802110539_new-migration.sql`):
    - contents of `supabase/migrations/20260726120000_init_schema.sql`
    - contents of `supabase/migrations/20260726120100_rls_policies.sql`
    - contents of `supabase/migrations/20260726120200_storage_buckets.sql`
    - contents of `supabase/migrations/20260814114738_harden_grants_rls_indexes.sql`
    - contents of `supabase/migrations/20260814120331_harden_function_search_path.sql`
    - contents of `supabase/migrations/20260816194000_admin_roles_cms.sql`
+   - contents of `supabase/migrations/20260826220000_app_settings_pdf_access.sql`
+   - contents of `supabase/migrations/20260830120000_admin_cms_v2.sql`
+   - contents of `supabase/migrations/20260831130000_search_views_and_admin_fixes.sql`
    - contents of `supabase/seed.sql`
+
+Prefer **Option 2b** (`db push`) so migration history stays consistent.
 
 **Option 2b — CLI (best long-term)**
 
 ```bash
-cd D:/Projects/Ilm-o-Irfan-App-BE
+cd D:/ilm-o-irfan-books-app-BE
 npm install
 npx supabase login
 npx supabase link --project-ref YOUR_PROJECT_REF
@@ -99,18 +104,22 @@ Set secrets (Dashboard → Edge Functions → Secrets, or CLI):
 npx supabase secrets set REVENUECAT_WEBHOOK_AUTH="Bearer your-shared-secret"
 npx supabase secrets set REVENUECAT_ENTITLEMENT_ID="premium"
 npx supabase secrets set SIGNED_PDF_EXPIRES_IN="300"
-# Dev only — lets any signed-in user open PDFs without an entitlement.
+# Production / public staging: keep the paywall CLOSED.
+npx supabase secrets set ALLOW_PDF_WITHOUT_ENTITLEMENT="false"
+# Local/dev open-paywall ONLY (never on a public project):
+# npx supabase secrets set ALLOW_PDF_WITHOUT_ENTITLEMENT="true"
 # Also toggled from Admin → Overview ("Free PDF access") via app_settings.
-# Unsafe for production. Leave unset or "false" before a public release.
-npx supabase secrets set ALLOW_PDF_WITHOUT_ENTITLEMENT="true"
 ```
 
 ### 4. Auth providers
 
 In Supabase **Authentication → Providers**:
 
-- Enable **Email**
-- Enable **Google** (add OAuth client ID/secret from Google Cloud Console)
+- Enable **Email** (required for launch)
+- Enable **Google** when ready (add OAuth client ID/secret from Google Cloud Console; set iOS/Android redirect / deep-link URLs)
+- Local `supabase/config.toml` has `[auth.external.google] enabled = false` until those credentials exist
+
+Email confirmation policy (`enable_confirmations`) is a launch decision — local defaults leave confirmations off for easier testing.
 
 ### 5. Connect pgAdmin to Supabase Postgres
 
@@ -230,7 +239,7 @@ select label, book_count from public.category_with_counts;
 Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
 ```bash
-cd D:/Projects/Ilm-o-Irfan-App-BE
+cd D:/ilm-o-irfan-books-app-BE
 npm install
 npx supabase start
 ```

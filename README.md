@@ -4,7 +4,7 @@ Supabase + PostgreSQL backend for the **Ilm o Irfan** React Native e-book app.
 
 ## Companion frontend
 
-`D:\Projects\Ilm-o-Irfan-App-FE`
+`D:\ilm-o-irfan-books-app`
 
 ## Stack
 
@@ -12,7 +12,7 @@ Supabase + PostgreSQL backend for the **Ilm o Irfan** React Native e-book app.
 | --- | --- |
 | Platform | Supabase |
 | Database | PostgreSQL |
-| Auth | Supabase Auth (email + Google) |
+| Auth | Supabase Auth (email; Google when enabled in Dashboard) |
 | Files | Storage buckets `covers`, `pdfs`, `avatars` |
 | Privileged logic | Edge Functions |
 | Subscriptions | RevenueCat → webhook → `entitlements` |
@@ -53,10 +53,15 @@ Full click-by-click instructions are in the setup guide.
 
 ```bash
 npm install
+npm run supabase:start       # local Docker stack
+npm run supabase:stop
+npm run db:reset             # local: migrations + seed
 npm run db:push              # push migrations to the linked project
 npm run types:generate       # types from the linked project (run AFTER db:push)
 npm run types:generate:local # types from the local Docker stack instead
 npm run functions:serve      # local functions (needs Docker + supabase start)
+npm run books:import         # generate/import books from BOOKS_DIR
+npm run test:e2e             # bash e2e against local stack (Git Bash / WSL on Windows)
 ```
 
 `types:generate` needs CLI auth — `npx supabase login` once, or set `SUPABASE_ACCESS_TOKEN`.
