@@ -1,0 +1,13 @@
+{
+  "data": {
+    "isActive": true,
+    "isAdmin": false,
+    "canAccessPremium": true,
+    "entitlement": {
+      "status": "active",
+      "expires_at": null,
+      "store": "promotional",
+      "plan_id": "55555555-5555-5555-5555-555555555001"
+    }
+  }
+}

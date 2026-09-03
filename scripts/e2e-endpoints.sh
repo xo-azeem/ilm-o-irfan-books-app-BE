@@ -8,6 +8,7 @@ ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZ
 SERVICE="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU"
 DB=supabase_db_ilm-o-irfan
 BOOK=aaaaaaaa-0000-0000-0000-000000000001
+FREE=aaaaaaaa-0000-0000-0000-000000000002
 DRAFT=aaaaaaaa-0000-0000-0000-000000000003
 
 PASS=0; FAIL=0
@@ -45,6 +46,7 @@ insert into public.books (id, slug, title, description, author_id, genre, tag, t
 SQL
 printf '%%PDF-1.4\ntrailer<</Root 1 0 R>>\n%%%%EOF\n' > /tmp/e2e.pdf
 curl -s -X POST "http://127.0.0.1:54321/storage/v1/object/pdfs/ihya.pdf" -H "Authorization: Bearer $SERVICE" -H "Content-Type: application/pdf" --data-binary @/tmp/e2e.pdf >/dev/null
+curl -s -X POST "http://127.0.0.1:54321/storage/v1/object/pdfs/masnavi.pdf" -H "Authorization: Bearer $SERVICE" -H "Content-Type: application/pdf" --data-binary @/tmp/e2e.pdf >/dev/null
 
 EMAIL="e2e$(date +%s)@test.local"
 TOKEN=$(curl -s -X POST "http://127.0.0.1:54321/auth/v1/signup" -H "apikey: $ANON" -H "Content-Type: application/json" \
@@ -131,10 +133,11 @@ has "color survived"   "$R" '"color":"amber"'
 echo
 echo "== paywall =="
 psqlq "delete from public.entitlements where user_id=(select id from public.profiles where email='$EMAIL');" >/dev/null
-has "no entitlement -> PREMIUM_REQUIRED" "$(curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$BOOK\"}")" 'PREMIUM_REQUIRED'
+has "free book without entitlement -> signedUrl" "$(curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$FREE\"}")" 'signedUrl'
+has "premium book without entitlement -> PREMIUM_REQUIRED" "$(curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$BOOK\"}")" 'PREMIUM_REQUIRED'
 psqlq "insert into public.entitlements (user_id,status,store,starts_at,expires_at) select id,'active','stripe',now(),now()+interval '30 days' from public.profiles where email='$EMAIL' on conflict (user_id) do update set status='active',expires_at=now()+interval '30 days';" >/dev/null
 R=$(curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$BOOK\"}")
-has "with entitlement -> signedUrl" "$R" 'signedUrl'
+has "premium book with entitlement -> signedUrl" "$R" 'signedUrl'
 URL=$(echo "$R" | sed -n 's/.*"signedUrl":"\([^"]*\)".*/\1/p' | sed 's|http://kong:8000|http://127.0.0.1:54321|')
 is "signed url serves pdf 200" "$(code "$URL")" 200
 is "unsigned object denied"    "$(code 'http://127.0.0.1:54321/storage/v1/object/pdfs/ihya.pdf')" 400

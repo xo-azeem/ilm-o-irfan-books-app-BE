@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "PREMIUM_REQUIRED",
+    "message": "Active subscription required"
+  }
+}

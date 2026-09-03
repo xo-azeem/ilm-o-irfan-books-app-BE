@@ -1,9 +1,10 @@
 // Edge Function: get-signed-pdf
 // JWT required. Admins may preview drafts.
 //
-// Access is granted on exactly two conditions, and there is no third:
+// Access is granted on exactly these conditions, and there is no other:
 //   - JWT / profile role is admin
-//   - the user has an active entitlement
+//   - the book is published and free (is_premium = false)
+//   - the book is premium and the user has an active entitlement
 //
 // The former ALLOW_PDF_WITHOUT_ENTITLEMENT env flag and the
 // app_settings.allow_pdf_without_entitlement column are both gone from this
@@ -45,7 +46,7 @@ Deno.serve(async (req) => {
       admin.from('profiles').select('role').eq('id', ctx.user.id).maybeSingle(),
       admin
         .from('books')
-        .select('id, title, pdf_path, is_published, file_size_bytes')
+        .select('id, title, pdf_path, is_published, is_premium, file_size_bytes')
         .eq('id', bookId)
         .maybeSingle(),
     ])
@@ -74,7 +75,11 @@ Deno.serve(async (req) => {
       return fail('PDF_NOT_AVAILABLE', 'PDF not available for this book', 404)
     }
 
-    if (!isAdmin) {
+    // Free published books are available to any signed-in user.
+    // Premium books require admin or an active entitlement.
+    const requiresEntitlement = book.is_premium === true
+
+    if (!isAdmin && requiresEntitlement) {
       const { data: entitlement, error: entError } = await admin
         .from('entitlements')
         .select('status, expires_at')

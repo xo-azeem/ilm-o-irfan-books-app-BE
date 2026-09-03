@@ -59,8 +59,9 @@ books.pdf_path   → Storage pdfs/
 ### Subscriptions
 
 - **plans** — Premium definition + RevenueCat product id + features JSON
-- **entitlements** — active/expired status, expiry, RC ids, store
-- **app_settings** — singleton product flags (maintenance, sign-ups, featured collection). `allow_pdf_without_entitlement` is retained but unread: nothing consults it, and PDF access follows the admin role and the entitlement alone.
+- **entitlements** — active/expired status, expiry, RC ids, store, `last_revenuecat_event_id` / `last_revenuecat_event_at`
+- **revenuecat_events** — webhook idempotency ledger (service role only; unique event id)
+- **app_settings** — singleton product flags (maintenance, sign-ups, featured collection). `allow_pdf_without_entitlement` is retained but unread: nothing consults it, and PDF access follows the admin role, `books.is_premium` and the entitlement alone.
 
 ## FE field mapping
 
@@ -85,6 +86,7 @@ books.pdf_path   → Storage pdfs/
 | `profiles` | read/update own contact fields; `role` is not client-writable |
 | progress / wishlist / downloads / highlights / streaks | CRUD own rows |
 | `entitlements` | `SELECT` own (admins may `SELECT` all); writes via service role |
+| `revenuecat_events` | No client access; service role / webhook only |
 | `app_settings` | `SELECT` for anon + authenticated; `UPDATE` for `is_admin()` only |
 | Catalog writes + unpublished reads | `authenticated` + `is_admin()` (JWT `app_metadata.app_role`) |
 | Storage `covers` / `pdfs` writes | admin JWT only; PDFs still have no client SELECT |
@@ -140,8 +142,13 @@ grant, which is why that grant is labelled promotional.
 
 ## Applying schema
 
-- Supabase migrations: `supabase/migrations/`
-- pgAdmin one-shot: `sql/pgadmin/01_full_schema.sql`, `03_harden_grants_rls_indexes.sql`, `04_admin_roles.sql`, `06_app_settings.sql`, `07_admin_cms_v2.sql`, then `02_seed.sql`
+- **Canonical:** `supabase/migrations/` via `npm run db:push` (preferred for staging/production)
+- pgAdmin exploration only (not production source of truth), in order:
+  `01_full_schema.sql` → `03_harden_grants_rls_indexes.sql` → `04_admin_roles.sql` →
+  `06_app_settings.sql` → `07_admin_cms_v2.sql` → `08_search_views_and_admin_fixes.sql` →
+  `09_revenuecat_events_idempotency.sql` → `10_lock_reading_streaks.sql` →
+  `02_seed.sql` (and optionally `05_remove_dummy_seed_books.sql` if old dummy rows exist)
 - After applying, regenerate typings: `npm run types:generate`
+- Hosted deploy steps: [`docs/ops/deploy-checklist.md`](./ops/deploy-checklist.md)
 
 See [setup-guide.md](./setup-guide.md) for connection steps.

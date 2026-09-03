@@ -4,7 +4,7 @@ Supabase + PostgreSQL backend for the **Ilm o Irfan** React Native e-book app.
 
 ## Companion frontend
 
-`D:\Projects\Ilm-o-Irfan-App-FE`
+`D:\ilm-o-irfan-books-app`
 
 ## Stack
 
@@ -12,14 +12,17 @@ Supabase + PostgreSQL backend for the **Ilm o Irfan** React Native e-book app.
 | --- | --- |
 | Platform | Supabase |
 | Database | PostgreSQL |
-| Auth | Supabase Auth (email + Google) |
+| Auth | Supabase Auth (email; Google when enabled in Dashboard) |
 | Files | Storage buckets `covers`, `pdfs`, `avatars` |
 | Privileged logic | Edge Functions |
 | Subscriptions | RevenueCat → webhook → `entitlements` |
 
 Design & cost notes: [`docs/backend-stack.md`](docs/backend-stack.md)  
 Schema reference: [`docs/schema.md`](docs/schema.md)  
-**Setup + pgAdmin steps:** [`docs/setup-guide.md`](docs/setup-guide.md)
+**Setup + pgAdmin steps:** [`docs/setup-guide.md`](docs/setup-guide.md)  
+**Beast backlog:** [`docs/backend-beast-roadmap.md`](docs/backend-beast-roadmap.md)  
+**Work progress report:** [`docs/backend-work-progress.md`](docs/backend-work-progress.md)  
+**FE fixtures:** [`docs/fixtures/`](docs/fixtures/)
 
 ## Repo layout
 
@@ -53,14 +56,26 @@ Full click-by-click instructions are in the setup guide.
 
 ```bash
 npm install
+npm run supabase:start       # local Docker stack
+npm run supabase:stop
+npm run db:reset             # local: migrations + seed
 npm run db:push              # push migrations to the linked project
+npm run link                 # supabase link --project-ref … (interactive)
 npm run types:generate       # types from the linked project (run AFTER db:push)
 npm run types:generate:local # types from the local Docker stack instead
 npm run functions:serve      # local functions (needs Docker + supabase start)
+npm run functions:deploy     # deploy all Edge Functions to linked project
+npm run functions:list       # list deployed functions
+npm run books:import         # BOOKS_DIR=D:/Books required (DRY_RUN=1 supported)
+npm run test:e2e             # bash e2e against local stack (Git Bash / WSL on Windows)
+npm run ci:static            # folder/manifest/fixture checks (no Docker)
 ```
 
+API response fixtures for the FE: [`docs/fixtures/`](docs/fixtures/).  
+Full hosted steps: [`docs/ops/deploy-checklist.md`](docs/ops/deploy-checklist.md).
+
 `types:generate` needs CLI auth — `npx supabase login` once, or set `SUPABASE_ACCESS_TOKEN`.
-Only the `:local` variant needs Docker. Always push migrations before regenerating, or the
+Only the `:local` / `supabase:start` / `test:e2e` paths need Docker. Always push migrations before regenerating, or the
 output will be missing whatever the new migration adds.
 
 ## API contract

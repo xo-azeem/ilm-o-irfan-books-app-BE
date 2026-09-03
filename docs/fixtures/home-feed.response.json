@@ -1,0 +1,38 @@
+{
+  "data": {
+    "collections": [
+      {
+        "id": "44444444-4444-4444-4444-444444444001",
+        "slug": "home-hero",
+        "title": "Featured",
+        "kind": "hero",
+        "book_count": 3,
+        "sort_order": 1
+      }
+    ],
+    "books": [
+      {
+        "id": "aaaaaaaa-0000-0000-0000-000000000001",
+        "slug": "ihya",
+        "title": "Ihya Ulum al-Din",
+        "author_name": "Imam Al Ghazali",
+        "is_premium": true,
+        "is_published": true
+      }
+    ],
+    "categories": [
+      {
+        "id": "22222222-2222-2222-2222-222222222002",
+        "slug": "spirituality",
+        "label": "Spirituality",
+        "book_count": 1
+      }
+    ],
+    "featuredCollectionId": "44444444-4444-4444-4444-444444444001",
+    "shelves": {
+      "hero": [],
+      "trending": [],
+      "newArrivals": []
+    }
+  }
+}

@@ -8,7 +8,7 @@ import {
   ok,
   readJsonBody,
 } from '../_shared/http.ts'
-import { asOptionalText, pickProvided, type FieldSpec } from '../_shared/payload.ts'
+import { asOptionalDate, asOptionalText, pickProvided, type FieldSpec } from '../_shared/payload.ts'
 
 // Only these columns are writable by the owner. role, email, id and the
 // timestamps are deliberately absent.
@@ -19,6 +19,11 @@ const EDITABLE_FIELDS: FieldSpec[] = [
     column: 'avatar_path',
     aliases: ['avatar_path', 'avatarPath'],
     coerce: asOptionalText('avatar_path'),
+  },
+  {
+    column: 'date_of_birth',
+    aliases: ['date_of_birth', 'dateOfBirth'],
+    coerce: asOptionalDate('date_of_birth'),
   },
   { column: 'city', aliases: ['city'], coerce: asOptionalText('city') },
   { column: 'state', aliases: ['state'], coerce: asOptionalText('state') },

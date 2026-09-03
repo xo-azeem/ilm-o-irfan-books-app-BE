@@ -151,3 +151,54 @@ verify_jwt = true
 [functions.admin-settings]
 verify_jwt = true
 
+[functions.admin-book-delete]
+verify_jwt = true
+
+[functions.admin-bulk-update-books]
+verify_jwt = true
+
+[functions.admin-set-book-relations]
+verify_jwt = true
+
+[functions.admin-set-collection-books]
+verify_jwt = true
+
+[functions.admin-reorder]
+verify_jwt = true
+
+[functions.admin-set-entitlement]
+verify_jwt = true
+
+[functions.admin-set-user-role]
+verify_jwt = true
+
+[functions.admin-user-detail]
+verify_jwt = true
+
+[functions.admin-storage-audit]
+verify_jwt = true
+
+[functions.admin-delete-storage-object]
+verify_jwt = true
+
+[functions.admin-dashboard-stats]
+verify_jwt = true
+
+[functions.highlights-delete]
+verify_jwt = true
+
+[functions.admin-book-create]
+verify_jwt = true
+
+[functions.admin-authors]
+verify_jwt = true
+
+[functions.admin-author-create]
+verify_jwt = true
+
+[functions.admin-author-update]
+verify_jwt = true
+
+[functions.admin-author-delete]
+verify_jwt = true
+

@@ -1,0 +1,17 @@
+{
+  "data": {
+    "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+    "full_name": "Test Reader",
+    "email": "test@gmail.com",
+    "phone": "+92 300 0000000",
+    "avatar_path": null,
+    "date_of_birth": "1995-01-15",
+    "role": "user",
+    "streak": {
+      "current_streak": 3,
+      "longest_streak": 12,
+      "last_read_date": "2026-08-31",
+      "updated_at": "2026-08-31T12:00:00.000Z"
+    }
+  }
+}

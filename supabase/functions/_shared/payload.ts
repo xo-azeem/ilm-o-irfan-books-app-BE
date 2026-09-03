@@ -53,6 +53,31 @@ export function asOptionalText(label: string) {
   }
 }
 
+/** Accepts YYYY-MM-DD or null/empty to clear. */
+export function asOptionalDate(label: string) {
+  return (value: unknown): string | null => {
+    if (value === null || value === undefined || value === '') {
+      return null
+    }
+
+    if (typeof value !== 'string') {
+      throw new BadRequestError(`${label} must be a date string (YYYY-MM-DD)`)
+    }
+
+    const trimmed = value.trim()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      throw new BadRequestError(`${label} must be YYYY-MM-DD`)
+    }
+
+    const ms = Date.parse(`${trimmed}T00:00:00.000Z`)
+    if (!Number.isFinite(ms)) {
+      throw new BadRequestError(`${label} must be a valid calendar date`)
+    }
+
+    return trimmed
+  }
+}
+
 export function asBoolean(label: string) {
   return (value: unknown): boolean => {
     if (typeof value === 'boolean') {
@@ -150,4 +175,51 @@ export function requireUuidField(
   }
 
   return asUuid(label)(payload[key])
+}
+
+export function asUuidArray(label: string) {
+  const inner = asUuid(`${label} item`)
+
+  return (value: unknown): string[] => {
+    if (!Array.isArray(value)) {
+      throw new BadRequestError(`${label} must be an array of UUIDs`)
+    }
+
+    if (value.length === 0) {
+      throw new BadRequestError(`${label} must not be empty`)
+    }
+
+    return value.map((item) => inner(item))
+  }
+}
+
+/** Empty array allowed; omit/null → null (for optional relation clears). */
+export function asOptionalUuidArray(label: string) {
+  const item = asUuid(`${label} item`)
+
+  return (value: unknown): string[] | null => {
+    if (value === null || value === undefined) {
+      return null
+    }
+
+    if (!Array.isArray(value)) {
+      throw new BadRequestError(`${label} must be an array of UUIDs`)
+    }
+
+    return value.map((entry) => item(entry))
+  }
+}
+
+export function requireUuidArrayField(
+  payload: Record<string, unknown>,
+  aliases: string[],
+  label: string,
+): string[] {
+  const key = aliases.find((alias) => payload[alias] !== undefined && payload[alias] !== null)
+
+  if (key === undefined) {
+    throw new BadRequestError(`${label} is required`)
+  }
+
+  return asUuidArray(label)(payload[key])
 }

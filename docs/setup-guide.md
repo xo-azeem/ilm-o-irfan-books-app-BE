@@ -6,11 +6,11 @@ This repo is the **Supabase** backend for Ilm o Irfan. PostgreSQL is the databas
 
 | Path | Purpose |
 | --- | --- |
-| `supabase/migrations/` | Production schema, RLS, storage buckets |
-| `supabase/functions/` | `get-signed-pdf`, `revenuecat-webhook` |
-| `supabase/seed.sql` | Baseline categories and subscription plan |
+| `supabase/migrations/` | Production schema, RLS, storage buckets, admin CMS, search |
+| `supabase/functions/` | Full app/admin API (~28 Edge Functions): catalog, library, PDF, webhook, admin |
+| `supabase/seed.sql` | Baseline categories, subscription plan, local-only test users |
 | `sql/pgadmin/` | Same schema/seed for running in pgAdmin Query Tool |
-| `.env.example` | Keys / connection placeholders |
+| `.env.example` | Keys / connection placeholders (paywall bypass defaults **off**) |
 
 ---
 
@@ -29,19 +29,26 @@ Use this for the real app (Auth, Storage, Edge Functions, RLS).
 **Option 2a — Dashboard SQL (fastest first time)**
 
 1. In Supabase: **SQL Editor** → New query.
-2. Paste and run, in order:
+2. Paste and run, in order (skip the empty stub `20260802110539_new-migration.sql`):
    - contents of `supabase/migrations/20260726120000_init_schema.sql`
    - contents of `supabase/migrations/20260726120100_rls_policies.sql`
    - contents of `supabase/migrations/20260726120200_storage_buckets.sql`
    - contents of `supabase/migrations/20260814114738_harden_grants_rls_indexes.sql`
    - contents of `supabase/migrations/20260814120331_harden_function_search_path.sql`
    - contents of `supabase/migrations/20260816194000_admin_roles_cms.sql`
+   - contents of `supabase/migrations/20260826220000_app_settings_pdf_access.sql`
+   - contents of `supabase/migrations/20260830120000_admin_cms_v2.sql`
+   - contents of `supabase/migrations/20260831130000_search_views_and_admin_fixes.sql`
+   - contents of `supabase/migrations/20260831140000_revenuecat_events_idempotency.sql`
+   - contents of `supabase/migrations/20260831150000_lock_reading_streaks.sql`
    - contents of `supabase/seed.sql`
+
+Prefer **Option 2b** (`db push`) so migration history stays consistent.
 
 **Option 2b — CLI (best long-term)**
 
 ```bash
-cd D:/Projects/Ilm-o-Irfan-App-BE
+cd D:/ilm-o-irfan-books-app-BE
 npm install
 npx supabase login
 npx supabase link --project-ref YOUR_PROJECT_REF
@@ -91,6 +98,23 @@ npx supabase functions deploy admin-collections
 npx supabase functions deploy admin-users
 npx supabase functions deploy admin-analytics
 npx supabase functions deploy admin-settings
+npx supabase functions deploy admin-book-create
+npx supabase functions deploy admin-authors
+npx supabase functions deploy admin-author-create
+npx supabase functions deploy admin-author-update
+npx supabase functions deploy admin-author-delete
+npx supabase functions deploy admin-book-delete
+npx supabase functions deploy admin-bulk-update-books
+npx supabase functions deploy admin-set-book-relations
+npx supabase functions deploy admin-set-collection-books
+npx supabase functions deploy admin-reorder
+npx supabase functions deploy admin-set-entitlement
+npx supabase functions deploy admin-set-user-role
+npx supabase functions deploy admin-user-detail
+npx supabase functions deploy admin-storage-audit
+npx supabase functions deploy admin-delete-storage-object
+npx supabase functions deploy admin-dashboard-stats
+npx supabase functions deploy highlights-delete
 ```
 
 Set secrets (Dashboard → Edge Functions → Secrets, or CLI):
@@ -113,8 +137,11 @@ npx supabase secrets set SIGNED_PDF_EXPIRES_IN="300"
 
 In Supabase **Authentication → Providers**:
 
-- Enable **Email**
-- Enable **Google** (add OAuth client ID/secret from Google Cloud Console)
+- Enable **Email** (required for launch)
+- Enable **Google** when ready (add OAuth client ID/secret from Google Cloud Console; set iOS/Android redirect / deep-link URLs)
+- Local `supabase/config.toml` has `[auth.external.google] enabled = false` until those credentials exist
+
+Email confirmation policy (`enable_confirmations`) is a launch decision — local defaults leave confirmations off for easier testing.
 
 ### 5. Connect pgAdmin to Supabase Postgres
 
@@ -234,7 +261,7 @@ select label, book_count from public.category_with_counts;
 Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
 ```bash
-cd D:/Projects/Ilm-o-Irfan-App-BE
+cd D:/ilm-o-irfan-books-app-BE
 npm install
 npx supabase start
 ```
@@ -268,16 +295,17 @@ pgAdmin connection for local Supabase:
 
 Upload cover and PDF files in Dashboard → Storage using the paths stored on each book.
 
-PDFs are only served via **`get-signed-pdf`**. A signed-in user can open a book on exactly two conditions:
+PDFs are only served via **`get-signed-pdf`**. A signed-in user can open a book on exactly these conditions:
 
-- they are an **admin** (`profiles.role` / JWT `app_metadata.app_role`), or
-- they have an **active entitlement** (`status = 'active'` and unexpired)
+- they are an **admin** (`profiles.role` / JWT `app_metadata.app_role`)
+- the book is **free** (`is_premium = false`) and published
+- the book is **premium** and they have an **active entitlement** (`status = 'active'` and unexpired)
 
 Anyone else gets `403 PREMIUM_REQUIRED`. Admins may also preview unpublished drafts.
 
 There is no override — no environment flag and no product switch — so nothing
-needs turning off before a release. To let someone read without paying, give
-them an entitlement.
+needs turning off before a release. To let someone read a premium book without
+paying, give them an entitlement.
 
 ### Promote the first admin
 
@@ -297,6 +325,12 @@ That user must **sign out and sign back in** so the JWT picks up `app_metadata.a
 2. Webhook URL: `https://YOUR_PROJECT_REF.supabase.co/functions/v1/revenuecat-webhook`
 3. Authorization header must match `REVENUECAT_WEBHOOK_AUTH`.
 4. Set RevenueCat `app_user_id` = Supabase Auth user UUID so entitlements map correctly.
+5. Each event must include a stable `event.id` (UUID) and `event_timestamp_ms`.
+6. Behaviour:
+   - Duplicate `event.id` → `200` `{ data: { duplicate: true } }` (no double-apply)
+   - Older than last applied event → ledger kept, entitlement unchanged → `200` `{ data: { stale: true } }`
+   - Unknown / non-UUID `app_user_id` → `400`
+   - Applied updates go through `apply_revenuecat_entitlement()` (race-safe)
 
 ---
 
