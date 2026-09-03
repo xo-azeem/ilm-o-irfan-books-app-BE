@@ -368,7 +368,7 @@ books.pdf_path   → Storage bucket pdfs/
 | Profile screen | `profiles` + aggregated stats |
 | Theme | MMKV / Zustand |
 | Subscription screen | `plans` + `entitlements` + RevenueCat paywall |
-| Premium gating | `entitlements` + Edge Function; bypass via admin role, `ALLOW_PDF_WITHOUT_ENTITLEMENT` env, or `app_settings.allow_pdf_without_entitlement` |
+| Premium gating | `entitlements` + Edge Function; the admin role is the only bypass |
 | Push / email marketing | **Out of scope for v1** (add later if needed) |
 | Admin CMS for uploading books | **In-app admin panel** (admins routed there on login); RLS + Storage policies |
 | Analytics | Start with store + RevenueCat; optional product analytics later |

@@ -60,7 +60,7 @@ books.pdf_path   → Storage pdfs/
 
 - **plans** — Premium definition + RevenueCat product id + features JSON
 - **entitlements** — active/expired status, expiry, RC ids, store
-- **app_settings** — singleton product flags; `allow_pdf_without_entitlement` skips the paywall when on
+- **app_settings** — singleton product flags (maintenance, sign-ups, featured collection). `allow_pdf_without_entitlement` is retained but unread: nothing consults it, and PDF access follows the admin role and the entitlement alone.
 
 ## FE field mapping
 

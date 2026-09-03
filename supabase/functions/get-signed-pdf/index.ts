@@ -1,10 +1,16 @@
 // Edge Function: get-signed-pdf
 // JWT required. Admins may preview drafts.
-// Access is granted when any of these is true:
+//
+// Access is granted on exactly two conditions, and there is no third:
 //   - JWT / profile role is admin
-//   - ALLOW_PDF_WITHOUT_ENTITLEMENT env is on (true/1/yes/on)
-//   - app_settings.allow_pdf_without_entitlement is on
 //   - the user has an active entitlement
+//
+// The former ALLOW_PDF_WITHOUT_ENTITLEMENT env flag and the
+// app_settings.allow_pdf_without_entitlement column are both gone from this
+// path on purpose. Either one could silently hand every premium PDF to every
+// signed-in reader, from a place no code review would look, and the app has no
+// way to observe them. If the paywall ever needs opening again, that is a
+// product decision that belongs in entitlements, not a hidden switch.
 
 import { requireMethod, requireUser, serviceClient } from '../_shared/auth.ts'
 import {
@@ -17,11 +23,6 @@ import {
   readJsonBody,
 } from '../_shared/http.ts'
 import { requireUuidField } from '../_shared/payload.ts'
-
-function envFlagOn(name: string): boolean {
-  const value = (Deno.env.get(name) ?? '').trim().toLowerCase()
-  return value === 'true' || value === '1' || value === 'yes' || value === 'on'
-}
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)
@@ -39,14 +40,9 @@ Deno.serve(async (req) => {
 
     const admin = serviceClient()
 
-    // Role, product flags and the book row are independent reads.
-    const [profileRes, settingsRes, bookRes] = await Promise.all([
+    // The role and the book row are independent reads.
+    const [profileRes, bookRes] = await Promise.all([
       admin.from('profiles').select('role').eq('id', ctx.user.id).maybeSingle(),
-      admin
-        .from('app_settings')
-        .select('allow_pdf_without_entitlement')
-        .eq('id', 1)
-        .maybeSingle(),
       admin
         .from('books')
         .select('id, title, pdf_path, is_published, file_size_bytes')
@@ -58,21 +54,18 @@ Deno.serve(async (req) => {
       return failFromDbError('get-signed-pdf', 'BOOK_READ_FAILED', 'Unable to load book', bookRes.error)
     }
 
+    // A role lookup that fails must not silently promote the caller, but it
+    // must not lock out a real admin either, so the JWT claim still stands.
+    if (profileRes.error) {
+      console.error('[get-signed-pdf] role lookup failed', profileRes.error.message)
+    }
+
     const isAdmin =
       ctx.user.app_metadata?.app_role === 'admin' || profileRes.data?.role === 'admin'
 
-    // If the settings row could not be read, fall back to the closed position
-    // rather than handing out a free PDF.
-    if (settingsRes.error) {
-      console.error('[get-signed-pdf] settings read failed', settingsRes.error.message)
-    }
-
-    const allowWithoutEntitlement =
-      envFlagOn('ALLOW_PDF_WITHOUT_ENTITLEMENT') ||
-      settingsRes.data?.allow_pdf_without_entitlement === true
-
     const book = bookRes.data
 
+    // Admins may preview an unpublished draft; nobody else sees one exists.
     if (!book || (!isAdmin && !book.is_published)) {
       return fail('NOT_FOUND', 'Book not found', 404)
     }
@@ -81,7 +74,7 @@ Deno.serve(async (req) => {
       return fail('PDF_NOT_AVAILABLE', 'PDF not available for this book', 404)
     }
 
-    if (!isAdmin && !allowWithoutEntitlement) {
+    if (!isAdmin) {
       const { data: entitlement, error: entError } = await admin
         .from('entitlements')
         .select('status, expires_at')

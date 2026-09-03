@@ -16,10 +16,13 @@ import {
   type FieldSpec,
 } from '../_shared/payload.ts'
 
-// maintenance_mode, signup_enabled and allow_pdf_without_entitlement are NOT
-// NULL columns. Writing `payload.x ?? null` for each of them meant any PATCH
-// that did not send all three failed with a not-null violation, so only a
-// full-form save ever worked.
+// maintenance_mode and signup_enabled are NOT NULL columns. Writing
+// `payload.x ?? null` for each of them meant any PATCH that did not send both
+// failed with a not-null violation, so only a full-form save ever worked.
+//
+// allow_pdf_without_entitlement is deliberately absent: get-signed-pdf no
+// longer reads it, so exposing it here would hand an operator a switch that
+// silently does nothing.
 const EDITABLE_FIELDS: FieldSpec[] = [
   {
     column: 'maintenance_mode',
@@ -35,11 +38,6 @@ const EDITABLE_FIELDS: FieldSpec[] = [
     column: 'signup_enabled',
     aliases: ['signup_enabled', 'signupEnabled'],
     coerce: asBoolean('signup_enabled'),
-  },
-  {
-    column: 'allow_pdf_without_entitlement',
-    aliases: ['allow_pdf_without_entitlement', 'allowPdfWithoutEntitlement'],
-    coerce: asBoolean('allow_pdf_without_entitlement'),
   },
   {
     column: 'featured_collection_id',

@@ -99,11 +99,15 @@ Set secrets (Dashboard → Edge Functions → Secrets, or CLI):
 npx supabase secrets set REVENUECAT_WEBHOOK_AUTH="Bearer your-shared-secret"
 npx supabase secrets set REVENUECAT_ENTITLEMENT_ID="premium"
 npx supabase secrets set SIGNED_PDF_EXPIRES_IN="300"
-# Dev only — lets any signed-in user open PDFs without an entitlement.
-# Also toggled from Admin → Overview ("Free PDF access") via app_settings.
-# Unsafe for production. Leave unset or "false" before a public release.
-npx supabase secrets set ALLOW_PDF_WITHOUT_ENTITLEMENT="true"
 ```
+
+> There is no PDF access override. `get-signed-pdf` grants access to the admin
+> role or an active entitlement and to nothing else. If an earlier setup ran
+> `secrets set ALLOW_PDF_WITHOUT_ENTITLEMENT`, remove it — it is now ignored:
+>
+> ```bash
+> npx supabase secrets unset ALLOW_PDF_WITHOUT_ENTITLEMENT
+> ```
 
 ### 4. Auth providers
 
@@ -264,14 +268,16 @@ pgAdmin connection for local Supabase:
 
 Upload cover and PDF files in Dashboard → Storage using the paths stored on each book.
 
-PDFs are only served via **`get-signed-pdf`**. A signed-in user can open a book when any of these is true:
+PDFs are only served via **`get-signed-pdf`**. A signed-in user can open a book on exactly two conditions:
 
-- they are an **admin** (`profiles.role` / JWT `app_metadata.app_role`)
-- **`ALLOW_PDF_WITHOUT_ENTITLEMENT`** Edge Function env is `true` / `1` / `yes` / `on`
-- **`app_settings.allow_pdf_without_entitlement`** is on (Admin → Overview switch)
-- they have an **active entitlement**
+- they are an **admin** (`profiles.role` / JWT `app_metadata.app_role`), or
+- they have an **active entitlement** (`status = 'active'` and unexpired)
 
-Admins may also preview unpublished drafts. Turn the switch and env **off** before a public release.
+Anyone else gets `403 PREMIUM_REQUIRED`. Admins may also preview unpublished drafts.
+
+There is no override — no environment flag and no product switch — so nothing
+needs turning off before a release. To let someone read without paying, give
+them an entitlement.
 
 ### Promote the first admin
 

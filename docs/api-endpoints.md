@@ -97,8 +97,10 @@ Two independent things grant access to a PDF through `get-signed-pdf`:
 2. An active row in `entitlements` — `status = 'active'` and `expires_at` either null
    (never expires) or in the future.
 
-`app_settings.allow_pdf_without_entitlement` is a global override that opens the paywall for
-everyone. It ships **off**.
+Those two are the whole list. There is no global override: the
+`ALLOW_PDF_WITHOUT_ENTITLEMENT` env flag and the
+`app_settings.allow_pdf_without_entitlement` column are no longer read by
+`get-signed-pdf`, so the only way to grant access is an entitlement.
 
 `entitlements-status` reports all of this:
 
