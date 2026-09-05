@@ -1,4 +1,5 @@
 import { requireMethod, requireUser } from '../_shared/auth.ts'
+import { withNestedBookCoverUrls } from '../_shared/covers.ts'
 import { failFromDbError, handleError, handleOptions, list } from '../_shared/http.ts'
 import { isRangeNotSatisfiable, paginate, rangeFromRequest } from '../_shared/pagination.ts'
 
@@ -41,7 +42,8 @@ Deno.serve(async (req) => {
       )
     }
 
-    return list(paginate(data ?? [], count ?? null, page, pageSize))
+    const items = withNestedBookCoverUrls((data ?? []) as Record<string, unknown>[])
+    return list(paginate(items, count ?? null, page, pageSize))
   } catch (error) {
     return handleError('downloads-list', error)
   }

@@ -90,8 +90,8 @@ Deploy list (must all succeed):
 | books-search | wishlist-list | admin-book-delete | |
 | categories-list | wishlist-toggle | admin-authors | |
 | collections-list | downloads-list | admin-author-create | |
-| plans-list | downloads-create | admin-author-update | |
-| | highlights-list | admin-author-delete | |
+| collection-books | downloads-create | admin-author-update | |
+| plans-list | highlights-list | admin-author-delete | |
 | | highlights-upsert | admin-bulk-update-books | |
 | | highlights-delete | admin-set-book-relations | |
 | | library-overview | admin-set-collection-books | |

@@ -34,7 +34,8 @@ export function fail(code: string, message: string, status: number): Response {
 
 // Paginated list response. The envelope already carries `data`, so it is
 // serialised as-is rather than nested under another `data` key.
-export function list(envelope: { data: unknown[] }): Response {
+// Extra keys (e.g. collection meta on collection-books) are allowed.
+export function list(envelope: { data: unknown[] } & Record<string, unknown>): Response {
   return json(envelope)
 }
 

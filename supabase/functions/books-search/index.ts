@@ -1,4 +1,5 @@
 import { anonClient, requireMethod } from '../_shared/auth.ts'
+import { withCoverUrls } from '../_shared/covers.ts'
 import { failFromDbError, handleError, handleOptions, list } from '../_shared/http.ts'
 import { paginate, rangeFromRequest } from '../_shared/pagination.ts'
 
@@ -44,7 +45,9 @@ Deno.serve(async (req) => {
 
     // Every row carries the same window count; strip it from the payload.
     const totalCount = Number(rows[0].total_count ?? 0)
-    const items = rows.map(({ total_count: _ignored, ...book }) => book)
+    const items = withCoverUrls(
+      rows.map(({ total_count: _ignored, ...book }) => book as Record<string, unknown>),
+    )
 
     return list(paginate(items, Number.isFinite(totalCount) ? totalCount : null, page, pageSize))
   } catch (error) {

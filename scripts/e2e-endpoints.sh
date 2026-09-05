@@ -82,11 +82,20 @@ is "books-list 200"       "$(code "$B/books-list" "${P[@]}")" 200
 is "book-detail 200"      "$(code "$B/book-detail?id=$BOOK" "${P[@]}")" 200
 is "categories-list 200"  "$(code "$B/categories-list" "${P[@]}")" 200
 is "collections-list 200" "$(code "$B/collections-list" "${P[@]}")" 200
+is "collection-books needs id" "$(code "$B/collection-books" "${P[@]}")" 400
+is "collection-books by slug" "$(code "$B/collection-books?slug=home-hero" "${P[@]}")" 200
+has "books-list coverUrl" "$(curl -s "$B/books-list" "${P[@]}")" '"coverUrl"'
+has "book-detail no pdf_path" "$(curl -s "$B/book-detail?id=$BOOK" "${P[@]}")" '"coverUrl"'
+case "$(curl -s "$B/book-detail?id=$BOOK" "${P[@]}")" in *pdf_path*) no "pdf_path not leaked" "absent" "present";; *) ok "pdf_path not leaked";; esac
 is "plans-list 200"       "$(code "$B/plans-list" "${P[@]}")" 200
 is "book-detail bad uuid 400" "$(code "$B/book-detail?id=nope" "${P[@]}")" 400
 is "book-detail draft 404"    "$(code "$B/book-detail?id=$DRAFT" "${P[@]}")" 404
 has "books-list has no tsvector" "$(curl -s "$B/books-list" "${P[@]}")" '"published_at"'
 case "$(curl -s "$B/books-list" "${P[@]}")" in *search_vector*) no "tsvector not leaked" "absent" "present";; *) ok "tsvector not leaked";; esac
+
+# Category filter: spirituality is seeded; unknown slug 404s.
+is "books-list bad category 404" "$(code "$B/books-list?category=not-a-real-category" "${P[@]}")" 404
+is "books-list category slug" "$(code "$B/books-list?category=spirituality" "${P[@]}")" 200
 
 echo
 echo "== search =="

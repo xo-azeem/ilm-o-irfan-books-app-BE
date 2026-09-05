@@ -1,4 +1,5 @@
 import { anonClient, requireMethod } from '../_shared/auth.ts'
+import { withCoverUrls } from '../_shared/covers.ts'
 import { failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
 
 type BookCard = Record<string, unknown> & { id: string }
@@ -130,13 +131,13 @@ Deno.serve(async (req) => {
 
     return ok({
       collections: collectionsRes.data ?? [],
-      books: newest,
+      books: withCoverUrls(newest),
       categories: categoriesRes.data ?? [],
       featuredCollectionId: settingsRes.data?.featured_collection_id ?? null,
       shelves: {
-        hero,
-        trending,
-        newArrivals,
+        hero: withCoverUrls(hero),
+        trending: withCoverUrls(trending),
+        newArrivals: withCoverUrls(newArrivals),
       },
     })
   } catch (error) {

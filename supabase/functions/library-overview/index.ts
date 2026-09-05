@@ -1,4 +1,5 @@
 import { requireMethod, requireUser } from '../_shared/auth.ts'
+import { withNestedBookCoverUrls } from '../_shared/covers.ts'
 import { failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
 import { normalizePageSize } from '../_shared/pagination.ts'
 
@@ -87,19 +88,28 @@ Deno.serve(async (req) => {
       )
     }
 
-    const shelf = <T,>(res: { data: T[] | null; count: number | null }) => ({
-      items: res.data ?? [],
-      totalCount: res.count ?? 0,
-      hasMore: (res.count ?? 0) > (res.data?.length ?? 0),
-    })
+    const shelf = (res: { data: Record<string, unknown>[] | null; count: number | null }) => {
+      const items = withNestedBookCoverUrls(res.data ?? [])
+      return {
+        items,
+        totalCount: res.count ?? 0,
+        hasMore: (res.count ?? 0) > items.length,
+      }
+    }
 
     return ok({
       limit,
-      wishlist: shelf(wishlistRes),
-      readingProgress: shelf(progressRes),
-      finished: shelf(finishedRes),
-      downloads: shelf(downloadsRes),
-      highlights: shelf(highlightsRes),
+      wishlist: shelf(wishlistRes as { data: Record<string, unknown>[] | null; count: number | null }),
+      readingProgress: shelf(
+        progressRes as { data: Record<string, unknown>[] | null; count: number | null },
+      ),
+      finished: shelf(finishedRes as { data: Record<string, unknown>[] | null; count: number | null }),
+      downloads: shelf(
+        downloadsRes as { data: Record<string, unknown>[] | null; count: number | null },
+      ),
+      highlights: shelf(
+        highlightsRes as { data: Record<string, unknown>[] | null; count: number | null },
+      ),
     })
   } catch (error) {
     return handleError('library-overview', error)

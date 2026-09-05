@@ -81,6 +81,7 @@ npx supabase functions deploy book-detail
 npx supabase functions deploy books-search
 npx supabase functions deploy categories-list
 npx supabase functions deploy collections-list
+npx supabase functions deploy collection-books
 npx supabase functions deploy plans-list
 npx supabase functions deploy profile-read
 npx supabase functions deploy profile-update

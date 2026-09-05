@@ -19,6 +19,8 @@ Supabase + PostgreSQL backend for the **Ilm o Irfan** React Native e-book app.
 
 Design & cost notes: [`docs/backend-stack.md`](docs/backend-stack.md)  
 Schema reference: [`docs/schema.md`](docs/schema.md)  
+**Mobile contract (FE team):** [`docs/mobile-contract.md`](docs/mobile-contract.md)  
+**FE/BE parity audit:** [`docs/audits/2026-09-06-fe-be-parity.md`](docs/audits/2026-09-06-fe-be-parity.md)  
 **Setup + pgAdmin steps:** [`docs/setup-guide.md`](docs/setup-guide.md)  
 **Beast backlog:** [`docs/backend-beast-roadmap.md`](docs/backend-beast-roadmap.md)  
 **Work progress report:** [`docs/backend-work-progress.md`](docs/backend-work-progress.md)  
@@ -146,6 +148,11 @@ reader one page in.
   them any PDF regardless. Gating on `isActive` would show an admin a locked button on a file
   the backend would hand over.
 - `POST /functions/v1/signed-pdf` is gone; it answers 410. Use `get-signed-pdf`.
+- Use `coverUrl` on book cards; do not invent Storage public URLs on the client.
+- Filter Search by category with `GET books-list?category=<uuid-or-slug>`.
+- Collection detail: `GET collection-books?id=` or `?slug=`.
+
+Mobile contract: [`docs/mobile-contract.md`](docs/mobile-contract.md).
 
 ## Pagination contract
 
@@ -207,16 +214,18 @@ The backend is now structured in functional phases for the app's real product fl
 
 Included endpoints:
 
-- `GET /functions/v1/books-list` — paginated list of published books
+- `GET /functions/v1/books-list` — paginated list of published books (`?category=` optional)
 - `GET /functions/v1/book-detail?id=<bookId>` — single book detail lookup
 - `GET /functions/v1/books-search?q=<query>` — full-text search over title, author name,
   description, genre and tags, ranked by relevance
 - `GET /functions/v1/categories-list` — category list with counts
 - `GET /functions/v1/collections-list` — collection and shelf summaries
+- `GET /functions/v1/collection-books?id=` or `?slug=` — books in one collection
 - `GET /functions/v1/plans-list` — active premium plans
 - `GET /functions/v1/home-feed` — home feed with collections, categories, and featured books
 
-These endpoints live under `supabase/functions/` and use the shared pagination helper for list responses.
+Catalog and library book cards include a computed `coverUrl`. Full field map:
+[`docs/mobile-contract.md`](docs/mobile-contract.md).
 
 ### Authenticated user phase
 
