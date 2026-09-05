@@ -22,7 +22,9 @@
     "lint": "deno lint",
     "fmt:check": "deno fmt --check",
     "ci:static": "node scripts/ci-static-check.mjs",
-    "ci": "npm run ci:static && npm run typecheck && npm run lint && npm run test:unit"
+    "ci": "npm run ci:static && npm run typecheck && npm run lint && npm run test:unit",
+    "deploy:hosted": "node scripts/deploy-hosted.mjs",
+    "smoke:hosted": "node scripts/smoke-hosted.mjs"
   },
   "devDependencies": {
     "supabase": "^2.26.0"

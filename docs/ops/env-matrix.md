@@ -59,27 +59,51 @@ These are for tooling, not for the deployed functions.
 
 | Variable | Used by | Notes |
 | --- | --- | --- |
+| `SUPABASE_PROJECT_REF` | `npm run deploy:hosted` | Hosted project ref |
+| `SUPABASE_ACCESS_TOKEN` | deploy / types CLI | Or `npx supabase login` |
+| `DEPLOY_SEED` | `deploy:hosted` | `1` to apply `supabase/seed.sql` |
+| `DEPLOY_ALLOW_PLACEHOLDER_RC` | `deploy:hosted` | Staging-only placeholder webhook auth |
 | `BOOKS_DIR` | `npm run books:import` | Folder of book assets to ingest |
 | `DEFAULT_IS_PREMIUM` | `npm run books:import` | Default flag when `meta.json` omits it |
 | `DRY_RUN` / `SQL_ONLY` | `npm run books:import` | Emit SQL without uploading |
 | `ANON` / `SERVICE` | `npm run test:e2e` | Optional override; read from `supabase status` otherwise |
+| `SUPABASE_USER_JWT` | `npm run smoke:hosted` | Optional authenticated smoke |
 
-CI runs only the checks that need no project: contract checks, secret scan, typecheck,
-lint, and unit tests. Nothing in `.github/workflows/` holds a project secret today; adding
-a deploy workflow means adding `SUPABASE_ACCESS_TOKEN` and a project ref as repository
-secrets, and that is a deliberate decision, not a default.
+CI runs static checks on every push (contracts, Deno typecheck/lint/unit tests). Hosted
+deploy is **manual only**:
+
+| GitHub Actions secret | Used by |
+| --- | --- |
+| `SUPABASE_ACCESS_TOKEN` | CLI auth in `deploy-hosted.yml` |
+| `SUPABASE_PROJECT_REF_STAGING` | Staging project ref |
+| `SUPABASE_DB_PASSWORD_STAGING` | Non-interactive `supabase link` (optional if already linked in CI) |
+| `REVENUECAT_WEBHOOK_AUTH` | Function secret |
+| `REVENUECAT_ENTITLEMENT_ID` | Usually `premium` |
+| `SIGNED_PDF_EXPIRES_IN` | Usually `300` |
+
+Workflow: **Actions → Deploy hosted (staging) → Run workflow**. Never on push.  
+Local equivalent: `npm run deploy:hosted` (see [`deploy-checklist.md`](./deploy-checklist.md)).
+
+Placeholder RC: set `DEPLOY_ALLOW_PLACEHOLDER_RC=1` (or the workflow checkbox) only on
+staging when RevenueCat is not wired yet. Replace before any real purchase traffic.
 
 ## Deploying
 
 ```bash
-npm run link                                    # pick the project
-npm run db:push                                 # migrations
-npm run functions:deploy                        # every function in supabase/functions
-npm run types:generate                          # regenerate types/database.ts after migrations
+# One pass (preferred)
+DEPLOY_SEED=1 npm run deploy:hosted
+npm run smoke:hosted
+npm run types:generate   # after migrations, with linked project
+
+# Or step by step
+npm run link
+npm run db:push
+npm run functions:deploy
+npm run types:generate
 ```
 
 The full ordered procedure, including the checks that must pass before production, is in
-[deploy-checklist.md](./deploy-checklist.md).
+[deploy-checklist.md](./deploy-checklist.md). Mobile env handoff: [fe-handoff.md](./fe-handoff.md).
 
 ## Before production, verify
 

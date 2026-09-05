@@ -26,7 +26,9 @@ Schema reference: [`docs/schema.md`](docs/schema.md)
 **Work progress report:** [`docs/backend-work-progress.md`](docs/backend-work-progress.md)  
 **FE fixtures:** [`docs/fixtures/`](docs/fixtures/)  
 **Runbooks:** [`docs/runbooks/`](docs/runbooks/)  
-**Env matrix:** [`docs/ops/env-matrix.md`](docs/ops/env-matrix.md)
+**Env matrix:** [`docs/ops/env-matrix.md`](docs/ops/env-matrix.md)  
+**Deploy checklist:** [`docs/ops/deploy-checklist.md`](docs/ops/deploy-checklist.md)  
+**FE handoff:** [`docs/ops/fe-handoff.md`](docs/ops/fe-handoff.md)
 
 ## Repo layout
 
@@ -39,13 +41,17 @@ sql/pgadmin/      # run in pgAdmin Query Tool
 docs/             # stack, schema, setup
 ```
 
-## Quick start (recommended)
+## Deploy staging (one pass)
 
-1. Create a free project at [supabase.com](https://supabase.com/dashboard).
-2. Follow **Path A** in [`docs/setup-guide.md`](docs/setup-guide.md) to apply migrations + seed.
-3. Register that database in **pgAdmin** (host `db.<project-ref>.supabase.co`, SSL required).
-4. Copy `.env.example` → `.env` and fill API + DB values.
-5. Deploy Edge Functions and set RevenueCat webhook secrets.
+1. Create a Supabase project; copy the project ref.
+2. `npx supabase login` (or set `SUPABASE_ACCESS_TOKEN`).
+3. Put in `.env`: `SUPABASE_PROJECT_REF`, `REVENUECAT_WEBHOOK_AUTH` (or use `DEPLOY_ALLOW_PLACEHOLDER_RC=1`), `REVENUECAT_ENTITLEMENT_ID=premium`, `SIGNED_PDF_EXPIRES_IN=300`, plus `SUPABASE_URL` / anon key for smoke.
+4. `DEPLOY_SEED=1 npm run deploy:hosted`
+5. `npm run smoke:hosted`
+6. Enable Email Auth; promote first admin; give FE URL + anon key ([`docs/ops/fe-handoff.md`](docs/ops/fe-handoff.md)).
+
+Details: [`docs/ops/deploy-checklist.md`](docs/ops/deploy-checklist.md).  
+Path A walkthrough: [`docs/setup-guide.md`](docs/setup-guide.md).
 
 ### Local schema-only (pgAdmin)
 
@@ -65,6 +71,8 @@ npm run supabase:stop
 npm run db:reset             # local: migrations + seed
 npm run db:push              # push migrations to the linked project
 npm run link                 # supabase link --project-ref … (interactive)
+npm run deploy:hosted        # one-pass: link → push → functions → secrets
+npm run smoke:hosted         # public EF smoke against SUPABASE_URL
 npm run types:generate       # types from the linked project (run AFTER db:push)
 npm run types:generate:local # types from the local Docker stack instead
 npm run functions:serve      # local functions (needs Docker + supabase start)
@@ -81,7 +89,7 @@ npm run ci                   # everything CI runs, in order
 
 Only `test:e2e`, `functions:serve`, `supabase:start` and `db:reset` need Docker.
 `test:unit`, `typecheck` and `lint` need [Deno](https://deno.com) on PATH; `ci:static`
-runs on Node alone.
+runs on Node alone. `deploy:hosted` / `smoke:hosted` need a real project (no Docker).
 
 API response fixtures for the FE: [`docs/fixtures/`](docs/fixtures/).  
 Full hosted steps: [`docs/ops/deploy-checklist.md`](docs/ops/deploy-checklist.md).  

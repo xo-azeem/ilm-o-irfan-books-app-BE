@@ -4,10 +4,12 @@
 **Companion FE:** `D:\ilm-o-irfan-books-app`  
 **Branch (working):** `feat/app-optimization`  
 **Report started:** 2026-08-31  
-**Last updated:** 2026-09-05 (release hardening, CMS completion, tests/CI/runbooks — then **hosted unblocked**: migrations applied to staging/production remote + local, functions deployed)
+**Last updated:** 2026-09-06 (repo ship-ready deploy path: `deploy:hosted` / `smoke:hosted` / manual CI workflow)
 
 This file tracks work done in the “absolute beast backend” stream.  
 Backlog: [`backend-beast-roadmap.md`](./backend-beast-roadmap.md) · Audit: [`backend-audit-remaining-work.md`](./backend-audit-remaining-work.md)
+
+**Hosted status:** Treat any earlier “Phase 8 hosted sync Done” notes as **historical**. Hosted is **unverified until** [`ops/deploy-checklist.md`](./ops/deploy-checklist.md) §G free-path smoke is signed off on the current project. Use `npm run deploy:hosted` + `npm run smoke:hosted` for a fresh proof.
 
 ---
 
@@ -26,7 +28,7 @@ Backlog: [`backend-beast-roadmap.md`](./backend-beast-roadmap.md) · Audit: [`ba
 
 | Item | Why it is not happening |
 | --- | --- |
-| `supabase link` / `db push` / `functions:deploy` to hosted | **No Supabase project ref** and no `.supabase/project-ref` or `.env` on this machine |
+| `supabase link` / `db push` / `functions:deploy` to hosted | Needs **project ref** + CLI login / `SUPABASE_ACCESS_TOKEN` on this machine — then `npm run deploy:hosted` |
 | Local `supabase start` / `db reset` / `npm run test:e2e` | **Docker is not installed** (`docker` command missing) |
 | Uploading real book PDFs/covers via `books:import` | **No `BOOKS_DIR`** on disk (`D:/Books`, `D:/Projects/Books`, etc. all missing) and no linked project / `.env` with service role |
 | Creating staging/production Supabase projects | Requires your Supabase Dashboard account |
@@ -240,12 +242,17 @@ Deno, which is not installed on this machine; they run in CI.
 
 ---
 
-## Phase 8 — Hosted sync (Done, 2026-09-05)
+## Phase 8 — Hosted sync (2026-09-05, re-verify required)
 
-The project ref and database credentials turned up in `.env`, and Docker was installed but
-not running. Both blockers cleared, so the hosted work in §2 finally ran.
+A prior session applied migrations through `fix_last_admin_guard` and deployed functions when
+credentials were present in `.env`. That does **not** replace a current checklist §G sign-off.
 
-### 8.1 Migrations
+**As of 2026-09-06:** the ship-ready path is `npm run deploy:hosted` + `npm run smoke:hosted`
+([`ops/deploy-checklist.md`](./ops/deploy-checklist.md)). Re-run against staging before calling
+hosted “verified.” Later migrations (e.g. `restrict_covers_listing`) and `collection-books` /
+`coverUrl` work on `feat/mobile-api-parity` must be included in that re-deploy.
+
+### 8.1 Migrations (historical note)
 
 The remote ledger was healthy and in sync through `20260831130000` — no repair needed. Four
 migrations were pending on **both** databases, and the same set was applied to each:

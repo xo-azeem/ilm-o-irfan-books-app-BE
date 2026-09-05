@@ -1,9 +1,9 @@
 # Backend Audit: Remaining Work
 
-**Opened:** 2026-08-31 · **Last updated:** 2026-09-05  
+**Opened:** 2026-08-31 · **Last updated:** 2026-09-06  
 **Scope:** Supabase/PostgreSQL backend for the Ilm o Irfan mobile app  
-**Status:** Code complete. Every finding below is fixed in-repo; what is left is runtime
-verification against a real project.
+**Status:** Code complete. Deploy path is ship-ready in-repo (`npm run deploy:hosted`).  
+Runtime verification against a linked project still needs credentials.
 
 ## Executive Summary
 
@@ -198,17 +198,20 @@ Run these cases against a real staging project:
 
 ## Current Readiness
 
-**Everything that can be done in the repository is done.** What remains needs infrastructure:
+**Everything that can be done in the repository is done**, including the one-pass deploy
+script, hosted smoke script, and manual staging deploy workflow. What remains needs
+infrastructure:
 
 | Remaining | Needs |
 | --- | --- |
-| `db push` against a real project, migration history confirmed | A Supabase project ref |
-| All functions deployed and smoke-tested | The same |
+| `npm run deploy:hosted` + checklist §G free-path smoke | A Supabase project ref + CLI login / access token |
+| All functions live and `smoke:hosted` green | The same |
 | RevenueCat sandbox event matrix | A RevenueCat project + store products |
 | Real catalog imported, `admin_storage_audit()` clean | `BOOKS_DIR` with the book files |
 | Local E2E run | Docker |
 | Google OAuth end to end | Google Cloud + Dashboard configuration |
 
-Static review, contract enforcement, unit tests, and CI now catch what they can catch
-without a running database. The rest is runtime verification, and it is blocked on access
-rather than on code.
+Ship path: [`docs/ops/deploy-checklist.md`](./ops/deploy-checklist.md) · FE env: [`docs/ops/fe-handoff.md`](./ops/fe-handoff.md).
+
+Static review, contract enforcement, unit tests, and CI catch what they can without a
+running database. Hosted verification is blocked on access rather than on code.
