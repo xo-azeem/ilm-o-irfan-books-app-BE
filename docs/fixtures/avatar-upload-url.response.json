@@ -1,0 +1,9 @@
+{
+  "data": {
+    "path": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/6f1d0c9e-6d5a-4a1a-9d3e-2c7d1b0a51f4.jpg",
+    "signedUrl": "https://<ref>.supabase.co/storage/v1/object/upload/sign/avatars/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/6f1d0c9e-6d5a-4a1a-9d3e-2c7d1b0a51f4.jpg?token=<jwt>",
+    "token": "<upload-token>",
+    "contentType": "image/jpeg",
+    "expiresIn": 7200
+  }
+}

@@ -6,61 +6,19 @@ import { requireMethod, serviceClient } from '../_shared/auth.ts'
 import {
   fail,
   failFromDbError,
-  failUnexpected,
+  handleError,
   handleOptions,
   ok,
   readJsonBody,
 } from '../_shared/http.ts'
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-type RcEvent = {
-  id?: string
-  type?: string
-  app_user_id?: string
-  entitlement_ids?: string[]
-  product_id?: string
-  store?: string
-  expiration_at_ms?: number | null
-  purchased_at_ms?: number | null
-  event_timestamp_ms?: number | null
-}
-
-function isUuid(value: string): boolean {
-  return UUID_RE.test(value.trim())
-}
-
-function mapStatus(
-  eventType: string,
-  hasPremium: boolean,
-  expirationAtMs: number | null | undefined,
-): string {
-  const activeEventTypes = new Set([
-    'INITIAL_PURCHASE',
-    'RENEWAL',
-    'UNCANCELLATION',
-    'PRODUCT_CHANGE',
-    'NON_RENEWING_PURCHASE',
-    'TEMPORARY_ENTITLEMENT_GRANT',
-  ])
-
-  const expiredEventTypes = new Set(['EXPIRATION', 'SUBSCRIPTION_PAUSED'])
-
-  if (activeEventTypes.has(eventType) && hasPremium) {
-    return 'active'
-  }
-  if (eventType === 'BILLING_ISSUE') {
-    return 'billing_issue'
-  }
-  if (eventType === 'CANCELLATION') {
-    return expirationAtMs != null && expirationAtMs > Date.now() ? 'cancelled' : 'expired'
-  }
-  if (expiredEventTypes.has(eventType)) {
-    return 'expired'
-  }
-  return 'expired'
-}
+import {
+  grantsEntitlement,
+  isUuid,
+  mapStatus,
+  mapStore,
+  resolveEventTimestampMs,
+  type RcEvent,
+} from '../_shared/revenuecat.ts'
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)
@@ -104,12 +62,7 @@ Deno.serve(async (req) => {
       return fail('INVALID_WEBHOOK_EVENT', 'Missing event type', 400)
     }
 
-    const eventTimestampMs =
-      typeof event.event_timestamp_ms === 'number' && Number.isFinite(event.event_timestamp_ms)
-        ? event.event_timestamp_ms
-        : typeof event.purchased_at_ms === 'number' && Number.isFinite(event.purchased_at_ms)
-          ? event.purchased_at_ms
-          : null
+    const eventTimestampMs = resolveEventTimestampMs(event)
 
     if (eventTimestampMs == null) {
       return fail('INVALID_WEBHOOK_EVENT', 'Missing event_timestamp_ms', 400)
@@ -158,20 +111,9 @@ Deno.serve(async (req) => {
       )
     }
 
-    const hasPremiumEntitlement =
-      !event.entitlement_ids ||
-      event.entitlement_ids.length === 0 ||
-      event.entitlement_ids.includes(entitlementId)
+    const hasPremiumEntitlement = grantsEntitlement(event, entitlementId)
 
     const status = mapStatus(eventType, hasPremiumEntitlement, event.expiration_at_ms)
-
-    const storeMap: Record<string, string> = {
-      APP_STORE: 'app_store',
-      MAC_APP_STORE: 'app_store',
-      PLAY_STORE: 'play_store',
-      STRIPE: 'stripe',
-      PROMOTIONAL: 'promotional',
-    }
 
     const { data: plan, error: planError } = await admin
       .from('plans')
@@ -199,7 +141,7 @@ Deno.serve(async (req) => {
           : new Date().toISOString(),
         p_expires_at:
           event.expiration_at_ms != null ? new Date(event.expiration_at_ms).toISOString() : null,
-        p_store: storeMap[event.store ?? ''] ?? 'unknown',
+        p_store: mapStore(event.store),
         p_revenuecat_entitlement_id: entitlementId,
         p_raw_event: payload,
         p_event_id: eventIdRaw,
@@ -234,6 +176,6 @@ Deno.serve(async (req) => {
       applied: true,
     })
   } catch (error) {
-    return failUnexpected('revenuecat-webhook', error)
+    return handleError('revenuecat-webhook', error)
   }
 })

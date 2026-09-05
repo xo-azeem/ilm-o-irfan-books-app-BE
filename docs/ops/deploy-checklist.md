@@ -56,6 +56,20 @@ select to_regclass('public.revenuecat_events');
 -- expect: revenuecat_events
 ```
 
+- [ ] Migration `20260905120000_release_hardening.sql` applied
+
+```sql
+-- expect one row per function; a missing row means the migration did not run
+select proname
+from pg_proc
+where pronamespace = 'public'::regnamespace
+  and proname in (
+    'storage_object_exists', 'book_publish_blocker', 'upsert_reading_progress',
+    'admin_upsert_category', 'admin_upsert_collection', 'admin_upsert_plan'
+  )
+order by proname;
+```
+
 ---
 
 ## C. Deploy every Edge Function
@@ -82,6 +96,7 @@ Deploy list (must all succeed):
 | | highlights-delete | admin-set-book-relations | |
 | | library-overview | admin-set-collection-books | |
 | | entitlements-status | admin-reorder | |
+| | avatar-upload-url | admin-audit-log | |
 | | | admin-set-entitlement | |
 | | | admin-set-user-role | |
 | | | admin-user-detail | |
@@ -93,6 +108,16 @@ Deploy list (must all succeed):
 | | | admin-users | |
 | | | admin-analytics | |
 | | | admin-settings | |
+| | | admin-category-create | |
+| | | admin-category-update | |
+| | | admin-category-delete | |
+| | | admin-collection-create | |
+| | | admin-collection-update | |
+| | | admin-collection-delete | |
+| | | admin-plans | |
+| | | admin-plan-create | |
+| | | admin-plan-update | |
+| | | admin-plan-delete | |
 
 - [ ] `npx supabase functions list` shows all expected functions
 
@@ -164,6 +189,17 @@ curl -s "$SUPABASE_URL/functions/v1/home-feed" \
 - [ ] Free published book (`is_premium=false`) opens for signed-in user without entitlement
 - [ ] Premium book returns `PREMIUM_REQUIRED` without entitlement
 - [ ] Premium book opens with active entitlement or admin
+- [ ] Publishing a book whose PDF is not uploaded is refused with `PDF_NOT_IN_STORAGE`
+- [ ] `POST reading-progress { book_id, progress }` alone does not reset `current_page`
+- [ ] A CMS edit shows the admin's email in `admin-audit-log`, not `system`
+- [ ] `GET books-list?page=100000` returns `PAGE_OUT_OF_RANGE`, not a slow 200
+- [ ] `admin-storage-audit` reports no broken references
+
+```sql
+-- Supabase's own review of the deployed schema; address security findings before launch
+-- npx supabase db advisors --project-ref YOUR_PROJECT_REF
+select * from public.admin_storage_audit();
+```
 
 ---
 
@@ -172,7 +208,7 @@ curl -s "$SUPABASE_URL/functions/v1/home-feed" \
 | | Staging | Production |
 | --- | --- | --- |
 | Separate Supabase project | required | required |
-| Paywall bypass env | **false** | **false** |
+| Paywall | closed — no bypass exists in code | closed |
 | Catalog data | sample OK | real titles only |
 | RevenueCat | sandbox | production |
 

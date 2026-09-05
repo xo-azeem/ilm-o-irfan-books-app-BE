@@ -1,5 +1,5 @@
 import { requireAdmin, requireMethod } from '../_shared/auth.ts'
-import { BadRequestError, fail, failFromDbError, failUnexpected, handleOptions, ok } from '../_shared/http.ts'
+import { fail, failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
 import { asUuid } from '../_shared/payload.ts'
 
 Deno.serve(async (req) => {
@@ -36,9 +36,6 @@ Deno.serve(async (req) => {
 
     return ok(data)
   } catch (error) {
-    if (error instanceof BadRequestError) {
-      return fail(error.code, error.message, 400)
-    }
-    return failUnexpected('admin-user-detail', error)
+    return handleError('admin-user-detail', error)
   }
 })

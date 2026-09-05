@@ -1,5 +1,5 @@
-import { anonClient } from '../_shared/auth.ts'
-import { failFromDbError, failUnexpected, handleOptions, list } from '../_shared/http.ts'
+import { anonClient, requireMethod } from '../_shared/auth.ts'
+import { failFromDbError, handleError, handleOptions, list } from '../_shared/http.ts'
 import { paginate, rangeFromRequest } from '../_shared/pagination.ts'
 
 type SearchRow = Record<string, unknown> & { total_count?: number | string | null }
@@ -9,6 +9,9 @@ Deno.serve(async (req) => {
   if (preflight) return preflight
 
   try {
+    const notAllowed = requireMethod(req, ['GET'])
+    if (notAllowed) return notAllowed
+
     const url = new URL(req.url)
     const query = (url.searchParams.get('q') ?? '').trim()
     const { page, pageSize, from } = rangeFromRequest(req)
@@ -45,6 +48,6 @@ Deno.serve(async (req) => {
 
     return list(paginate(items, Number.isFinite(totalCount) ? totalCount : null, page, pageSize))
   } catch (error) {
-    return failUnexpected('books-search', error)
+    return handleError('books-search', error)
   }
 })

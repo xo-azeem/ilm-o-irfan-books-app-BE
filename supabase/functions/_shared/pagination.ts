@@ -1,10 +1,18 @@
+import { BadRequestError } from './http.ts'
+
 export type PaginationParams = {
   page?: number | string
   pageSize?: number | string
   defaultPage?: number
   defaultPageSize?: number
   maxPageSize?: number
+  maxOffset?: number
 }
+
+// Offset pagination reads and discards every preceding row, so page 50,000 is a
+// full table scan dressed up as a list request. Nothing in the product needs to
+// reach past this, and a client that asks is either looping or scraping.
+export const MAX_OFFSET = 10_000
 
 export type PaginationMeta = {
   page: number
@@ -119,6 +127,35 @@ export function parsePaginationQuery(
   }
 }
 
+// PostgREST answers a Range that starts past the last row with 416 /
+// PGRST103 rather than an empty body. That is not an edge case: it is the
+// final call of every "load more" loop, so without this an infinite-scroll
+// list ends in a 500 the moment the user reaches the bottom.
+//
+// The right answer is the empty tail page, which is what a paging client is
+// waiting for. totalCount comes back as null here because PostgREST sends no
+// count with the error; hasNextPage is false either way, and that is the field
+// the client stops on.
+export const RANGE_NOT_SATISFIABLE = 'PGRST103'
+
+export function isRangeNotSatisfiable(
+  error: { code?: string } | null | undefined,
+): boolean {
+  return error?.code === RANGE_NOT_SATISFIABLE
+}
+
+// Rejects a page whose offset would run past MAX_OFFSET. Throwing beats
+// silently clamping: a client that pages forever should be told it has left the
+// range, not handed the last page over and over as if it were new data.
+export function assertOffsetInRange(offset: number, maxOffset = MAX_OFFSET): void {
+  if (offset > maxOffset) {
+    throw new BadRequestError(
+      `Page is out of range. Offset pagination stops at ${maxOffset} rows; narrow the query instead.`,
+      'PAGE_OUT_OF_RANGE',
+    )
+  }
+}
+
 // Reads page/pageSize off a Request URL and returns everything a PostgREST
 // .range() call needs. Every list endpoint goes through this so the offset
 // arithmetic exists in exactly one place.
@@ -137,6 +174,7 @@ export function rangeFromRequest(
   )
 
   const from = (page - 1) * pageSize
+  assertOffsetInRange(from, opts.maxOffset ?? MAX_OFFSET)
 
   return { page, pageSize, from, to: from + pageSize - 1 }
 }

@@ -17,7 +17,12 @@
     "types:generate:local": "node scripts/gen-types.mjs --local",
     "books:import": "node scripts/import-folder-books.mjs",
     "test:e2e": "bash scripts/e2e-endpoints.sh",
-    "ci:static": "node scripts/ci-static-check.mjs"
+    "test:unit": "deno test --allow-env --allow-net=esm.sh,jsr.io,deno.land tests/",
+    "typecheck": "deno check supabase/functions/_shared/*.ts supabase/functions/*/index.ts",
+    "lint": "deno lint",
+    "fmt:check": "deno fmt --check",
+    "ci:static": "node scripts/ci-static-check.mjs",
+    "ci": "npm run ci:static && npm run typecheck && npm run lint && npm run test:unit"
   },
   "devDependencies": {
     "supabase": "^2.26.0"

@@ -1,11 +1,19 @@
 /**
  * Static CI checks that do not need Docker or a linked Supabase project.
+ *
  * - Every deployable function folder is listed in config.toml
- * - Every endpoint-manifest name has a matching folder
- * - Fixture JSON files parse
+ * - Every endpoint-manifest name has a matching folder, and its documented
+ *   method is one the handler actually allows
+ * - Every handler enforces a method, answers CORS preflight, and catches
+ * - Fixture JSON files parse and carry a data/error envelope
+ * - Migration timestamps are unique and in order
+ * - Nothing secret-shaped is committed
+ *
+ * Deno-dependent checks (`deno check`, `deno lint`, `deno test`) run as separate
+ * CI steps; keep this file runnable with Node alone.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = join(fileURLToPath(new URL('..', import.meta.url)))
@@ -105,6 +113,134 @@ if (migs.length < 10) {
   no(`expected >= 10 migrations, found ${migs.length}`)
 } else {
   ok(`${migs.length} migration files`)
+}
+
+// Migrations are applied in filename order and the ledger records what it has
+// already seen, so an out-of-order or duplicate timestamp is silently skipped on
+// any database that is already ahead of it.
+const migTimestamps = migs.map((f) => f.split('_')[0])
+const duplicateTimestamps = migTimestamps.filter((t, i) => migTimestamps.indexOf(t) !== i)
+if (duplicateTimestamps.length > 0) {
+  no(`duplicate migration timestamps: ${[...new Set(duplicateTimestamps)].join(', ')}`)
+} else {
+  ok('migration timestamps are unique')
+}
+
+const sortedTimestamps = [...migTimestamps].sort()
+if (sortedTimestamps.join() !== migTimestamps.join()) {
+  no('migration filenames are not in timestamp order')
+} else {
+  ok('migration filenames sort in timestamp order')
+}
+
+console.log('== HTTP contract ==')
+
+// Exempt: signed-pdf answers 410 to everything on purpose.
+const METHOD_EXEMPT = new Set(['signed-pdf'])
+
+for (const name of dirs) {
+  const source = readFileSync(join(FUNCTIONS_DIR, name, 'index.ts'), 'utf8')
+
+  if (METHOD_EXEMPT.has(name)) {
+    ok(`${name} exempt from method enforcement (documented)`)
+    continue
+  }
+
+  if (!/requireMethod\(req,\s*\[/.test(source)) {
+    no(`${name} does not enforce an HTTP method`)
+    continue
+  }
+
+  if (!source.includes('handleOptions(req)')) {
+    no(`${name} does not answer CORS preflight`)
+    continue
+  }
+
+  // A handler that lets a throw escape returns a raw 500 from the runtime with
+  // no envelope, which the app cannot parse.
+  if (!new RegExp(`(handleError|failUnexpected)\\('${name}'`).test(source)) {
+    no(`${name} has no catch-all error handler`)
+    continue
+  }
+
+  ok(`${name} enforces method, preflight, and error envelope`)
+}
+
+console.log('== manifest methods match the handlers ==')
+const manifestEntries = [
+  ...manifest.matchAll(/name:\s*'([^']+)',\s*\n\s*route:[^\n]*\n\s*method:\s*'([A-Z]+)'/g),
+].map((m) => ({ name: m[1], method: m[2] }))
+
+for (const entry of manifestEntries) {
+  if (!dirs.includes(entry.name)) continue
+  if (METHOD_EXEMPT.has(entry.name)) continue
+
+  const source = readFileSync(join(FUNCTIONS_DIR, entry.name, 'index.ts'), 'utf8')
+  const allowed = [...source.matchAll(/requireMethod\(req,\s*\[([^\]]+)\]/g)]
+    .flatMap((m) => m[1].split(','))
+    .map((s) => s.trim().replace(/'/g, ''))
+    .filter(Boolean)
+
+  if (!allowed.includes(entry.method)) {
+    no(
+      `manifest says ${entry.name} is ${entry.method} but the handler allows ${allowed.join(', ')}`,
+    )
+  } else {
+    ok(`${entry.name} ${entry.method}`)
+  }
+}
+
+console.log('== no committed secrets ==')
+// Catches the two mistakes that actually happen: committing .env, and pasting a
+// service-role key into a doc, script, or function.
+const SECRET_PATTERNS = [
+  { label: 'JWT-shaped key', re: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/ },
+  { label: 'Supabase service key', re: /\bsb_secret_[A-Za-z0-9_-]{10,}/ },
+  { label: 'assigned service role key', re: /SERVICE_ROLE_KEY\s*=\s*['"][^'"\s]{20,}['"]/ },
+]
+
+const SCAN_DIRS = ['supabase/functions', 'supabase/migrations', 'scripts', 'docs', 'sql', '.github']
+
+function walk(dir) {
+  const out = []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name.startsWith('.git')) continue
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) out.push(...walk(full))
+    else out.push(full)
+  }
+  return out
+}
+
+const gitignore = existsSync(join(ROOT, '.gitignore'))
+  ? readFileSync(join(ROOT, '.gitignore'), 'utf8')
+  : ''
+
+if (!/^\.env$/m.test(gitignore) && !/^\.env\b/m.test(gitignore)) {
+  no('.gitignore does not ignore .env')
+} else {
+  ok('.env is gitignored')
+}
+
+let secretHits = 0
+for (const rel of SCAN_DIRS) {
+  const dir = join(ROOT, rel)
+  if (!existsSync(dir)) continue
+
+  for (const file of walk(dir)) {
+    if (/\.(png|jpg|jpeg|webp|pdf|ico|lock)$/i.test(file)) continue
+    const content = readFileSync(file, 'utf8')
+    for (const { label, re } of SECRET_PATTERNS) {
+      if (re.test(content)) {
+        secretHits += 1
+        no(`${label} found in ${relative(ROOT, file).split(sep).join('/')}`)
+      }
+    }
+  }
+}
+
+if (secretHits === 0) {
+  ok('no secret-shaped strings in tracked source, docs, or SQL')
 }
 
 if (failed > 0) {

@@ -4,7 +4,9 @@
     "full_name": "Test Reader",
     "email": "test@gmail.com",
     "phone": "+92 300 0000000",
-    "avatar_path": null,
+    "avatar_path": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/6f1d0c9e-6d5a-4a1a-9d3e-2c7d1b0a51f4.jpg",
+    "avatarUrl": "https://<ref>.supabase.co/storage/v1/object/sign/avatars/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/6f1d0c9e-6d5a-4a1a-9d3e-2c7d1b0a51f4.jpg?token=<jwt>",
+    "avatarUrlExpiresIn": 3600,
     "date_of_birth": "1995-01-15",
     "role": "user",
     "streak": {

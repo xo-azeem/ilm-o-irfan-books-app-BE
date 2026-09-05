@@ -1,14 +1,13 @@
 import { requireAdmin, requireMethod } from '../_shared/auth.ts'
 import {
-  BadRequestError,
   fail,
-  failFromDbError,
-  failUnexpected,
+  handleError,
   handleOptions,
   ok,
   readJsonBody,
 } from '../_shared/http.ts'
 import { asOptionalText, requireUuidField } from '../_shared/payload.ts'
+import { failFromRpcError } from '../_shared/rpc.ts'
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)
@@ -35,7 +34,17 @@ Deno.serve(async (req) => {
     })
 
     if (error) {
-      return failFromDbError(
+      // 23514 is the last-admin guard. It is the caller's request that is
+      // refused, not the server failing, and the CMS needs to show why.
+      if (error.code === '23514') {
+        return fail(
+          'LAST_ADMIN',
+          'This is the last admin. Promote someone else before demoting this account.',
+          409,
+        )
+      }
+
+      return failFromRpcError(
         'admin-set-user-role',
         'ADMIN_SET_ROLE_FAILED',
         'Unable to update user role',
@@ -45,9 +54,6 @@ Deno.serve(async (req) => {
 
     return ok({ userId, role })
   } catch (error) {
-    if (error instanceof BadRequestError) {
-      return fail(error.code, error.message, 400)
-    }
-    return failUnexpected('admin-set-user-role', error)
+    return handleError('admin-set-user-role', error)
   }
 })

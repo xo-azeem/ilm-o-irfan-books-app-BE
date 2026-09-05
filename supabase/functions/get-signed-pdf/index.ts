@@ -15,10 +15,9 @@
 
 import { requireMethod, requireUser, serviceClient } from '../_shared/auth.ts'
 import {
-  BadRequestError,
   fail,
   failFromDbError,
-  failUnexpected,
+  handleError,
   handleOptions,
   ok,
   readJsonBody,
@@ -137,9 +136,6 @@ Deno.serve(async (req) => {
       fileSizeBytes: book.file_size_bytes ?? null,
     })
   } catch (error) {
-    if (error instanceof BadRequestError) {
-      return fail(error.code, error.message, 400)
-    }
-    return failUnexpected('get-signed-pdf', error)
+    return handleError('get-signed-pdf', error)
   }
 })

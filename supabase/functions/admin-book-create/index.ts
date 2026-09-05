@@ -1,9 +1,8 @@
 import { requireAdmin, requireMethod } from '../_shared/auth.ts'
 import {
-  BadRequestError,
   fail,
   failFromDbError,
-  failUnexpected,
+  handleError,
   handleOptions,
   ok,
   readJsonBody,
@@ -18,6 +17,7 @@ import {
   pickProvided,
   type FieldSpec,
 } from '../_shared/payload.ts'
+import { assertPublishable } from '../_shared/publishing.ts'
 
 function slugify(input: string): string {
   return input
@@ -59,7 +59,8 @@ const OPTIONAL_FIELDS: FieldSpec[] = [
     column: 'read_time_minutes',
     aliases: ['read_time_minutes', 'readTimeMinutes'],
     coerce: asOptionalInteger('read_time_minutes', { min: 0 }),
-  },  { column: 'tag', aliases: ['tag'], coerce: asOptionalText('tag') },
+  },
+  { column: 'tag', aliases: ['tag'], coerce: asOptionalText('tag') },
   { column: 'tags', aliases: ['tags'], coerce: asStringArray('tags') },
   { column: 'is_premium', aliases: ['is_premium', 'isPremium'], coerce: asBoolean('is_premium') },
   {
@@ -101,12 +102,10 @@ Deno.serve(async (req) => {
 
     const optional = pickProvided(payload, OPTIONAL_FIELDS)
 
-    if (optional.is_published === true && !optional.pdf_path) {
-      return fail(
-        'INVALID_REQUEST',
-        'is_published requires pdf_path (or create unpublished then set pdf_path)',
-        400,
-      )
+    // Publishing at create time is allowed, but only against a file that is
+    // actually in the bucket. Otherwise create it unpublished, upload, publish.
+    if (optional.is_published === true) {
+      await assertPublishable(ctx.admin, optional.pdf_path as string | null | undefined)
     }
 
     const row = {
@@ -136,9 +135,6 @@ Deno.serve(async (req) => {
 
     return ok(data)
   } catch (error) {
-    if (error instanceof BadRequestError) {
-      return fail(error.code, error.message, 400)
-    }
-    return failUnexpected('admin-book-create', error)
+    return handleError('admin-book-create', error)
   }
 })

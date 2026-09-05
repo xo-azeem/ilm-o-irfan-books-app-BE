@@ -1,11 +1,14 @@
-import { requireUser } from '../_shared/auth.ts'
-import { failFromDbError, failUnexpected, handleOptions, ok } from '../_shared/http.ts'
+import { requireMethod, requireUser } from '../_shared/auth.ts'
+import { failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)
   if (preflight) return preflight
 
   try {
+    const notAllowed = requireMethod(req, ['GET'])
+    if (notAllowed) return notAllowed
+
     const ctx = await requireUser(req)
     if (ctx instanceof Response) return ctx
 
@@ -54,6 +57,6 @@ Deno.serve(async (req) => {
       entitlement: data ?? null,
     })
   } catch (error) {
-    return failUnexpected('entitlements-status', error)
+    return handleError('entitlements-status', error)
   }
 })

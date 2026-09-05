@@ -1,8 +1,12 @@
-import { requireMethod, requireUser } from '../_shared/auth.ts'
-import { fail, failFromDbError, failUnexpected, handleOptions, ok } from '../_shared/http.ts'
+import { requireMethod, requireUser, serviceClient } from '../_shared/auth.ts'
+import { fail, failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
 
 const PROFILE_COLUMNS =
   'id, full_name, email, phone, avatar_path, date_of_birth, address_line1, address_line2, city, state, postal_code, country, role, created_at, updated_at'
+
+// The avatars bucket is private, so avatar_path on its own renders nothing.
+// Signing it here saves the app a second round trip on every profile load.
+const AVATAR_URL_TTL_SECONDS = 3600
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)
@@ -40,8 +44,27 @@ Deno.serve(async (req) => {
       return failFromDbError('profile-read', 'STREAK_READ_FAILED', 'Unable to load reading streak', streakRes.error)
     }
 
+    // A missing or unsignable avatar is not a failed profile read - the screen
+    // falls back to initials - so this never turns into an error response.
+    let avatarUrl: string | null = null
+    const avatarPath = profileRes.data.avatar_path as string | null
+
+    if (avatarPath) {
+      const { data: signed, error: signError } = await serviceClient()
+        .storage.from('avatars')
+        .createSignedUrl(avatarPath, AVATAR_URL_TTL_SECONDS)
+
+      if (signError) {
+        console.error('[profile-read] avatar sign failed', signError.message)
+      }
+
+      avatarUrl = signed?.signedUrl ?? null
+    }
+
     return ok({
       ...profileRes.data,
+      avatarUrl,
+      avatarUrlExpiresIn: avatarUrl ? AVATAR_URL_TTL_SECONDS : null,
       streak: streakRes.data ?? {
         current_streak: 0,
         longest_streak: 0,
@@ -50,6 +73,6 @@ Deno.serve(async (req) => {
       },
     })
   } catch (error) {
-    return failUnexpected('profile-read', error)
+    return handleError('profile-read', error)
   }
 })

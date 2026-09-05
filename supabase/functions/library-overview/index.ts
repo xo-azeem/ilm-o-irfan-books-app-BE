@@ -1,9 +1,9 @@
 import { requireMethod, requireUser } from '../_shared/auth.ts'
-import { failFromDbError, failUnexpected, handleOptions, ok } from '../_shared/http.ts'
+import { failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
 import { normalizePageSize } from '../_shared/pagination.ts'
 
 const BOOK_CARD =
-  'book:books(id, slug, title, cover_path, cover_color, cover_color_dark, genre, is_premium, read_time_minutes)'
+  'book:books(id, slug, title, cover_path, cover_color, cover_color_dark, genre, is_premium, read_time_minutes, author:authors(name))'
 
 const FINISHED_THRESHOLD = 0.99
 
@@ -102,6 +102,6 @@ Deno.serve(async (req) => {
       highlights: shelf(highlightsRes),
     })
   } catch (error) {
-    return failUnexpected('library-overview', error)
+    return handleError('library-overview', error)
   }
 })

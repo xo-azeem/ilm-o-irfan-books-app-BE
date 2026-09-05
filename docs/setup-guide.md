@@ -41,6 +41,8 @@ Use this for the real app (Auth, Storage, Edge Functions, RLS).
    - contents of `supabase/migrations/20260831130000_search_views_and_admin_fixes.sql`
    - contents of `supabase/migrations/20260831140000_revenuecat_events_idempotency.sql`
    - contents of `supabase/migrations/20260831150000_lock_reading_streaks.sql`
+   - contents of `supabase/migrations/20260905120000_release_hardening.sql`
+   - contents of `supabase/migrations/20260905130000_fix_last_admin_guard.sql`
    - contents of `supabase/seed.sql`
 
 Prefer **Option 2b** (`db push`) so migration history stays consistent.
@@ -115,6 +117,18 @@ npx supabase functions deploy admin-storage-audit
 npx supabase functions deploy admin-delete-storage-object
 npx supabase functions deploy admin-dashboard-stats
 npx supabase functions deploy highlights-delete
+npx supabase functions deploy avatar-upload-url
+npx supabase functions deploy admin-category-create
+npx supabase functions deploy admin-category-update
+npx supabase functions deploy admin-category-delete
+npx supabase functions deploy admin-collection-create
+npx supabase functions deploy admin-collection-update
+npx supabase functions deploy admin-collection-delete
+npx supabase functions deploy admin-plans
+npx supabase functions deploy admin-plan-create
+npx supabase functions deploy admin-plan-update
+npx supabase functions deploy admin-plan-delete
+npx supabase functions deploy admin-audit-log
 ```
 
 Set secrets (Dashboard → Edge Functions → Secrets, or CLI):

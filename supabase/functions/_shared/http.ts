@@ -78,6 +78,17 @@ export class BadRequestError extends Error {
   }
 }
 
+// The tail of every handler. Bad input is the caller's fault (400); anything
+// else is ours (500, logged, nothing leaked). Written once so a handler cannot
+// forget the BadRequestError branch and turn a typo into a 500.
+export function handleError(scope: string, error: unknown): Response {
+  if (error instanceof BadRequestError) {
+    return fail(error.code, error.message, 400)
+  }
+
+  return failUnexpected(scope, error)
+}
+
 export async function readJsonBody(req: Request): Promise<Record<string, unknown>> {
   const body = await req.json().catch(() => null)
 
@@ -94,5 +105,6 @@ export const ERROR_CODES = {
   INVALID_REQUEST: 'INVALID_REQUEST',
   NOT_FOUND: 'NOT_FOUND',
   METHOD_NOT_ALLOWED: 'METHOD_NOT_ALLOWED',
+  PAGE_OUT_OF_RANGE: 'PAGE_OUT_OF_RANGE',
   UNEXPECTED_ERROR: 'UNEXPECTED_ERROR',
 } as const

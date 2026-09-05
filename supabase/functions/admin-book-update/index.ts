@@ -1,9 +1,8 @@
 import { requireAdmin, requireMethod } from '../_shared/auth.ts'
 import {
-  BadRequestError,
   fail,
   failFromDbError,
-  failUnexpected,
+  handleError,
   handleOptions,
   ok,
   readJsonBody,
@@ -17,6 +16,7 @@ import {
   requireUuidField,
   type FieldSpec,
 } from '../_shared/payload.ts'
+import { assertPublishable } from '../_shared/publishing.ts'
 
 // Allow-list. Anything not named here (id, slug, rating, timestamps,
 // published_at) is not writable through this endpoint. published_at in
@@ -75,6 +75,37 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Going live is checked against the file that will be stored after this
+    // update, which is the incoming pdf_path when the same request sets one and
+    // the stored value otherwise. Reading the row first also turns "publish a
+    // book id that does not exist" into a 404 instead of a silent no-op.
+    if (update.is_published === true) {
+      const { data: current, error: readError } = await ctx.admin
+        .from('books')
+        .select('pdf_path')
+        .eq('id', bookId)
+        .maybeSingle()
+
+      if (readError) {
+        return failFromDbError(
+          'admin-book-update',
+          'ADMIN_BOOK_READ_FAILED',
+          'Unable to load book',
+          readError,
+        )
+      }
+
+      if (!current) {
+        return fail('NOT_FOUND', 'Book not found', 404)
+      }
+
+      const pdfPath = 'pdf_path' in update
+        ? (update.pdf_path as string | null)
+        : (current.pdf_path as string | null)
+
+      await assertPublishable(ctx.admin, pdfPath)
+    }
+
     const { data, error } = await ctx.admin
       .from('books')
       .update(update)
@@ -97,9 +128,6 @@ Deno.serve(async (req) => {
 
     return ok(data)
   } catch (error) {
-    if (error instanceof BadRequestError) {
-      return fail(error.code, error.message, 400)
-    }
-    return failUnexpected('admin-book-update', error)
+    return handleError('admin-book-update', error)
   }
 })

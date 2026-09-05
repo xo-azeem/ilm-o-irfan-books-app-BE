@@ -1,0 +1,14 @@
+{
+  "data": {
+    "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+    "user_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+    "book_id": "aaaaaaaa-0000-0000-0000-000000000001",
+    "current_page": 42,
+    "total_pages": 310,
+    "progress": 0.1355,
+    "chapter_label": "Chapter 3 — The Marvels of the Heart",
+    "last_read_at": "2026-09-05T09:12:44.000Z",
+    "created_at": "2026-08-20T18:03:11.000Z",
+    "updated_at": "2026-09-05T09:12:44.000Z"
+  }
+}

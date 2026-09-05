@@ -37,6 +37,7 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | `/functions/v1/library-overview` | GET | User | Combined shelves: wishlist, in-progress, finished (`progress >= 0.99`), downloads, highlights |
 | `/functions/v1/entitlements-status` | GET | User | Current premium state |
 | `/functions/v1/get-signed-pdf` | POST | User | Signed PDF URL for premium or allowed access |
+| `/functions/v1/avatar-upload-url` | POST | User | One-shot signed upload URL for the caller's avatar |
 
 ## Admin endpoints
 
@@ -65,6 +66,17 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | `/functions/v1/admin-users` | GET | Admin | User directory and dashboards |
 | `/functions/v1/admin-analytics` | GET | Admin | Top books, reads, downloads, signups |
 | `/functions/v1/admin-settings` | GET/PATCH | Admin | Product flags and app config |
+| `/functions/v1/admin-category-create` | POST | Admin | Create category (`label` required) |
+| `/functions/v1/admin-category-update` | PATCH | Admin | Update category fields |
+| `/functions/v1/admin-category-delete` | POST | Admin | Delete category; 409 while books use it unless `force` |
+| `/functions/v1/admin-collection-create` | POST | Admin | Create collection (`title` required, `kind` defaults to `shelf`) |
+| `/functions/v1/admin-collection-update` | PATCH | Admin | Update collection fields |
+| `/functions/v1/admin-collection-delete` | POST | Admin | Delete collection; 409 if it is the featured one unless `force` |
+| `/functions/v1/admin-plans` | GET | Admin | All plans including inactive, with entitlement counts |
+| `/functions/v1/admin-plan-create` | POST | Admin | Create plan (`code`, `name`, `price_cents` required) |
+| `/functions/v1/admin-plan-update` | PATCH | Admin | Update plan pricing, interval, features, RC product id |
+| `/functions/v1/admin-plan-delete` | POST | Admin | Delete plan; 409 while entitlements reference it unless `force` |
+| `/functions/v1/admin-audit-log` | GET | Admin | Who changed what: filter by `entityType`, `entityId`, `actorId`, `action`, `since` |
 
 ## Webhooks
 
@@ -103,7 +115,12 @@ errors are logged server-side and never returned to the client.
 | `INVALID_REQUEST` | 400 | Bad or missing field; message names the field |
 | `NOT_FOUND` | 404 | Target row does not exist or is not published |
 | `METHOD_NOT_ALLOWED` | 405 | Wrong HTTP verb; message lists the allowed ones |
+| `CONFLICT` | 409 | The row is still referenced; retry with `force: true` if that is intended |
+| `PAGE_OUT_OF_RANGE` | 400 | Offset pagination stops at 10,000 rows — narrow the query |
 | `UNEXPECTED_ERROR` | 500 | Unhandled failure — check the function logs |
+
+Every endpoint enforces its documented method and answers `OPTIONS` preflight. A verb the
+handler does not implement is a `405`, never a silent fallthrough to the GET path.
 
 ### Endpoint-specific codes
 
@@ -117,6 +134,10 @@ errors are logged server-side and never returned to the client.
 | `INVALID_WEBHOOK_EVENT` | 400 | `revenuecat-webhook` — missing/invalid id, user, type, or timestamp |
 | `USER_NOT_FOUND` | 400 | `revenuecat-webhook` — no profile for `app_user_id` |
 | `WEBHOOK_CONFIG_ERROR` | 500 | `revenuecat-webhook` — secret not configured |
+| `PDF_PATH_MISSING` | 400 | `admin-book-create` / `admin-book-update` — publish requested with no `pdf_path` |
+| `PDF_NOT_IN_STORAGE` | 400 | `admin-book-create` / `admin-book-update` — `pdf_path` matches no object in the `pdfs` bucket |
+| `AVATAR_UPLOAD_URL_FAILED` | 500 | `avatar-upload-url` — Storage refused to mint the URL |
+| `LAST_ADMIN` | 409 | `admin-set-user-role` — refuses to demote the only remaining admin |
 
 ## Premium access
 
@@ -148,14 +169,41 @@ and holds no active entitlement.
 Gating on `isActive` alone would show an admin a locked button on a file the backend would
 serve them. Free books do not need `canAccessPremium` to open.
 
+## Publishing a book
+
+`is_published = true` is refused unless the file is actually there:
+
+| Condition | Result |
+| --- | --- |
+| No `pdf_path` on the row and none in the request | `400 PDF_PATH_MISSING` |
+| `pdf_path` set but no matching object in `pdfs` | `400 PDF_NOT_IN_STORAGE` |
+| `pdf_path` set and the object exists | Published |
+
+The same check runs for `admin-book-create`, `admin-book-update`, and each id in
+`admin-bulk-update-books` — the bulk response returns `skippedBooks: [{ id, reason }]`
+rather than failing the batch. Upload the PDF first, then publish.
+
 ## Request notes
 
-- **Partial updates.** `profile-update`, `admin-settings`, `admin-book-update` and
-  `highlights-upsert` write only the keys present in the body. Send an explicit `null` to
-  clear a field; an empty body returns 400.
+- **Partial updates.** `profile-update`, `admin-settings`, `admin-book-update`,
+  `highlights-upsert`, `reading-progress`, and the category / collection / plan update
+  endpoints write only the keys present in the body. Send an explicit `null` to clear a
+  field; an empty body returns 400.
 - **Both key styles.** `snake_case` and `camelCase` are accepted (`full_name` / `fullName`).
 - **Reading progress.** Send `progress` (0–1) *or* `progress_percent` (0–100), never both.
-- **Pagination.** `page` / `pageSize` (`limit` is an alias). `pageSize` is capped at 100.
+  A `POST` merges: omitted fields keep their stored value, so a background sync that knows
+  only the page cannot reset the chapter. Send `chapter_label: ""` to clear the chapter.
+  The merge happens in one statement, so two devices syncing at once cannot interleave.
+- **Downloads are telemetry.** `downloads-create` records what a device *says* it saved.
+  It drives the Downloaded shelf and the admin counter and never gates access; the only
+  authority on whether a reader may hold the bytes is `get-signed-pdf`.
+- **Avatars.** `POST avatar-upload-url { contentType }` → upload the bytes to the returned
+  `signedUrl` → `PUT profile-update { avatar_path }` with the returned `path`.
+  `profile-read` returns a signed `avatarUrl` (1 hour) alongside `avatar_path`.
+- **Pagination.** `page` / `pageSize` (`limit` is an alias). `pageSize` is capped at 100 and
+  the offset is capped at 10,000 rows (`PAGE_OUT_OF_RANGE`); every list sorts on a stable
+  key with `id` as the tiebreaker. `books-search` clamps its own limit and offset inside
+  `search_books()` as well, so a direct RPC call cannot ask for more.
 
 ## Rules for implementation
 

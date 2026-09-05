@@ -1,5 +1,5 @@
-import { anonClient } from '../_shared/auth.ts'
-import { failFromDbError, failUnexpected, handleOptions, ok } from '../_shared/http.ts'
+import { anonClient, requireMethod } from '../_shared/auth.ts'
+import { failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
 
 type BookCard = Record<string, unknown> & { id: string }
 
@@ -57,6 +57,9 @@ Deno.serve(async (req) => {
   if (preflight) return preflight
 
   try {
+    const notAllowed = requireMethod(req, ['GET'])
+    if (notAllowed) return notAllowed
+
     const supabase = anonClient()
 
     const [collectionsRes, booksRes, categoriesRes, settingsRes] = await Promise.all([
@@ -137,6 +140,6 @@ Deno.serve(async (req) => {
       },
     })
   } catch (error) {
-    return failUnexpected('home-feed', error)
+    return handleError('home-feed', error)
   }
 })

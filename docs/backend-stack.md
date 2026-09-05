@@ -621,8 +621,13 @@ At this stage, optimize PDF size and ensure clients don’t re-download existing
 - [x] PostgreSQL schema (catalog, users, library, plans, entitlements)  
 - [~] Supabase Auth (email ready; Google requires Dashboard + OAuth client setup)  
 - [x] Supabase Storage (`covers`, `pdfs`, `avatars`)  
-- [x] Edge Functions (catalog, library, admin, signed PDF, RevenueCat webhook — ~28 on `dev`)  
+- [x] Edge Functions — 57 on `dev`: catalog, library, signed PDF, RevenueCat webhook, and a
+  complete admin CMS (books, authors, categories, collections, plans, users, entitlements,
+  storage, audit log). Inventory: `supabase/functions/_shared/endpoint-manifest.ts`  
 - [x] RLS on all user tables  
+- [x] CI: contract checks, secret scan, typecheck, lint, unit tests  
+- [x] Runbooks (`docs/runbooks/`) and env matrix (`docs/ops/env-matrix.md`)  
+- [ ] Hosted deploy verified against a real project (needs a project ref)  
 
 **Billing**
 

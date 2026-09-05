@@ -13,7 +13,9 @@ max_rows = 1000
 [db]
 port = 54322
 shadow_port = 54320
-major_version = 15
+# Match the hosted project (Postgres 17.6). Local must mirror production or it
+# stops being a rehearsal for it.
+major_version = 17
 
 [db.pooler]
 enabled = false
@@ -202,3 +204,38 @@ verify_jwt = true
 [functions.admin-author-delete]
 verify_jwt = true
 
+[functions.admin-category-create]
+verify_jwt = true
+
+[functions.admin-category-update]
+verify_jwt = true
+
+[functions.admin-category-delete]
+verify_jwt = true
+
+[functions.admin-collection-create]
+verify_jwt = true
+
+[functions.admin-collection-update]
+verify_jwt = true
+
+[functions.admin-collection-delete]
+verify_jwt = true
+
+[functions.admin-plans]
+verify_jwt = true
+
+[functions.admin-plan-create]
+verify_jwt = true
+
+[functions.admin-plan-update]
+verify_jwt = true
+
+[functions.admin-plan-delete]
+verify_jwt = true
+
+[functions.admin-audit-log]
+verify_jwt = true
+
+[functions.avatar-upload-url]
+verify_jwt = true

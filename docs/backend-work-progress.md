@@ -4,7 +4,7 @@
 **Companion FE:** `D:\ilm-o-irfan-books-app`  
 **Branch (working):** `feat/app-optimization`  
 **Report started:** 2026-08-31  
-**Last updated:** 2026-08-31 (CI + admin create/authors + FE fixtures; hosted still blocked)
+**Last updated:** 2026-09-05 (release hardening, CMS completion, tests/CI/runbooks — then **hosted unblocked**: migrations applied to staging/production remote + local, functions deployed)
 
 This file tracks work done in the “absolute beast backend” stream.  
 Backlog: [`backend-beast-roadmap.md`](./backend-beast-roadmap.md) · Audit: [`backend-audit-remaining-work.md`](./backend-audit-remaining-work.md)
@@ -47,7 +47,8 @@ Backlog: [`backend-beast-roadmap.md`](./backend-beast-roadmap.md) · Audit: [`ba
 4. Audit #2 RevenueCat webhook idempotency.
 5. §4 content pipeline + API polish — skipped waiting on project ref per your request.
 6. §5 admin CMS Edge Function wrappers + `highlights-delete`.
-7. §6 unblocked options: CI scaffolding, `admin-book-create` / authors CRUD, FE fixtures (this update).
+7. §6 unblocked options: CI scaffolding, `admin-book-create` / authors CRUD, FE fixtures.
+8. §7 release hardening: audit fixes, CMS completion, unit tests, CI, runbooks (this update).
 
 ---
 
@@ -143,7 +144,7 @@ Wrapped existing SQL RPCs so day-to-day CMS work does not need raw SQL. All use 
 
 Also: `config.toml` `verify_jwt = true`, `endpoint-manifest.ts`, `api-endpoints.md`, setup-guide deploy list, deploy-checklist inventory.
 
-**Still not present (intentionally later):** category/collection write EFs beyond reorder/membership (create category/collection rows still via SQL/Dashboard if needed).
+**Closed in Phase 7:** category / collection / plan write EFs, so nothing in day-to-day CMS work needs raw SQL any more.
 
 **Not deployed** — still blocked on project ref.
 
@@ -171,14 +172,150 @@ Also: `config.toml` `verify_jwt = true`, `endpoint-manifest.ts`, `api-endpoints.
 
 ---
 
+## Phase 7 — Release hardening + CMS completion (Done in-repo, 2026-09-05)
+
+Closes every remaining item in the audit and every code item in the roadmap.
+
+### 7.1 Migration `20260905120000_release_hardening.sql` (+ pgAdmin `11_…`)
+
+| Area | Change |
+| --- | --- |
+| Storage-aware publishing | `storage_object_key()`, `storage_object_exists()`, `book_publish_blocker()`; `admin_bulk_update_books` now returns `skippedBooks: [{ id, reason }]` |
+| Reading progress | `upsert_reading_progress()` — atomic partial merge; null keeps a column, `''` clears the chapter |
+| Search limits | `search_books()` clamps limit to 1–100 and offset to 0–10,000 inside the function |
+| Audit attribution | `private.audit_write()` reads `x-audit-actor-*` on service-role requests, so CMS writes stop being logged as `system` |
+| Category / collection / plan CRUD | `admin_upsert_*` and `admin_delete_*` with reference guards and a `force` override |
+| `admin_plan_rows` | Admin view including inactive plans + entitlement counts |
+| Indexes | `entitlements(plan_id)`, `book_categories(category_id)`, `collection_books(book_id)` — unindexed FKs the new guards scan |
+
+### 7.2 HTTP contract hardening
+
+| Change | Detail |
+| --- | --- |
+| Method enforcement | 16 read endpoints had no `requireMethod` guard and would answer any verb; all now enforce |
+| Error tails | `handleError()` added to `_shared/http.ts` and adopted by all 45 pre-existing functions, so no handler can drop the `BadRequestError` branch |
+| Pagination ceiling | `rangeFromRequest()` rejects offsets past 10,000 rows with `400 PAGE_OUT_OF_RANGE` |
+| Publish gate | `admin-book-create` / `admin-book-update` verify the PDF object before going live |
+| Downloads | Documented as telemetry; book visibility now checked through RLS, reported size capped |
+| Reading progress | Partial writes stopped resetting `current_page` / `chapter_label` |
+| Audit headers | `requireAdmin()` forwards the verified caller to the audit trigger |
+
+### 7.3 New Edge Functions (12)
+
+| Function | Purpose |
+| --- | --- |
+| `avatar-upload-url` | One-shot signed upload URL under `{user_id}/…`; `profile-read` now returns a signed `avatarUrl` |
+| `admin-category-create` / `-update` / `-delete` | Category CMS without SQL |
+| `admin-collection-create` / `-update` / `-delete` | Collection CMS; refuses to delete the featured shelf |
+| `admin-plans`, `admin-plan-create` / `-update` / `-delete` | Plan CMS including inactive plans |
+| `admin-audit-log` | "Who published X" — filter by entity, actor, action, date |
+
+Total Edge Functions: **57**.
+
+### 7.4 Tests + CI
+
+| Item | Detail |
+| --- | --- |
+| `tests/` | 60+ Deno unit tests: pagination, payload validation, response envelopes, progress scale, webhook state machine |
+| `_shared/progress.ts`, `_shared/revenuecat.ts` | Logic extracted from the handlers so it is testable without a database |
+| `_shared/publishing.ts`, `_shared/rpc.ts` | Publish gate and Postgres-error → HTTP mapping, shared |
+| `scripts/ci-static-check.mjs` | Now also checks method enforcement, manifest/handler agreement, migration ordering, and scans for committed secrets |
+| `.github/workflows/static-checks.yml` | Two jobs: Node contract checks, and `deno check` / `lint` / `test` |
+| `deno.json`, npm scripts | `test:unit`, `typecheck`, `lint`, `fmt:check`, `ci` |
+| `scripts/e2e-endpoints.sh` | Local keys read from `supabase status` instead of a pinned copy that newer CLI versions invalidate |
+
+**Verified locally:** `npm run ci:static` — all checks pass. `test:unit` / `typecheck` need
+Deno, which is not installed on this machine; they run in CI.
+
+### 7.5 Docs
+
+| Item | Detail |
+| --- | --- |
+| `docs/runbooks/` | paywall-open, webhook-down, storage-miss, auth-failures, secret-rotation |
+| `docs/ops/env-matrix.md` | Local / staging / production, every secret, what leaking each costs |
+| `docs/fixtures/` | Added reading-progress, avatar-upload-url, admin-audit-log, page-out-of-range; contract notes for the app team |
+| `docs/api-endpoints.md` | New endpoints, new error codes, publish rules, merge semantics, pagination ceiling |
+| `docs/schema.md` | Full release-hardening section |
+| `docs/setup-guide.md`, `docs/ops/deploy-checklist.md`, `README.md` | Migration and deploy lists, new smoke checks, script inventory |
+
+---
+
+## Phase 8 — Hosted sync (Done, 2026-09-05)
+
+The project ref and database credentials turned up in `.env`, and Docker was installed but
+not running. Both blockers cleared, so the hosted work in §2 finally ran.
+
+### 8.1 Migrations
+
+The remote ledger was healthy and in sync through `20260831130000` — no repair needed. Four
+migrations were pending on **both** databases, and the same set was applied to each:
+
+| Migration | Remote | Local |
+| --- | --- | --- |
+| `20260831140000_revenuecat_events_idempotency` | applied | applied |
+| `20260831150000_lock_reading_streaks` | applied | applied |
+| `20260905120000_release_hardening` | applied | applied |
+| `20260905130000_fix_last_admin_guard` | applied | applied |
+
+Local was brought up with `supabase start` and migrated with `db push` rather than
+`db reset`, so existing local data survived.
+
+**Parity verified** by fingerprint, not by assumption: table/column shapes and function
+signatures hash identically, and function bodies match once line endings are normalised
+(local stores CRLF, remote LF — cosmetic, from the Windows checkout).
+
+### 8.2 Two real bugs found by running the suite
+
+Neither was introduced this session; both were pre-existing and both reached the app.
+
+**`PGRST103` — every list endpoint 500s at the end of an infinite scroll.**
+PostgREST answers a `Range` that starts past the last row with 416, not an empty body. That
+is the final call of every "load more" loop, so the app got
+`500 BOOKS_READ_FAILED` the moment a user scrolled to the bottom of any list. Fixed in
+`_shared/pagination.ts` (`isRangeNotSatisfiable`) and applied to all 14 paginated endpoints,
+which now return the empty tail page.
+
+**The last-admin guard never fired.**
+`admin_set_user_role()` declared its local variable as `current_role`, a reserved SQL
+keyword that Postgres resolves to the session role inside the function body. Both guards
+reading it were dead code: the last admin could be demoted, locking everyone out of the CMS,
+and setting a role on a non-existent user reported success. Fixed in
+`20260905130000`; the endpoint now returns `409 LAST_ADMIN`. Grepped the rest of the
+migrations for the same class of mistake — this was the only instance.
+
+### 8.3 E2E
+
+`npm run test:e2e` now runs for real against the local stack: **131 assertions, 0 failures**,
+including the publish gate, the progress merge, the pagination ceiling, audit attribution,
+the RLS regression block, and the corrected last-admin guard.
+
+### 8.4 Remote deployment and data
+
+| Item | State |
+| --- | --- |
+| Edge Functions | All 57 deployed; the remote set was stale (nothing since before Phase 5) |
+| Catalog | 18 authors, 20 books, all 20 published, **all with their PDF present in Storage** |
+| Collections | Were zero; the five canonical shelves seeded from `seed.sql`, `featured_collection_id` pointed at `home-hero`. Rows only — no membership yet |
+| Premium books | Zero, so the paywall is not yet exercised in production |
+| RLS | Every public table has it enabled; no `SECURITY DEFINER` function is missing a pinned `search_path` |
+
+---
+
 ## Audit alignment
 
-| Blocker | Status |
+| Item | Status |
 | --- | --- |
 | #1 PDF free-book auth | **Fixed** |
 | #2 Webhook idempotency | **Fixed in-repo** (sandbox after deploy) |
 | #3 Migration docs | **Fixed**; live push needs project |
-| #4 Paywall defaults | **Fixed** |
+| #4 Paywall defaults | **Fixed** — the flag is gone from the code, not merely defaulted off |
+| HTTP contracts | **Fixed** — enforced and CI-checked |
+| Reading progress integrity | **Fixed** — atomic partial merge |
+| Publishing / Storage integrity | **Fixed** — publish verifies the object exists |
+| Search RPC limits | **Fixed** — clamped in SQL |
+| Pagination scale | **Fixed** — offset ceiling |
+| Download records | **Decided** — telemetry, documented |
+| Automated verification | **Fixed** — unit tests + CI |
 
 ---
 
@@ -187,6 +324,11 @@ Also: `config.toml` `verify_jwt = true`, `endpoint-manifest.ts`, `api-endpoints.
 ### Created
 
 - `docs/backend-beast-roadmap.md`, `docs/ops/deploy-checklist.md`, `docs/backend-work-progress.md`
+- `supabase/migrations/20260905120000_release_hardening.sql`, `sql/pgadmin/11_release_hardening.sql`
+- `supabase/functions/_shared/{progress,publishing,revenuecat,rpc}.ts`
+- `supabase/functions/avatar-upload-url`, `admin-audit-log`, `admin-plans`, and the category / collection / plan CRUD functions
+- `tests/{pagination,payload,http,progress,revenuecat}_test.ts`, `deno.json`
+- `docs/runbooks/` (5 runbooks + index), `docs/ops/env-matrix.md`
 - `supabase/migrations/20260831140000_revenuecat_events_idempotency.sql`
 - `supabase/migrations/20260831150000_lock_reading_streaks.sql`
 - `sql/pgadmin/09_revenuecat_events_idempotency.sql`, `10_lock_reading_streaks.sql`

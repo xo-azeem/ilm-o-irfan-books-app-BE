@@ -3,58 +3,15 @@ import {
   BadRequestError,
   fail,
   failFromDbError,
-  failUnexpected,
+  handleError,
   handleOptions,
   list,
   ok,
   readJsonBody,
 } from '../_shared/http.ts'
-import { paginate, rangeFromRequest } from '../_shared/pagination.ts'
-import { asOptionalInteger, asOptionalText, asInteger, requireUuidField } from '../_shared/payload.ts'
-
-// The scale is fixed by the database: reading_progress.progress is CHECK
-// (progress >= 0 and progress <= 1), and admin_user_directory counts a book as
-// finished at >= 0.99.
-//
-// Guessing the scale per request cannot work. `progress: 1` is genuinely
-// ambiguous - it is "finished" on a 0-1 scale and "1% read" on a 0-100 scale -
-// and the old `value > 1 ? value / 100 : value` heuristic resolved it as
-// "finished", marking a book complete for a reader one page in. So the two
-// scales get two field names and anything out of range is a 400.
-function resolveProgress(payload: Record<string, unknown>): number | undefined {
-  const hasFraction = Object.hasOwn(payload, 'progress')
-  const hasPercent =
-    Object.hasOwn(payload, 'progress_percent') || Object.hasOwn(payload, 'progressPercent')
-
-  if (hasFraction && hasPercent) {
-    throw new BadRequestError('Send either progress (0-1) or progress_percent (0-100), not both')
-  }
-
-  if (hasPercent) {
-    const raw = payload.progress_percent ?? payload.progressPercent
-    const parsed = Number(raw)
-
-    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
-      throw new BadRequestError('progress_percent must be a number between 0 and 100')
-    }
-
-    return Number((parsed / 100).toFixed(4))
-  }
-
-  if (hasFraction) {
-    const parsed = Number(payload.progress)
-
-    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
-      throw new BadRequestError(
-        'progress must be a number between 0 and 1. Use progress_percent for a 0-100 value.',
-      )
-    }
-
-    return Number(parsed.toFixed(4))
-  }
-
-  return undefined
-}
+import { isRangeNotSatisfiable, paginate, rangeFromRequest } from '../_shared/pagination.ts'
+import { asInteger, asOptionalInteger, asOptionalText, requireUuidField } from '../_shared/payload.ts'
+import { hasAny, resolveProgress } from '../_shared/progress.ts'
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)
@@ -79,6 +36,12 @@ Deno.serve(async (req) => {
         .range(from, to)
 
       if (error) {
+        // The last call of a "load more" loop asks for a page that starts past
+        // the end. That is an empty page, not a failure.
+        if (isRangeNotSatisfiable(error)) {
+          return list(paginate([], count ?? null, page, pageSize))
+        }
+
         return failFromDbError(
           'reading-progress',
           'READING_PROGRESS_READ_FAILED',
@@ -93,43 +56,48 @@ Deno.serve(async (req) => {
     const payload = await readJsonBody(req)
     const bookId = requireUuidField(payload, ['book_id', 'bookId'], 'book_id')
 
-    const currentPage = Object.hasOwn(payload, 'current_page') || Object.hasOwn(payload, 'currentPage')
+    // A partial write must stay partial. The reader app syncs progress from a
+    // background task that knows the page but not the chapter, so anything the
+    // caller did not send is passed as null and left alone by the RPC rather
+    // than defaulted back to page 1 / no chapter.
+    const currentPage = hasAny(payload, ['current_page', 'currentPage'])
       ? asInteger('current_page', { min: 1 })(payload.current_page ?? payload.currentPage)
-      : 1
+      : null
 
-    const totalPages = asOptionalInteger('total_pages', { min: 1 })(
-      payload.total_pages ?? payload.totalPages ?? null,
-    )
+    const totalPages = hasAny(payload, ['total_pages', 'totalPages'])
+      ? asOptionalInteger('total_pages', { min: 1 })(payload.total_pages ?? payload.totalPages)
+      : null
 
-    if (totalPages !== null && currentPage > totalPages) {
+    if (currentPage !== null && totalPages !== null && currentPage > totalPages) {
       throw new BadRequestError('current_page cannot be greater than total_pages')
     }
+
+    // '' is the documented way to clear the chapter; null means "unchanged".
+    const chapterLabel = hasAny(payload, ['chapter_label', 'chapterLabel'])
+      ? asOptionalText('chapter_label')(payload.chapter_label ?? payload.chapterLabel) ?? ''
+      : null
 
     const progress = resolveProgress(payload)
 
     const { data, error } = await ctx.supabase
-      .from('reading_progress')
-      .upsert(
-        {
-          user_id: ctx.user.id,
-          book_id: bookId,
-          current_page: currentPage,
-          total_pages: totalPages,
-          progress: progress ?? 0,
-          chapter_label: asOptionalText('chapter_label')(
-            payload.chapter_label ?? payload.chapterLabel ?? null,
-          ),
-          last_read_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id,book_id' },
-      )
-      .select()
-      .maybeSingle()
+      .rpc('upsert_reading_progress', {
+        p_book_id: bookId,
+        p_current_page: currentPage,
+        p_total_pages: totalPages,
+        p_progress: progress ?? null,
+        p_chapter_label: chapterLabel,
+      })
 
     if (error) {
       // 23503 is a foreign key violation: the book id does not exist.
       if (error.code === '23503') {
         return fail('NOT_FOUND', 'Book not found', 404)
+      }
+
+      // 22023 is raised by the RPC when the merged row would put current_page
+      // past total_pages - the caller's input, so a 400 rather than a 500.
+      if (error.code === '22023') {
+        return fail('INVALID_REQUEST', 'current_page cannot be greater than total_pages', 400)
       }
 
       return failFromDbError(
@@ -142,9 +110,6 @@ Deno.serve(async (req) => {
 
     return ok(data)
   } catch (error) {
-    if (error instanceof BadRequestError) {
-      return fail(error.code, error.message, 400)
-    }
-    return failUnexpected('reading-progress', error)
+    return handleError('reading-progress', error)
   }
 })

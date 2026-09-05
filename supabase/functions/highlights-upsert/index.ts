@@ -1,9 +1,8 @@
 import { requireMethod, requireUser } from '../_shared/auth.ts'
 import {
-  BadRequestError,
   fail,
   failFromDbError,
-  failUnexpected,
+  handleError,
   handleOptions,
   ok,
   readJsonBody,
@@ -105,9 +104,6 @@ Deno.serve(async (req) => {
 
     return ok(data, 201)
   } catch (error) {
-    if (error instanceof BadRequestError) {
-      return fail(error.code, error.message, 400)
-    }
-    return failUnexpected('highlights-upsert', error)
+    return handleError('highlights-upsert', error)
   }
 })

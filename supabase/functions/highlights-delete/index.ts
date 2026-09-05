@@ -1,9 +1,8 @@
 import { requireMethod, requireUser } from '../_shared/auth.ts'
 import {
-  BadRequestError,
   fail,
   failFromDbError,
-  failUnexpected,
+  handleError,
   handleOptions,
   ok,
   readJsonBody,
@@ -47,9 +46,6 @@ Deno.serve(async (req) => {
 
     return ok({ id: data.id, deleted: true })
   } catch (error) {
-    if (error instanceof BadRequestError) {
-      return fail(error.code, error.message, 400)
-    }
-    return failUnexpected('highlights-delete', error)
+    return handleError('highlights-delete', error)
   }
 })

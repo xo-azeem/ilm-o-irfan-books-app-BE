@@ -1,12 +1,5 @@
-import { anonClient } from '../_shared/auth.ts'
-import {
-  BadRequestError,
-  fail,
-  failFromDbError,
-  failUnexpected,
-  handleOptions,
-  ok,
-} from '../_shared/http.ts'
+import { anonClient, requireMethod } from '../_shared/auth.ts'
+import { fail, failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
 import { asUuid } from '../_shared/payload.ts'
 
 Deno.serve(async (req) => {
@@ -14,6 +7,9 @@ Deno.serve(async (req) => {
   if (preflight) return preflight
 
   try {
+    const notAllowed = requireMethod(req, ['GET'])
+    if (notAllowed) return notAllowed
+
     const url = new URL(req.url)
     const rawId = url.searchParams.get('id') ?? url.pathname.split('/').at(-1) ?? ''
 
@@ -65,9 +61,6 @@ Deno.serve(async (req) => {
 
     return ok(book)
   } catch (error) {
-    if (error instanceof BadRequestError) {
-      return fail(error.code, error.message, 400)
-    }
-    return failUnexpected('book-detail', error)
+    return handleError('book-detail', error)
   }
 })

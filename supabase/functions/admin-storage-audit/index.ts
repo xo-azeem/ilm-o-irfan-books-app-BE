@@ -1,5 +1,5 @@
 import { requireAdmin, requireMethod } from '../_shared/auth.ts'
-import { failFromDbError, failUnexpected, handleOptions, ok } from '../_shared/http.ts'
+import { failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)
@@ -25,6 +25,6 @@ Deno.serve(async (req) => {
 
     return ok(data)
   } catch (error) {
-    return failUnexpected('admin-storage-audit', error)
+    return handleError('admin-storage-audit', error)
   }
 })

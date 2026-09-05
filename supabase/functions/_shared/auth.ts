@@ -27,10 +27,30 @@ export function userClient(authHeader: string): SupabaseClient {
   })
 }
 
+export type AuditActor = { id: string; email?: string | null }
+
 // Bypasses RLS. Only reachable after requireAdmin() has passed.
-export function serviceClient(): SupabaseClient {
+//
+// `actor` is forwarded as x-audit-actor-* so private.audit_write() can attribute
+// the change to the admin who made it. Without it every CMS write lands in
+// admin_audit_log as "system", because the service-role key carries no
+// auth.uid(). The trigger only reads those headers on a service_role request,
+// and no client role holds a write grant on an audited table, so a client
+// cannot forge an entry through them.
+export function serviceClient(actor?: AuditActor): SupabaseClient {
+  const headers: Record<string, string> = {}
+
+  if (actor?.id) {
+    headers['x-audit-actor-id'] = actor.id
+  }
+
+  if (actor?.email) {
+    headers['x-audit-actor-email'] = actor.email
+  }
+
   return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
+    ...(Object.keys(headers).length > 0 ? { global: { headers } } : {}),
   })
 }
 
@@ -72,7 +92,7 @@ export async function requireAdmin(req: Request): Promise<AdminContext | Respons
     return ctx
   }
 
-  const admin = serviceClient()
+  const admin = serviceClient({ id: ctx.user.id, email: ctx.user.email })
 
   if (ctx.user.app_metadata?.app_role === 'admin') {
     return { ...ctx, admin }

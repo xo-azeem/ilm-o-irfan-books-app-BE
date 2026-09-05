@@ -1,14 +1,21 @@
 # Backend Audit: Remaining Work
 
-**Date:** 2026-08-31  
+**Opened:** 2026-08-31 · **Last updated:** 2026-09-05  
 **Scope:** Supabase/PostgreSQL backend for the Ilm o Irfan mobile app  
-**Status:** Structurally complete, not yet production-ready
+**Status:** Code complete. Every finding below is fixed in-repo; what is left is runtime
+verification against a real project.
 
 ## Executive Summary
 
 The backend has the main catalog, user, admin, PDF, and RevenueCat webhook functions in place. Shared pagination, authentication helpers, response envelopes, database views, RLS policies, storage buckets, and admin authorization foundations are present.
 
-The remaining work is primarily release hardening and runtime verification. Four issues should be treated as release blockers: PDF authorization for free books, webhook replay and ordering protection, complete migration deployment documentation, and production-safe PDF bypass configuration.
+The four release blockers — free-book PDF authorization, webhook replay and ordering,
+migration documentation, and the production PDF bypass — are closed, as is every item under
+High-Priority Hardening and Automated Verification. Nothing on this list is waiting on code.
+
+What is still open is the work that needs infrastructure the repository does not have: a
+linked Supabase project, a RevenueCat project, the book files, and Docker. See
+[Current Readiness](#current-readiness).
 
 ## Release Blockers
 
@@ -43,69 +50,71 @@ The remaining work is primarily release hardening and runtime verification. Four
 
 ### 4. Close the production PDF bypass
 
-**Status:** Fixed — `.env.example` defaults `ALLOW_PDF_WITHOUT_ENTITLEMENT=false` with an explicit production warning. Setup-guide secrets example sets `false`. Deploy checklist requires closed paywall on staging/prod.
+**Status:** Fixed, and then removed outright. `get-signed-pdf` no longer reads
+`ALLOW_PDF_WITHOUT_ENTITLEMENT` or `app_settings.allow_pdf_without_entitlement`. A default
+of `false` still leaves a switch that one misconfigured deploy can flip from a place no code
+review looks, so the switch is gone: access is admin, or free-and-published, or an active
+entitlement, and there is no fourth branch. The deploy checklist tells operators to unset the
+secret if an earlier deploy created it.
 
-**Owner:** `.env.example`, `docs/setup-guide.md`, `docs/ops/deploy-checklist.md`
+**Owner:** `supabase/functions/get-signed-pdf/index.ts`, `.env.example`, `docs/setup-guide.md`
 
 ## High-Priority Hardening
 
-### HTTP contracts
+All of this is **done in-repo** as of 2026-09-05, in
+`supabase/migrations/20260905120000_release_hardening.sql` and the functions that call it.
+Runtime verification still needs a project.
 
-- Confirm every function enforces its documented HTTP method.
-- Confirm every failure uses `{ error: { code, message } }`.
-- Confirm raw Postgres and runtime error messages are logged server-side only.
-- Ensure public, authenticated, and admin routes all use the shared helpers.
+### HTTP contracts — Fixed
 
-### Reading progress integrity
+Every function enforces its documented method, answers `OPTIONS`, and ends in a catch-all
+that returns the `{ error: { code, message } }` envelope. Seventeen read endpoints had no
+method guard and would serve a GET body to a POST; they do not any more. `handleError()` in
+`_shared/http.ts` is the single tail, so a handler cannot forget the `BadRequestError` branch
+and turn a caller's typo into a 500. `npm run ci:static` fails the build on a regression.
 
-The POST handler currently supplies defaults for omitted fields. A partial update can therefore reset an existing record.
+### Reading progress integrity — Fixed
 
-Choose one contract:
+The merge option was taken. `upsert_reading_progress()` does it in one
+`INSERT ... ON CONFLICT DO UPDATE`, where null means "leave this column alone" and `''`
+clears `chapter_label`. Read-modify-write in the Edge Function would have had the same
+semantics but lost to itself whenever two devices synced at once.
 
-- Require all progress fields on every write, or
-- Read the current row and merge only supplied fields before upserting.
+### Publishing and Storage integrity — Fixed
 
-The second option is more compatible with mobile clients and should be preferred if partial updates are part of the API contract.
+`storage_object_exists()` answers whether the object is really in the bucket, and
+`book_publish_blocker()` turns that into one reason code. `admin-book-create`,
+`admin-book-update` and `admin_bulk_update_books` all consult it before publishing; the bulk
+RPC returns `skippedBooks: [{ id, reason }]` rather than a bare count. `admin_storage_audit()`
+is unchanged and still the tool for cleaning up after the fact.
 
-### Publishing and Storage integrity
+### Search RPC limits — Fixed
 
-Admin publishing validates that `pdf_path` is present, but a path can point to a missing Storage object.
+`search_books()` clamps `p_limit` to 1–100 and `p_offset` to 0–10,000 inside the function,
+so a direct Data API caller gets the same bounds as one going through `books-search`.
 
-Required work:
+### Pagination scale — Fixed
 
-- Check that the PDF object exists before publishing a book, or route publishing through a controlled storage-audit workflow.
-- Test missing-object, valid-object, unpublished, and published cases.
-- Keep `admin_storage_audit()` available for operational cleanup.
+`rangeFromRequest()` rejects an offset past 10,000 rows with `400 PAGE_OUT_OF_RANGE` instead
+of scanning and discarding. Page size stays capped at 100, and every list already ordered on
+a stable key with `id` as the tiebreaker. `buildCursorPagination` remains available if a list
+ever genuinely needs to go deeper.
 
-### Search RPC limits
+### Download records — Decided: telemetry
 
-The Edge Function limits search requests, but direct RPC callers can pass excessive values.
+`downloads-create` records what a device *says* it saved. It is documented as telemetry in
+the code, in `docs/api-endpoints.md`, and in the fixtures: it drives the Downloaded shelf and
+the admin counter and never gates access. Validation now also confirms the book is visible to
+the caller (so a download row cannot be planted against a draft to probe the catalog) and
+caps the reported size. If downloads ever need to be trusted for billing, the change is a
+short-lived token minted by `get-signed-pdf` — not tighter validation of a client field.
 
-Required work:
+### Audit attribution — Fixed (not in the original audit)
 
-- Clamp `p_limit` and `p_offset` inside `search_books()`.
-- Add tests for negative, null, oversized, and normal values.
-
-### Pagination scale
-
-The current endpoints use offset pagination. This is acceptable for launch-sized data but can become expensive for deep pages.
-
-Required work:
-
-- Add a maximum page or offset, or adopt cursor pagination for large catalog and admin lists.
-- Preserve stable ordering with an `id` tiebreaker.
-- Keep page size capped at 100.
-
-### Download records
-
-`downloads-create` currently accepts client-attested completion and file size.
-
-Decide whether downloads are:
-
-- **Telemetry only:** document that they are informational and validate only user/book ownership and field ranges, or
-- **Trusted accounting:** issue a short-lived download token from `get-signed-pdf` and require it when recording completion.
-
-For launch, telemetry is the simpler and safer product interpretation unless billing or compliance depends on download completion.
+Every CMS write through the admin functions was logged as `system`, because the service-role
+key carries no `auth.uid()`. "Who published this?" was unanswerable. `requireAdmin()` now
+forwards the verified caller as `x-audit-actor-*`, and `private.audit_write()` reads those
+headers only on a `service_role` request. `GET /admin-audit-log` exposes the result.
 
 ## Database and Security Audit
 
@@ -130,16 +139,17 @@ Before production deployment:
 
 ## Automated Verification
 
-The repository has `scripts/e2e-endpoints.sh`, but it assumes Docker, local Supabase, Bash, fixed local JWTs, and local fixture data. It is not a hosted-production test.
+| Item | Status |
+| --- | --- |
+| Unit tests: pagination, payload validation, progress scale, response envelopes, webhook state transitions | Done — `tests/`, run with `npm run test:unit` |
+| Generated test users instead of hard-coded credentials | Done — `e2e-endpoints.sh` already created a fresh user per run; the pinned local keys now come from `supabase status` |
+| npm scripts for typecheck, lint, tests | Done — `typecheck`, `lint`, `test:unit`, `ci` |
+| CI that validates configuration and checks migrations | Done — contracts, method/manifest agreement, migration ordering, secret scan, `deno check`, `deno lint`, unit tests |
+| Local E2E when Docker is available | Unchanged — `npm run test:e2e` |
+| Hosted staging smoke-test checklist | Done — `docs/ops/deploy-checklist.md` section G |
 
-Remaining automation work:
-
-- Add unit tests for pagination, payload validation, progress scale handling, response envelopes, and webhook state transitions.
-- Generate test users and fixtures instead of relying on stale hard-coded credentials.
-- Add npm scripts for typecheck, lint, and tests.
-- Add CI that installs dependencies, validates configuration, checks migrations, and runs static tests.
-- Run local E2E when Docker is available.
-- Add a hosted staging smoke-test checklist.
+The webhook state machine moved to `_shared/revenuecat.ts` and the progress scale rules to
+`_shared/progress.ts` specifically so they can be tested without a database or a network.
 
 ## Staging Smoke-Test Matrix
 
@@ -188,12 +198,17 @@ Run these cases against a real staging project:
 
 ## Current Readiness
 
-**Not production-ready until:**
+**Everything that can be done in the repository is done.** What remains needs infrastructure:
 
-- Free-book PDF authorization is corrected.
-- RevenueCat webhook idempotency and ordering are implemented.
-- All migration documentation is synchronized and tested.
-- Production configuration cannot enable the PDF bypass accidentally.
-- Staging runtime tests pass for Auth, RLS, Storage, Edge Functions, and webhook delivery.
+| Remaining | Needs |
+| --- | --- |
+| `db push` against a real project, migration history confirmed | A Supabase project ref |
+| All functions deployed and smoke-tested | The same |
+| RevenueCat sandbox event matrix | A RevenueCat project + store products |
+| Real catalog imported, `admin_storage_audit()` clean | `BOOKS_DIR` with the book files |
+| Local E2E run | Docker |
+| Google OAuth end to end | Google Cloud + Dashboard configuration |
 
-Static review is complete enough to guide implementation. Live verification still requires either a linked Supabase project or Docker Desktop with the local Supabase stack.
+Static review, contract enforcement, unit tests, and CI now catch what they can catch
+without a running database. The rest is runtime verification, and it is blocked on access
+rather than on code.

@@ -1,9 +1,8 @@
 import { requireAdmin, requireMethod } from '../_shared/auth.ts'
 import {
-  BadRequestError,
   fail,
   failFromDbError,
-  failUnexpected,
+  handleError,
   handleOptions,
   ok,
   readJsonBody,
@@ -45,9 +44,6 @@ Deno.serve(async (req) => {
 
     return ok({ table, ids })
   } catch (error) {
-    if (error instanceof BadRequestError) {
-      return fail(error.code, error.message, 400)
-    }
-    return failUnexpected('admin-reorder', error)
+    return handleError('admin-reorder', error)
   }
 })

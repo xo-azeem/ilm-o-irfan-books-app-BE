@@ -1,11 +1,14 @@
-import { requireAdmin } from '../_shared/auth.ts'
-import { failFromDbError, failUnexpected, handleOptions, ok } from '../_shared/http.ts'
+import { requireAdmin, requireMethod } from '../_shared/auth.ts'
+import { failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)
   if (preflight) return preflight
 
   try {
+    const notAllowed = requireMethod(req, ['GET'])
+    if (notAllowed) return notAllowed
+
     const ctx = await requireAdmin(req)
     if (ctx instanceof Response) return ctx
 
@@ -38,6 +41,6 @@ Deno.serve(async (req) => {
 
     return ok(data)
   } catch (error) {
-    return failUnexpected('admin-analytics', error)
+    return handleError('admin-analytics', error)
   }
 })

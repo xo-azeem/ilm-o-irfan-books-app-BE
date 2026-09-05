@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "PAGE_OUT_OF_RANGE",
+    "message": "Page is out of range. Offset pagination stops at 10000 rows; narrow the query instead."
+  }
+}

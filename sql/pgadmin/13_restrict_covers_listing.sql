@@ -1,0 +1,42 @@
+-- pgAdmin twin of 20260905140000_restrict_covers_listing.sql
+-- Prefer supabase/migrations via `db push` for staging/production.
+
+-- Stop clients enumerating the covers bucket.
+--
+-- Supabase's security advisor flags this as "Clients can list all files in this
+-- bucket". The policy it is pointing at:
+--
+--   create policy "covers_public_read"
+--     on storage.objects for select
+--     to anon, authenticated
+--     using (bucket_id = 'covers');
+--
+-- A SELECT policy on storage.objects is what authorises the LIST operation, so
+-- with this in place anyone holding the anon key could call
+-- POST /storage/v1/object/list/covers and receive the full inventory of the
+-- bucket. That is a catalog listing nobody asked us to publish: it exposes the
+-- slug of every title, including any cover uploaded before its book row is
+-- published.
+--
+-- The policy is not what makes covers render. `covers` is a PUBLIC bucket, and
+-- reads through /storage/v1/object/public/covers/<name> are served on the
+-- strength of buckets.public alone - that path never consults RLS. Verified
+-- against the hosted project before writing this migration: with the policy
+-- still in place, an anon list returned 19 objects and the public URL returned
+-- 200; the point of the change is to keep the second and lose the first.
+--
+-- Nothing else depends on it either:
+--   - admin_storage_audit() and admin_delete_storage_object() are
+--     SECURITY DEFINER, so they read storage.objects as the owner and bypass RLS
+--   - the import script and every admin Edge Function use the service-role key
+--   - no Edge Function lists the covers bucket with a client key
+--
+-- The admin insert/update/delete policies on covers are untouched: those gate
+-- writes, which still need to work from the CMS.
+
+drop policy if exists "covers_public_read" on storage.objects;
+
+-- pdfs deliberately has no SELECT policy at all and never did - that is what
+-- forces every read through get-signed-pdf, which checks the entitlement first.
+-- avatars keeps its owner-scoped SELECT: that bucket is private, so a user
+-- fetching their own avatar does go through RLS.

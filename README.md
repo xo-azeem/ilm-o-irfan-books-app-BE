@@ -22,7 +22,9 @@ Schema reference: [`docs/schema.md`](docs/schema.md)
 **Setup + pgAdmin steps:** [`docs/setup-guide.md`](docs/setup-guide.md)  
 **Beast backlog:** [`docs/backend-beast-roadmap.md`](docs/backend-beast-roadmap.md)  
 **Work progress report:** [`docs/backend-work-progress.md`](docs/backend-work-progress.md)  
-**FE fixtures:** [`docs/fixtures/`](docs/fixtures/)
+**FE fixtures:** [`docs/fixtures/`](docs/fixtures/)  
+**Runbooks:** [`docs/runbooks/`](docs/runbooks/)  
+**Env matrix:** [`docs/ops/env-matrix.md`](docs/ops/env-matrix.md)
 
 ## Repo layout
 
@@ -68,11 +70,21 @@ npm run functions:deploy     # deploy all Edge Functions to linked project
 npm run functions:list       # list deployed functions
 npm run books:import         # BOOKS_DIR=D:/Books required (DRY_RUN=1 supported)
 npm run test:e2e             # bash e2e against local stack (Git Bash / WSL on Windows)
-npm run ci:static            # folder/manifest/fixture checks (no Docker)
+npm run test:unit            # Deno unit tests for the shared helpers (no Docker)
+npm run typecheck            # deno check across every function
+npm run lint                 # deno lint
+npm run ci:static            # contracts, method enforcement, fixtures, secret scan (no Docker)
+npm run ci                   # everything CI runs, in order
 ```
 
+Only `test:e2e`, `functions:serve`, `supabase:start` and `db:reset` need Docker.
+`test:unit`, `typecheck` and `lint` need [Deno](https://deno.com) on PATH; `ci:static`
+runs on Node alone.
+
 API response fixtures for the FE: [`docs/fixtures/`](docs/fixtures/).  
-Full hosted steps: [`docs/ops/deploy-checklist.md`](docs/ops/deploy-checklist.md).
+Full hosted steps: [`docs/ops/deploy-checklist.md`](docs/ops/deploy-checklist.md).  
+Environment matrix: [`docs/ops/env-matrix.md`](docs/ops/env-matrix.md).  
+When something breaks: [`docs/runbooks/`](docs/runbooks/).
 
 `types:generate` needs CLI auth — `npx supabase login` once, or set `SUPABASE_ACCESS_TOKEN`.
 Only the `:local` / `supabase:start` / `test:e2e` paths need Docker. Always push migrations before regenerating, or the
@@ -105,7 +117,8 @@ their own, e.g. `PREMIUM_REQUIRED`, `PDF_NOT_IN_STORAGE`, `DEPRECATED_ENDPOINT`.
 
 ### Partial updates
 
-`profile-update`, `admin-settings`, `admin-book-update` and `highlights-upsert` only write the
+`profile-update`, `admin-settings`, `admin-book-update`, `highlights-upsert`,
+`reading-progress`, and the category / collection / plan update endpoints only write the
 fields present in the request body. Sending `{ "full_name": "..." }` leaves the address alone.
 To clear a field, send it explicitly as `null`. An empty body is a 400, not a silent no-op.
 
@@ -173,6 +186,12 @@ Requests are clamped server-side: `pageSize` is capped at 100, and a non-numeric
 `page` falls back to 1 rather than erroring. `page` beyond the last page returns an empty
 `data` array with the real `totalCount`, not a 404.
 
+There is a ceiling. Offset pagination reads and discards every preceding row, so an offset
+past 10,000 rows is answered with `400 PAGE_OUT_OF_RANGE` rather than a table scan. Nothing
+in the product needs to reach past it; a client that does is looping or scraping. Search is
+clamped in the database as well — `search_books()` bounds its own limit and offset, because
+the RPC is reachable directly through the Data API and not only through the Edge Function.
+
 Ordering always includes `id` as a final tiebreaker so a row cannot appear on two pages when
 the primary sort key ties or is null.
 
@@ -211,6 +230,7 @@ Included endpoints:
 - `GET /functions/v1/library-overview`
 - `GET /functions/v1/entitlements-status`
 - `POST /functions/v1/get-signed-pdf`
+- `POST /functions/v1/avatar-upload-url`
 
 These are protected by authenticated access and user-scoped data queries.
 
@@ -224,8 +244,16 @@ Included endpoints:
 - `GET /functions/v1/admin-categories`
 - `GET /functions/v1/admin-collections`
 - `GET /functions/v1/admin-settings` / `PATCH /functions/v1/admin-settings`
+- Author, category, collection and plan CRUD (`admin-*-create` / `-update` / `-delete`)
+- `GET /functions/v1/admin-plans` — includes inactive plans, unlike public `plans-list`
+- `GET /functions/v1/admin-audit-log` — who changed what, filterable by entity and actor
 
-These endpoints enforce admin checks and use service-role access for privileged backend operations.
+These endpoints enforce admin checks and use service-role access for privileged backend
+operations. The full inventory, with methods, is
+[`supabase/functions/_shared/endpoint-manifest.ts`](supabase/functions/_shared/endpoint-manifest.ts).
+
+Day-to-day CMS work needs no raw SQL: every admin RPC has an Edge Function in front of it,
+and each write is attributed to the admin who made it in `admin_audit_log`.
 
 ## Security rules (non-negotiable)
 

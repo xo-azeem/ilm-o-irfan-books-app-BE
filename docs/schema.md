@@ -89,7 +89,8 @@ books.pdf_path   → Storage pdfs/
 | `revenuecat_events` | No client access; service role / webhook only |
 | `app_settings` | `SELECT` for anon + authenticated; `UPDATE` for `is_admin()` only |
 | Catalog writes + unpublished reads | `authenticated` + `is_admin()` (JWT `app_metadata.app_role`) |
-| Storage `covers` / `pdfs` writes | admin JWT only; PDFs still have no client SELECT |
+| Storage `covers` / `pdfs` writes | admin JWT only |
+| Storage reads | No client SELECT policy on `covers` or `pdfs`. `covers` renders through the public bucket URL, which never consults RLS; `pdfs` is reachable only via `get-signed-pdf`. `avatars` keeps an owner-scoped SELECT because that bucket is private |
 | `admin_audit_log` | `SELECT` for `is_admin()`; rows written only by SECURITY DEFINER triggers |
 | library tables (progress / downloads / wishlist / highlights / streaks) | own rows, **plus** `SELECT` all for `is_admin()` |
 | `plans` | public `SELECT` of active plans; full write for `is_admin()` |
@@ -140,6 +141,93 @@ All are `security_invoker`, so admin RLS still applies.
 RevenueCat still owns store purchases — a webhook event overwrites a manual `admin_set_entitlement`
 grant, which is why that grant is labelled promotional.
 
+## Release hardening
+
+`20260905120000_release_hardening.sql` closes the gaps from the pre-release audit.
+
+### Storage-aware publishing
+
+| Function | Purpose |
+| --- | --- |
+| `storage_object_key(bucket, path)` | Normalises a stored path to a Storage key — strips a leading slash and an optional bucket prefix, so `pdfs/x.pdf`, `/pdfs/x.pdf` and `x.pdf` all resolve to the same object |
+| `storage_object_exists(bucket, path)` | `SECURITY DEFINER` boolean over `storage.objects`; answers one question rather than exposing the listing |
+| `book_publish_blocker(book_id)` | `NOT_FOUND`, `PDF_PATH_MISSING`, `PDF_NOT_IN_STORAGE`, or null when the title is safe to publish |
+
+`books_published_needs_pdf` only ever checked that `pdf_path` was non-empty, so a typo
+published a title whose readers hit `PDF_NOT_IN_STORAGE`. `admin_bulk_update_books` now runs
+`book_publish_blocker()` per id and returns `skippedBooks: [{ id, reason }]` instead of
+silently counting them; `admin-book-create` and `admin-book-update` run the same check
+before flipping `is_published`.
+
+### Reading progress
+
+`upsert_reading_progress(book_id, current_page, total_pages, progress, chapter_label)` —
+`security invoker`, writes only `auth.uid()`'s row. Null means "leave this column alone" and
+`''` clears `chapter_label`, so a partial sync cannot reset a reader to page 1. The merge is
+one `INSERT ... ON CONFLICT DO UPDATE`, so two devices syncing at once cannot interleave the
+way a read-then-write would.
+
+### Search limits
+
+`search_books()` clamps `p_limit` to 1–100 and `p_offset` to 0–10,000 inside the function.
+The Edge Function already capped page size, but the RPC is granted to `anon` and is callable
+directly through the Data API.
+
+### Audit attribution
+
+The admin functions write with the service-role key, which carries no `auth.uid()`, so every
+CMS change used to be logged as `system`. `private.audit_write()` now falls back to the
+`x-audit-actor-id` / `x-audit-actor-email` request headers, and only on a `service_role`
+request — no client role can reach that branch, and none holds a write grant on an audited
+table. `requireAdmin()` sets those headers from the verified JWT.
+
+### Category / collection / plan CRUD
+
+| Function | Guard |
+| --- | --- |
+| `admin_upsert_category(id, label, slug, icon_key, accent, accent_dark, sort_order)` | `is_admin()`; slug derived from label when omitted |
+| `admin_delete_category(id, force)` | Refuses while any book uses it (`23503`) |
+| `admin_upsert_collection(id, title, slug, subtitle, accent, kind, sort_order, is_published)` | `is_admin()`; validates `kind` |
+| `admin_delete_collection(id, force)` | Refuses the featured collection |
+| `admin_upsert_plan(id, code, name, price_cents, currency, interval, features, revenuecat_product_id, is_active, sort_order)` | `is_admin()`; validates interval and price |
+| `admin_delete_plan(id, force)` | Refuses while entitlements reference it |
+
+These are called with the **caller's JWT**, not the service-role key, so `is_admin()` sees
+the real user and the audit trigger records them without needing the header fallback.
+
+`admin_plan_rows` is the matching view: every plan including inactive ones, with an
+entitlement count. `plans_public_read_active` hides those from `plans-list` by design.
+
+## The last-admin guard actually guards now
+
+`20260905130000_fix_last_admin_guard.sql`. `admin_set_user_role()` declared its local
+variable as `current_role`, which is a **reserved SQL keyword**: inside the function body
+Postgres parses it as the built-in session role, never as the variable. Both guards that
+read it were therefore dead code, so the last admin could be demoted — locking everyone out
+of the CMS with no way back except raw SQL — and setting a role on a user id that does not
+exist reported success while updating nothing.
+
+Reproduce it on any database before this migration:
+
+```sql
+do $$
+declare current_role text;
+begin
+  select 'admin' into current_role;
+  raise notice '%', current_role;   -- prints the session role, not 'admin'
+end
+$$;
+```
+
+Renaming to `v_current_role` is the whole fix; the surrounding logic was already correct.
+`found` now drives the existence check, so the function no longer relies on a sentinel.
+`admin-set-user-role` maps the guard to `409 LAST_ADMIN`.
+
+### Indexes added
+
+`entitlements(plan_id)`, `book_categories(category_id)`, `collection_books(book_id)` — each
+is a foreign key that Postgres does not index for you and that the new delete guards scan.
+
 ## Applying schema
 
 - **Canonical:** `supabase/migrations/` via `npm run db:push` (preferred for staging/production)
@@ -147,6 +235,7 @@ grant, which is why that grant is labelled promotional.
   `01_full_schema.sql` → `03_harden_grants_rls_indexes.sql` → `04_admin_roles.sql` →
   `06_app_settings.sql` → `07_admin_cms_v2.sql` → `08_search_views_and_admin_fixes.sql` →
   `09_revenuecat_events_idempotency.sql` → `10_lock_reading_streaks.sql` →
+  `11_release_hardening.sql` →
   `02_seed.sql` (and optionally `05_remove_dummy_seed_books.sql` if old dummy rows exist)
 - After applying, regenerate typings: `npm run types:generate`
 - Hosted deploy steps: [`docs/ops/deploy-checklist.md`](./ops/deploy-checklist.md)
