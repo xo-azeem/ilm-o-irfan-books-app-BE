@@ -349,13 +349,13 @@ the RLS regression block, and the corrected last-admin guard.
 
 | # | Action | Owner | Blocker |
 | --- | --- | --- | --- |
-| 1 | Enable Email Auth + promote first admin + re-login | You | Dashboard |
-| 2 | Provide / place books under `BOOKS_DIR` | You | No books folder found |
-| 3 | `BOOKS_DIR=… npm run books:import` then storage audit | Agent | Needs #2 |
-| 4 | Google OAuth + RC sandbox | You + agent | Dashboards |
-| 5 | `npm run smoke:rls` with user/admin JWTs | Agent | Needs signed-in tokens |
-| 6 | FE wiring to Supabase/RC | FE repo | Optional parallel track |
-| 7 | Production project + merge/tag | You | Explicit ask |
+| 1 | Provide / place books under `BOOKS_DIR` | You | No usable books folder found |
+| 2 | `BOOKS_DIR=… npm run books:import` then storage audit | Agent | Needs #1 |
+| 3 | Google OAuth + RC sandbox | You + agent | Dashboards |
+| 4 | FE wiring to Supabase/RC | FE repo | Optional parallel track |
+| 5 | Production project + merge/tag | You | Explicit ask |
+
+**Staging auth (§F) done:** Email on; `admin@gmail.com` + `test@gmail.com` sign-in OK (`Password123!`); authenticated smokes green.
 
 ---
 
@@ -364,8 +364,8 @@ the RLS regression block, and the corrected last-admin guard.
 ### §2 Hosted — not done until
 
 - [x] Project linked, migrations applied, all EFs deployed, paywall closed, smoke OK
-- [ ] Admin promoted
-- [ ] Confirmations On for Email Auth
+- [x] Admin promoted (seed `admin@gmail.com` + verified JWT)
+- [x] Confirmations On for Email Auth
 
 ### §4 Content — code done; data not done until
 

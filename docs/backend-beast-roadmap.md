@@ -69,7 +69,9 @@ Goal: production-grade Supabase backend that is secure, operable, content-ready,
 - [x] npm/docs scripts for deploy + secrets (`functions:deploy`, deploy checklist, env matrix)
 - [x] Staging function secrets set (`REVENUECAT_*`, `SIGNED_PDF_EXPIRES_IN`; RC auth may be staging placeholder)
 - [x] `ALLOW_PDF_WITHOUT_ENTITLEMENT` removed from the code entirely — no default to get wrong, and `.env.example` says so
-- [ ] Promote first admin (`UPDATE profiles SET role = 'admin' …`) and force re-login
+- [x] Promote first admin (`UPDATE profiles SET role = 'admin' …`) and force re-login
+  - Staging: seed created `admin@gmail.com` (`role=admin`, JWT `app_role=admin`); password reset + `entitlements-status` verified (`isAdmin` + `canAccessPremium`)
+  - Helpers: `scripts/reset-hosted-user-password.mjs`, `scripts/verify-hosted-admin.mjs`, `scripts/run-authenticated-smokes.mjs`
 - [x] Storage policies verified against the hosted project; the broad `covers_public_read` SELECT policy that let any client enumerate the bucket was dropped in `20260905140000`
 - [x] Private ops note template: `docs/ops/private-ops.example.md` (fill locally; never commit secrets)
 - [ ] Upgrade to Supabase Pro before public launch (PITR / reliability)
@@ -78,15 +80,15 @@ Goal: production-grade Supabase backend that is secure, operable, content-ready,
 
 ## 3. Auth (production-ready)
 
-- [~] Email/password Auth enabled (`enable_signup = true`)
+- [x] Email/password Auth enabled (`enable_signup = true`) — hosted Email provider on; confirmations On (`mailer_autoconfirm=false`)
 - [ ] Google OAuth fully configured (Dashboard + Google Cloud + `config.toml` / hosted provider)
 - [ ] RN deep-link / redirect URLs for iOS + Android (today `site_url` / redirects are `127.0.0.1:3000` only)
 - [ ] Email templates (confirm, reset) branded for Ilm o Irfan
-- [ ] Launch decision: email confirmations on vs soft (`enable_confirmations` is currently `false` locally)
+- [x] Launch decision: email confirmations on vs soft — staging/prod keep confirmations On; local Docker may soft-confirm
 - [ ] Rate limits / abuse defaults reviewed on hosted Auth
 - [ ] Password reset flow verified (Auth supports it; FE has no Forgot UI yet — still BE-ready)
 - [x] Signup metadata contract frozen: `full_name`, `phone` → `handle_new_user` → `profiles` (documented in `docs/mobile-contract.md`)
-- [ ] Test matrix: signup → profile row → JWT; Google signup; admin promote → re-login → `app_role` claim
+- [x] Test matrix (staging): signup/seed → profile row → JWT; admin promote → `app_role` claim; `entitlements-status` OK for admin + promotional test user. Google signup still pending.
 
 ---
 
@@ -343,10 +345,11 @@ What remains needs infrastructure, not code:
 
 ## Suggested next
 
-1. **You:** Dashboard → Email Auth On → sign up admin → promote SQL (§F) → re-login
-2. **You:** books folder → `BOOKS_DIR=… npm run books:import` → `admin-storage-audit` ([books-ingest.md](./ops/books-ingest.md))
-3. **You:** RevenueCat project + Google OAuth in the Dashboards
-4. **Then:** `npm run smoke:rls` with user/admin JWTs, tag, and merge into `dev` / `main` when ready
+1. **You:** Provide `BOOKS_DIR` with real PDFs/covers → `npm run books:import` → `admin-storage-audit` ([books-ingest.md](./ops/books-ingest.md))
+2. **You:** RevenueCat project + Google OAuth in the Dashboards
+3. **Then:** full staging matrix, tag, and merge into `dev` / `main` when ready
+
+Staging auth is ready: `admin@gmail.com` / `test@gmail.com` (password `Password123!` after reset helper).
 
 ---
 
@@ -362,6 +365,6 @@ What remains needs infrastructure, not code:
 - [x] Hosted deploy + smoke
 - [ ] Real books + storage audit
 - [ ] Google OAuth + RC sandbox
-- [ ] First admin promote (Email Auth + SQL — deploy-checklist §F)
+- [x] First admin promote (Email Auth + seed admin verified on staging)
 - [ ] Merge to `main`
 - [x] `supportEmail` on home-feed + books ingest doc + `smoke:rls`

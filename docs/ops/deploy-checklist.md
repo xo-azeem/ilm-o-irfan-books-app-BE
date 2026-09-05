@@ -107,7 +107,9 @@ where email = 'YOUR_ADMIN_EMAIL';
 
 5. Sign out and back in (JWT must refresh `app_metadata.app_role`).
 
-- [ ] `entitlements-status` returns `isAdmin: true` and `canAccessPremium: true`
+Staging note: seed may already create `admin@gmail.com` / `test@gmail.com`. If login fails, run `node scripts/reset-hosted-user-password.mjs …` then `node scripts/run-authenticated-smokes.mjs`.
+
+- [x] `entitlements-status` returns `isAdmin: true` and `canAccessPremium: true` (staging seed admin verified)
 
 **Later (Google):** Dashboard Google provider + iOS/Android redirect / deep links when the FE ships Google login.
 

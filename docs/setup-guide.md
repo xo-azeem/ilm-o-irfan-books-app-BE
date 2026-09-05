@@ -263,16 +263,23 @@ Then refresh **Tables** — you should see catalog data.
 
 ### Local development accounts
 
-`supabase/seed.sql` creates two sign-in-ready accounts on every `supabase start` / `db reset`,
-mirroring the hosted project. Both use the password `Password123!`.
+`supabase/seed.sql` creates two sign-in-ready accounts on every `supabase start` / `db reset`.
+Both use the password `Password123!`.
 
 | Email | Role | Premium access via |
 | --- | --- | --- |
 | `admin@gmail.com` | `admin` | admin role bypass — no subscription needed |
 | `test@gmail.com` | `user` | comped entitlement (promotional, never expires) |
 
-`seed.sql` runs against the **local stack only** — `supabase db push` does not execute it, so
-these accounts cannot reach the hosted project.
+On **hosted**, apply seed with `npx supabase db query --linked --file supabase/seed.sql` (or `DEPLOY_SEED=1 npm run deploy:hosted`).  
+If password login fails after seed (hash mismatch across GoTrue versions), reset with:
+
+```bash
+node scripts/reset-hosted-user-password.mjs admin@gmail.com 'Password123!'
+node scripts/reset-hosted-user-password.mjs test@gmail.com 'Password123!'
+```
+
+Then verify: `node scripts/verify-hosted-admin.mjs` or `node scripts/run-authenticated-smokes.mjs`.
 
 > Script 08 is required. `books-search` calls `public.search_books()`, which only exists after
 > it runs, and the admin endpoints cannot read `app_settings` without the `service_role`
