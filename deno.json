@@ -1,11 +1,15 @@
 {
   "$schema": "https://deno.land/x/deno/cli/schemas/config-file.v1.json",
   "//": "Local tooling only. The Supabase CLI bundles each function folder on its own and does not read this file; it exists so `deno check`, `deno lint` and `deno test` behave the same here and in CI.",
+  "imports": {
+    "@types/node": "npm:@types/node@^22"
+  },
+  "nodeModulesDir": "auto",
   "tasks": {
     "check": "deno check supabase/functions/*/index.ts supabase/functions/_shared/*.ts",
     "lint": "deno lint",
     "fmt:check": "deno fmt --check",
-    "test": "deno test --allow-env --allow-net=esm.sh,jsr.io,deno.land tests/"
+    "test": "deno test --allow-env --allow-net=esm.sh,jsr.io,deno.land,registry.npmjs.org tests/"
   },
   "lint": {
     "include": ["supabase/functions/", "tests/"],

@@ -38,7 +38,7 @@ Deno.test('withNestedBookCoverUrl only decorates the nested book', () => {
     book: { id: '1', cover_path: 'x.webp' },
   })
   assertEquals(
-    (out.book as { coverUrl: string }).coverUrl,
+    (out.book as Record<string, unknown>).coverUrl,
     'https://abc.supabase.co/storage/v1/object/public/covers/x.webp',
   )
   assertEquals(out.book_id, '1')

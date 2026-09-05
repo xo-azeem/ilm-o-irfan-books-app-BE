@@ -17,7 +17,7 @@
     "types:generate:local": "node scripts/gen-types.mjs --local",
     "books:import": "node scripts/import-folder-books.mjs",
     "test:e2e": "bash scripts/e2e-endpoints.sh",
-    "test:unit": "deno test --allow-env --allow-net=esm.sh,jsr.io,deno.land tests/",
+    "test:unit": "deno test --allow-env --allow-net=esm.sh,jsr.io,deno.land,registry.npmjs.org tests/",
     "typecheck": "deno check supabase/functions/_shared/*.ts supabase/functions/*/index.ts",
     "lint": "deno lint",
     "fmt:check": "deno fmt --check",
