@@ -103,14 +103,15 @@ Seed intentionally has **no books, no authors, no collections**. Old dummy shelv
   - Create or require collection rows before joining (`new-arrivals` / `trending` currently silent no-ops)
   - Support `is_premium` flag, real category slugs, author upsert, publish gate
   - Document cover naming + Storage path conventions
-- [ ] Upload all objects to Storage with stable paths (`covers/…`, `pdfs/…`)
-- [ ] Authors, categories, collections, hero shelves populated with real titles
+- [x] Upload all objects to Storage with stable paths (`covers/…`, `pdfs/…`) — staging: 22 PDFs / 21 covers
+- [x] Authors, categories, collections, hero shelves populated (staging catalog + sample free/premium)
 - [x] Publish gate enforced against Storage, not just the column (`book_publish_blocker()`)
-- [ ] Cover public URLs verified in app-sized cards
-- [ ] Run `admin_storage_audit()` — zero broken references / orphans cleaned via `admin_delete_storage_object`
+- [ ] Cover public URLs verified in app-sized cards (FE visual check)
+- [x] Run `admin_storage_audit()` — zero broken / orphans on staging
 - [ ] Staging vs production catalog strategy (same schema, different data)
-- [ ] Document INP→PDF pipeline handoff (`FE docs/inp-to-pdf-conversion.md` → Storage `pdfs`) — pointer in `docs/ops/books-ingest.md`
+- [x] Document INP→PDF pipeline handoff — pointer in `docs/ops/books-ingest.md`
 - [x] Decide: audio lessons are marketing copy only for v1 (no audio schema) — keep out of catalog schema
+- [x] Sample ingest pack: `fixtures/sample-books` + `npm run books:sample` / `smoke:pdf`
 
 ---
 
@@ -345,11 +346,12 @@ What remains needs infrastructure, not code:
 
 ## Suggested next
 
-1. **You:** Provide `BOOKS_DIR` with real PDFs/covers → `npm run books:import` → `admin-storage-audit` ([books-ingest.md](./ops/books-ingest.md))
-2. **You:** RevenueCat project + Google OAuth in the Dashboards
-3. **Then:** full staging matrix, tag, and merge into `dev` / `main` when ready
+1. **You:** RevenueCat project + real webhook secret ([staging-billing-auth.md](./ops/staging-billing-auth.md))
+2. **You:** Google OAuth client + Dashboard provider + RN redirects
+3. **Optional:** Point FE at staging URL + anon key ([fe-handoff.md](./ops/fe-handoff.md)); visual-check covers
+4. **Then:** tag / merge when ready
 
-Staging auth is ready: `admin@gmail.com` / `test@gmail.com` (password `Password123!` after reset helper).
+Staging catalog + PDF paywall already verified (`npm run smoke:pdf`).
 
 ---
 
@@ -363,7 +365,7 @@ Staging auth is ready: `admin@gmail.com` / `test@gmail.com` (password `Password1
 - [x] Unit tests, typecheck, lint, secret scan, CI
 - [x] Runbooks, env matrix, FE fixture pack
 - [x] Hosted deploy + smoke
-- [ ] Real books + storage audit
+- [x] Real books + storage audit (staging)
 - [ ] Google OAuth + RC sandbox
 - [x] First admin promote (Email Auth + seed admin verified on staging)
 - [ ] Merge to `main`

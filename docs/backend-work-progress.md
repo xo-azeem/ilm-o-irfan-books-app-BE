@@ -349,13 +349,13 @@ the RLS regression block, and the corrected last-admin guard.
 
 | # | Action | Owner | Blocker |
 | --- | --- | --- | --- |
-| 1 | Provide / place books under `BOOKS_DIR` | You | No usable books folder found |
-| 2 | `BOOKS_DIR=… npm run books:import` then storage audit | Agent | Needs #1 |
-| 3 | Google OAuth + RC sandbox | You + agent | Dashboards |
-| 4 | FE wiring to Supabase/RC | FE repo | Optional parallel track |
-| 5 | Production project + merge/tag | You | Explicit ask |
+| 1 | RevenueCat project + real webhook secret | You | Dashboard — see `ops/staging-billing-auth.md` |
+| 2 | Google OAuth + RN redirects | You | Google Cloud + Dashboard |
+| 3 | FE visual cover check + wire staging URL | FE | Optional |
+| 4 | Production project + merge/tag | You | Explicit ask |
 
-**Staging auth (§F) done:** Email on; `admin@gmail.com` + `test@gmail.com` sign-in OK (`Password123!`); authenticated smokes green.
+**Staging catalog:** 22 published books; storage audit clean; PDF gates verified (`npm run smoke:pdf`).  
+**Staging auth:** `admin@gmail.com` / `test@gmail.com` (`Password123!`).
 
 ---
 
@@ -370,6 +370,6 @@ the RLS regression block, and the corrected last-admin guard.
 ### §4 Content — code done; data not done until
 
 - [x] Seed applied on staging DB  
-- [ ] Real books imported + Storage objects present  
-- [ ] `admin_storage_audit()` clean  
-- [ ] `home-feed.shelves` returns real membership (not only newest fallback)
+- [x] Real books imported + Storage objects present (staging)  
+- [x] `admin_storage_audit()` clean  
+- [x] `home-feed.shelves` can return membership (catalog present; sample books joined to shelves)

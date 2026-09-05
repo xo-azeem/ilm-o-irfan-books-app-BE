@@ -29,6 +29,7 @@ Schema reference: [`docs/schema.md`](docs/schema.md)
 **Env matrix:** [`docs/ops/env-matrix.md`](docs/ops/env-matrix.md)  
 **Deploy checklist:** [`docs/ops/deploy-checklist.md`](docs/ops/deploy-checklist.md)  
 **Book ingest:** [`docs/ops/books-ingest.md`](docs/ops/books-ingest.md)  
+**Staging RC / Google:** [`docs/ops/staging-billing-auth.md`](docs/ops/staging-billing-auth.md)  
 **FE handoff:** [`docs/ops/fe-handoff.md`](docs/ops/fe-handoff.md)
 
 ## Repo layout
@@ -80,7 +81,9 @@ npm run types:generate:local # types from the local Docker stack instead
 npm run functions:serve      # local functions (needs Docker + supabase start)
 npm run functions:deploy     # deploy all Edge Functions to linked project
 npm run functions:list       # list deployed functions
-npm run books:import         # BOOKS_DIR=D:/Books required (DRY_RUN=1 supported)
+npm run books:import         # BOOKS_DIR=… (or fixtures/sample-books); DRY_RUN=1 supported
+npm run books:sample         # write fixtures/sample-books tiny PDF+cover pack
+npm run smoke:pdf            # free/premium/admin PDF gates + PREMIUM_REQUIRED
 npm run test:e2e             # bash e2e against local stack (Git Bash / WSL on Windows)
 npm run test:unit            # Deno unit tests for the shared helpers (no Docker)
 npm run typecheck            # deno check across every function

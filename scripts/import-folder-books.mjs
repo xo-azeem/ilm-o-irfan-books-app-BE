@@ -358,10 +358,11 @@ function loadEnv() {
 }
 
 function supabase(args) {
-  const cli = join(ROOT, 'node_modules', 'supabase', 'dist', 'supabase.js')
-  execFileSync(process.execPath, [cli, ...args], {
+  execFileSync('npx', ['supabase', ...args], {
     cwd: ROOT,
     stdio: 'inherit',
+    shell: true,
+    env: process.env,
   })
 }
 
