@@ -51,7 +51,7 @@ Docker is **optional** (local Path C). Hosted deploy does not need Docker.
 ```bash
 npx supabase link --project-ref YOUR_PROJECT_REF
 npm run db:push
-DEPLOY_SEED=1 npx supabase db query --file supabase/seed.sql   # optional
+DEPLOY_SEED=1 npx supabase db query --linked --file supabase/seed.sql   # optional
 npm run functions:deploy
 npx supabase secrets set REVENUECAT_WEBHOOK_AUTH="Bearer YOUR_SHARED_SECRET"
 npx supabase secrets set REVENUECAT_ENTITLEMENT_ID="premium"

@@ -19,7 +19,7 @@
  *   npm run deploy:hosted
  */
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -148,37 +148,45 @@ if (doSeed) {
     '\nNOTE: seed.sql includes local-only auth users; on hosted they only apply if Auth allows inserts.',
   )
   console.warn('      Prefer Dashboard signup + admin promote for real accounts.')
-  run('apply seed', ['supabase', 'db', 'query', '--file', 'supabase/seed.sql'])
+  run('apply seed', [
+    'supabase',
+    'db',
+    'query',
+    '--linked',
+    '--file',
+    'supabase/seed.sql',
+  ])
 } else {
   console.log('\n== seed skipped == (set DEPLOY_SEED=1 to apply supabase/seed.sql)')
 }
 
 run('deploy edge functions', ['supabase', 'functions', 'deploy'])
 
-run('set REVENUECAT_WEBHOOK_AUTH', [
-  'supabase',
-  'secrets',
-  'set',
-  `REVENUECAT_WEBHOOK_AUTH=${rcAuth}`,
-  '--project-ref',
-  ref,
-])
-run('set REVENUECAT_ENTITLEMENT_ID', [
-  'supabase',
-  'secrets',
-  'set',
-  `REVENUECAT_ENTITLEMENT_ID=${rcEntitlement}`,
-  '--project-ref',
-  ref,
-])
-run('set SIGNED_PDF_EXPIRES_IN', [
-  'supabase',
-  'secrets',
-  'set',
-  `SIGNED_PDF_EXPIRES_IN=${pdfTtl}`,
-  '--project-ref',
-  ref,
-])
+// --env-file keeps values with spaces intact under Windows shell:true
+const secretsFile = join(ROOT, '.tmp-hosted-secrets.env')
+writeFileSync(
+  secretsFile,
+  [
+    `REVENUECAT_WEBHOOK_AUTH=${rcAuth}`,
+    `REVENUECAT_ENTITLEMENT_ID=${rcEntitlement}`,
+    `SIGNED_PDF_EXPIRES_IN=${pdfTtl}`,
+    '',
+  ].join('\n'),
+  'utf8',
+)
+try {
+  run('set function secrets', [
+    'supabase',
+    'secrets',
+    'set',
+    '--env-file',
+    secretsFile,
+    '--project-ref',
+    ref,
+  ])
+} finally {
+  unlinkSync(secretsFile)
+}
 
 const unset = runQuiet([
   'supabase',

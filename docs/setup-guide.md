@@ -72,7 +72,7 @@ npm install
 npx supabase login
 npx supabase link --project-ref YOUR_PROJECT_REF
 npx supabase db push
-npx supabase db query --file supabase/seed.sql
+npx supabase db query --linked --file supabase/seed.sql
 ```
 
 ### 3. Deploy Edge Functions (if not using deploy:hosted)
