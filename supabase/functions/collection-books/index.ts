@@ -64,10 +64,14 @@ Deno.serve(async (req) => {
       sort_order: collection.sort_order,
     }
 
+    // Count and page only membership whose book is still published.
+    // Junction rows for drafts / deleted titles must not inflate totalCount or
+    // consume offset slots — otherwise hasNextPage lies and pages skip titles.
     const { data: membership, count, error: membershipError } = await supabase
       .from('collection_books')
-      .select('book_id, sort_order', { count: 'exact' })
+      .select('book_id, sort_order, book:books!inner(id)', { count: 'exact' })
       .eq('collection_id', collection.id)
+      .eq('book.is_published', true)
       .order('sort_order', { ascending: true })
       .order('book_id', { ascending: true })
       .range(from, to)
@@ -118,8 +122,13 @@ Deno.serve(async (req) => {
       .map((id) => byId.get(id))
       .filter((book): book is ReturnType<typeof withCoverUrl> => Boolean(book))
 
+    // After the published filter, every id should resolve in book_list_items.
+    // If a row vanished mid-request, prefer the truthful page length over a
+    // stale junction count so hasNextPage cannot stay stuck true.
+    const totalCount = count ?? ordered.length
+
     return list({
-      ...paginate(ordered, count ?? null, page, pageSize),
+      ...paginate(ordered, totalCount, page, pageSize),
       collection: collectionMeta,
     })
   } catch (error) {

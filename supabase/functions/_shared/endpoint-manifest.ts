@@ -66,7 +66,8 @@ export const endpointManifest: EndpointDefinition[] = [
     method: 'GET',
     access: 'public',
     description: 'Returns paginated books in one published collection, ordered by sort_order.',
-    notes: 'Pass id or slug (not both). Envelope includes collection meta beside page fields.',
+    notes:
+      'Pass id or slug (not both). Envelope includes collection meta beside page fields. Pagination count excludes unpublished membership.',
   },
   {
     name: 'plans-list',

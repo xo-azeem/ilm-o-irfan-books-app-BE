@@ -36,5 +36,7 @@ Full mobile contract: [`../mobile-contract.md`](../mobile-contract.md).
 - `book-detail` never includes `pdf_path` — open files via `get-signed-pdf`.
 - `books-list?category=<uuid-or-slug>` filters the catalog for Search chips.
 - `collection-books` returns list pagination plus a `collection` meta object.
+  `totalCount` / paging only include **published** membership (drafts in the
+  junction table do not inflate the count or eat offset slots).
 
 These files are the frozen v1 contract. A change to any of them is a change to the app.

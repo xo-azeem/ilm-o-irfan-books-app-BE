@@ -39,6 +39,9 @@ Every Edge Function returns one of:
 | Search (query) | GET | `/functions/v1/books-search?q=` | Public |
 | Categories chips | GET | `/functions/v1/categories-list` | Public |
 | Collection tap | GET | `/functions/v1/collection-books?id=` or `?slug=` | Public |
+
+`collection-books` paginates only **published** books. Draft / missing titles still listed in `collection_books` do not count toward `totalCount` or consume page offset.
+
 | Collections strip | GET | `/functions/v1/collections-list` | Public |
 | Book detail | GET | `/functions/v1/book-detail?id=<uuid>` | Public |
 | Reader open / download | POST | `/functions/v1/get-signed-pdf` body `{ "bookId" }` | User |
