@@ -24,7 +24,7 @@ Pricing numbers below are based on public vendor pricing as of July 2026. Always
 | Database engine | **PostgreSQL** (inside Supabase) | All structured / relational data |
 | Identity | **Supabase Auth** | Email/password, Google, sessions, JWTs |
 | Object storage | **Supabase Storage** | Book covers, PDFs, avatars |
-| Privileged server logic | **Supabase Edge Functions** | Signed PDF URLs, RevenueCat webhooks |
+| Privileged server logic | **Supabase Edge Functions** | Catalog/user/admin APIs, signed PDF URLs, RevenueCat webhooks |
 | Subscriptions / IAP | **RevenueCat** + App Store + Google Play | Purchases, restores, entitlement sync |
 | On-device prefs / session | **MMKV** | Theme, auth session, small local cache |
 | Offline book files | **Device filesystem** | Downloaded PDFs for offline reading |
@@ -240,11 +240,11 @@ Rules:
 
 | Function | Responsibility |
 | --- | --- |
-| `get-signed-pdf` | Verify JWT → load book → allow if **admin**, **env/DB free-PDF flag**, or **active entitlement** (admins may preview drafts) → return signed Storage URL |
+| `get-signed-pdf` | Verify JWT → load book → allow if **admin**, **free published book**, or **active entitlement** (admins may preview drafts) → return signed Storage URL |
 | `revenuecat-webhook` | Verify webhook → upsert `entitlements` with service role |
-| (in-app admin CMS) | Authenticated admins mutate catalog via RLS (`is_admin()` from JWT `app_metadata.app_role`); cover/PDF uploads go to Storage |
+| Catalog / library / admin CMS EFs | Prefer Edge Functions for a stable mobile contract; Data API + RLS remains available for direct reads |
 
-Normal catalog reads/writes do **not** need Edge Functions — use the Supabase client + RLS.
+Inventory: `supabase/functions/_shared/endpoint-manifest.ts` (~58 functions). There is **no** production PDF bypass flag.
 
 ### Admin CMS surface
 
@@ -628,7 +628,7 @@ At this stage, optimize PDF size and ensure clients don’t re-download existing
 - [x] CI: contract checks, secret scan, typecheck, lint, unit tests  
 - [x] Runbooks (`docs/runbooks/`) and env matrix (`docs/ops/env-matrix.md`)  
 - [x] One-pass deploy + hosted smoke (`npm run deploy:hosted`, `npm run smoke:hosted`)  
-- [ ] Hosted deploy verified against a real project (run `npm run deploy:hosted` + `npm run smoke:hosted`; needs project ref — see `docs/ops/deploy-checklist.md`)  
+- [x] Hosted staging deploy verified (`rwnmckrepvycydmtgvcq` — link, migrations, seed, all EFs, secrets, `smoke:hosted` green). Still: Email Auth confirmations, first admin promote, real catalog, RC/Google.
 
 **Billing**
 

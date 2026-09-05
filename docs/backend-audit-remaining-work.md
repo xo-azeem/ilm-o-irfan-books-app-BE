@@ -2,8 +2,8 @@
 
 **Opened:** 2026-08-31 · **Last updated:** 2026-09-06  
 **Scope:** Supabase/PostgreSQL backend for the Ilm o Irfan mobile app  
-**Status:** Code complete. Deploy path is ship-ready in-repo (`npm run deploy:hosted`).  
-Runtime verification against a linked project still needs credentials.
+**Status:** Code complete. Staging hosted deploy verified (`npm run deploy:hosted` + `smoke:hosted`).  
+Remaining: Email Auth / first admin, real catalog (`BOOKS_DIR`), RevenueCat, Google OAuth, prod project.
 
 ## Executive Summary
 
@@ -204,12 +204,12 @@ infrastructure:
 
 | Remaining | Needs |
 | --- | --- |
-| `npm run deploy:hosted` + checklist §G free-path smoke | A Supabase project ref + CLI login / access token |
-| All functions live and `smoke:hosted` green | The same |
+| Email Auth + first admin promote + re-login | Dashboard + SQL (checklist §F) |
 | RevenueCat sandbox event matrix | A RevenueCat project + store products |
 | Real catalog imported, `admin_storage_audit()` clean | `BOOKS_DIR` with the book files |
 | Local E2E run | Docker |
 | Google OAuth end to end | Google Cloud + Dashboard configuration |
+| Production project twin | New Supabase project + secrets |
 
 Ship path: [`docs/ops/deploy-checklist.md`](./ops/deploy-checklist.md) · FE env: [`docs/ops/fe-handoff.md`](./ops/fe-handoff.md).
 

@@ -137,6 +137,7 @@ select code, is_active from public.plans;
 ```
 
 - [ ] `npm run smoke:hosted` passes (or `home-feed` curl returns 200 `{ data }`)
+- [ ] `npm run smoke:rls` passes (anon checks; optional JWTs)
 - [ ] Free published book opens for signed-in user without entitlement *(needs catalog)*
 - [ ] Premium book returns `PREMIUM_REQUIRED` without entitlement *(needs catalog)*
 - [ ] Premium book opens with active entitlement or admin *(needs RC or admin)*

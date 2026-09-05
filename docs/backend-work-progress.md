@@ -2,14 +2,14 @@
 
 **Repo:** `D:\ilm-o-irfan-books-app-BE`  
 **Companion FE:** `D:\ilm-o-irfan-books-app`  
-**Branch (working):** `feat/app-optimization`  
+**Branch (working):** `feat/mobile-api-parity`  
 **Report started:** 2026-08-31  
-**Last updated:** 2026-09-06 (repo ship-ready deploy path: `deploy:hosted` / `smoke:hosted` / manual CI workflow)
+**Last updated:** 2026-09-06 (staging hosted live + `supportEmail` / ingest / `smoke:rls`)
 
 This file tracks work done in the “absolute beast backend” stream.  
 Backlog: [`backend-beast-roadmap.md`](./backend-beast-roadmap.md) · Audit: [`backend-audit-remaining-work.md`](./backend-audit-remaining-work.md)
 
-**Hosted status:** Treat any earlier “Phase 8 hosted sync Done” notes as **historical**. Hosted is **unverified until** [`ops/deploy-checklist.md`](./ops/deploy-checklist.md) §G free-path smoke is signed off on the current project. Use `npm run deploy:hosted` + `npm run smoke:hosted` for a fresh proof.
+**Hosted status:** Staging project `rwnmckrepvycydmtgvcq` linked — migrations, seed, all Edge Functions, secrets, and `npm run smoke:hosted` **passed**. Still open: Email Auth + first admin (§F), real catalog, RC/Google, prod twin.
 
 ---
 
@@ -28,14 +28,13 @@ Backlog: [`backend-beast-roadmap.md`](./backend-beast-roadmap.md) · Audit: [`ba
 
 | Item | Why it is not happening |
 | --- | --- |
-| `supabase link` / `db push` / `functions:deploy` to hosted | Needs **project ref** + CLI login / `SUPABASE_ACCESS_TOKEN` on this machine — then `npm run deploy:hosted` |
 | Local `supabase start` / `db reset` / `npm run test:e2e` | **Docker is not installed** (`docker` command missing) |
-| Uploading real book PDFs/covers via `books:import` | **No `BOOKS_DIR`** on disk (`D:/Books`, `D:/Projects/Books`, etc. all missing) and no linked project / `.env` with service role |
-| Creating staging/production Supabase projects | Requires your Supabase Dashboard account |
+| Uploading real book PDFs/covers via `books:import` | **No `BOOKS_DIR`** on disk yet — see [`ops/books-ingest.md`](./ops/books-ingest.md) |
+| Creating production Supabase project | Requires your Supabase Dashboard account |
 | Google OAuth / App Store / Play / RevenueCat live projects | Dashboard + store credentials — ops on your side |
 | Wiring the React Native app to Supabase/RC | FE work in `D:\ilm-o-irfan-books-app` (out of this BE pass unless you ask) |
 | Merging to `main` / deleting stale remote branches | Ops decision — not done without your explicit ask |
-| Regenerating `types/database.ts` from hosted schema | Needs linked project after migrations are pushed |
+| First admin promote | Needs you to enable Email Auth + sign up, then SQL (§F) |
 
 **Unblocked work continued anyway** (below): seed shelves, import script, home-feed/library/profile APIs, streak lock, admin CMS Edge Function wrappers, docs.
 
@@ -350,14 +349,13 @@ the RLS regression block, and the corrected last-admin guard.
 
 | # | Action | Owner | Blocker |
 | --- | --- | --- | --- |
-| 1 | Create Supabase project + send **project ref** | You | — |
+| 1 | Enable Email Auth + promote first admin + re-login | You | Dashboard |
 | 2 | Provide / place books under `BOOKS_DIR` | You | No books folder found |
-| 3 | Install Docker (optional local Path C + e2e) | You | Docker missing |
-| 4 | link → `db:push` → deploy EFs → secrets → smoke | Agent | Needs #1 |
-| 5 | `BOOKS_DIR=… npm run books:import` then storage audit | Agent | Needs #1 + #2 |
-| 6 | Google OAuth + RC sandbox | You + agent | Dashboards |
-| 7 | FE wiring to Supabase/RC | FE repo | Optional parallel track |
-| 8 | Deploy workflow with secrets | Agent | Needs your Supabase CI credentials |
+| 3 | `BOOKS_DIR=… npm run books:import` then storage audit | Agent | Needs #2 |
+| 4 | Google OAuth + RC sandbox | You + agent | Dashboards |
+| 5 | `npm run smoke:rls` with user/admin JWTs | Agent | Needs signed-in tokens |
+| 6 | FE wiring to Supabase/RC | FE repo | Optional parallel track |
+| 7 | Production project + merge/tag | You | Explicit ask |
 
 ---
 
@@ -365,11 +363,13 @@ the RLS regression block, and the corrected last-admin guard.
 
 ### §2 Hosted — not done until
 
-- [ ] Project linked, migrations applied (incl. RC events + streak lock), all EFs deployed, paywall closed, admin promoted, smoke OK
+- [x] Project linked, migrations applied, all EFs deployed, paywall closed, smoke OK
+- [ ] Admin promoted
+- [ ] Confirmations On for Email Auth
 
 ### §4 Content — code done; data not done until
 
-- [ ] Seed applied on target DB  
+- [x] Seed applied on staging DB  
 - [ ] Real books imported + Storage objects present  
 - [ ] `admin_storage_audit()` clean  
 - [ ] `home-feed.shelves` returns real membership (not only newest fallback)

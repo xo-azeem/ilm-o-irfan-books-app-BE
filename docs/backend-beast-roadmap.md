@@ -52,37 +52,26 @@ Goal: production-grade Supabase backend that is secure, operable, content-ready,
 
 - [ ] Merge `dev` → `main` when release-ready (main is still init/docs-only)
 - [ ] Align or delete stale remotes: `feat/app-functioanlity`, `feat/app-optimization` (alias of `dev`), empty `staging-1.0.0`
-- [ ] Fix remaining wrong paths in docs/rules (still present in places):
-  - FE: `D:\ilm-o-irfan-books-app` (not `D:\Projects\Ilm-o-Irfan-App-FE`)
-  - BE: `D:\ilm-o-irfan-books-app-BE` (not `D:\Projects\Ilm-o-Irfan-App-BE` in `docs/setup-guide.md`)
+- [x] Companion FE/BE paths documented as `D:\ilm-o-irfan-books-app` and `D:\ilm-o-irfan-books-app-BE` (Cursor rule + setup-guide)
 - [ ] Tag releases (`v1.0.0-staging`, etc.) after deploy verification
 - [ ] Protect `main` / require PR reviews
 - [x] Empty stub migration kept deliberately (commented no-op — deleting it breaks the ledger on any database that already recorded it)
-- [ ] Sync stale doc claims: setup-guide / stack checklist still imply “only PDF + webhook” EFs; README claims Google Auth while `config.toml` has Google `enabled = false`
+- [x] Stale “PDF + webhook only” / Google-enabled claims fixed in stack + README (Google stays Dashboard-ops until configured)
 
 ---
 
 ## 2. Hosted infrastructure (must ship)
 
-- [~] Create / confirm production Supabase project
-- [ ] Separate **staging** project (same migrations, different data/secrets)
-- [ ] `supabase link` + `db push` (all migrations applied) on staging then prod
-- [ ] Deploy **every** Edge Function (not only PDF + webhook)
+- [x] Staging Supabase project linked (`rwnmckrepvycydmtgvcq`)
+- [ ] Separate **production** project (same migrations, different data/secrets)
+- [x] `supabase link` + `db push` (migrations up to date) on staging
+- [x] Deploy **every** Edge Function on staging
 - [x] npm/docs scripts for deploy + secrets (`functions:deploy`, deploy checklist, env matrix)
-- [ ] Set function secrets / env (env matrix: local / staging / prod):
-
-  | Variable | Local | Staging | Prod |
-  | --- | --- | --- | --- |
-  | `SUPABASE_URL` / anon / service role | local | staging | prod |
-  | `REVENUECAT_WEBHOOK_AUTH` | test secret | staging secret | rotated prod secret |
-  | `REVENUECAT_ENTITLEMENT_ID` | `premium` | `premium` | `premium` |
-  | `SIGNED_PDF_EXPIRES_IN` | 300 | 300 | 300 (or shorter) |
-  | Google OAuth client ids | optional | required if testing Google | required |
-
+- [x] Staging function secrets set (`REVENUECAT_*`, `SIGNED_PDF_EXPIRES_IN`; RC auth may be staging placeholder)
 - [x] `ALLOW_PDF_WITHOUT_ENTITLEMENT` removed from the code entirely — no default to get wrong, and `.env.example` says so
-- [ ] Promote first admin (`UPDATE profiles SET role = 'admin' …` or future EF) and force re-login
+- [ ] Promote first admin (`UPDATE profiles SET role = 'admin' …`) and force re-login
 - [x] Storage policies verified against the hosted project; the broad `covers_public_read` SELECT policy that let any client enumerate the bucket was dropped in `20260905140000`
-- [ ] Private ops note: project refs, webhook URLs, secret locations (never commit secrets)
+- [x] Private ops note template: `docs/ops/private-ops.example.md` (fill locally; never commit secrets)
 - [ ] Upgrade to Supabase Pro before public launch (PITR / reliability)
 
 ---
@@ -96,7 +85,7 @@ Goal: production-grade Supabase backend that is secure, operable, content-ready,
 - [ ] Launch decision: email confirmations on vs soft (`enable_confirmations` is currently `false` locally)
 - [ ] Rate limits / abuse defaults reviewed on hosted Auth
 - [ ] Password reset flow verified (Auth supports it; FE has no Forgot UI yet — still BE-ready)
-- [ ] Signup metadata contract frozen: `full_name`, `phone` → `handle_new_user` → `profiles`
+- [x] Signup metadata contract frozen: `full_name`, `phone` → `handle_new_user` → `profiles` (documented in `docs/mobile-contract.md`)
 - [ ] Test matrix: signup → profile row → JWT; Google signup; admin promote → re-login → `app_role` claim
 
 ---
@@ -118,8 +107,8 @@ Seed intentionally has **no books, no authors, no collections**. Old dummy shelv
 - [ ] Cover public URLs verified in app-sized cards
 - [ ] Run `admin_storage_audit()` — zero broken references / orphans cleaned via `admin_delete_storage_object`
 - [ ] Staging vs production catalog strategy (same schema, different data)
-- [ ] Document INP→PDF pipeline handoff (`FE docs/inp-to-pdf-conversion.md` → Storage `pdfs`)
-- [ ] Decide: audio lessons are marketing copy only for v1 (no audio schema) — keep out of catalog schema
+- [ ] Document INP→PDF pipeline handoff (`FE docs/inp-to-pdf-conversion.md` → Storage `pdfs`) — pointer in `docs/ops/books-ingest.md`
+- [x] Decide: audio lessons are marketing copy only for v1 (no audio schema) — keep out of catalog schema
 
 ---
 
@@ -145,8 +134,8 @@ Seed intentionally has **no books, no authors, no collections**. Old dummy shelv
 - [x] Public catalog EFs
 - [x] Authenticated library EFs
 - [x] `get-signed-pdf` + deprecated `signed-pdf` 410
-- [x] **`home-feed` product shape:** today returns generic collections + newest books + categories; does **not** use `app_settings.featured_collection_id` or guarantee `kind='hero'` / trending shelves for FE Home
-- [ ] Trending semantics (optional): most-read window vs “newest published” (FE mock says Trending)
+- [x] **`home-feed` product shape:** `featuredCollectionId`, curated `shelves.{hero,trending,newArrivals}`, `supportEmail`
+- [x] Trending semantics: curated `trending` collection (not most-read); empty → newest published fallback
 - [x] `profile-update`: add `date_of_birth` to editable allow-list (column exists; FE Personal Details needs it; email stays Auth-owned)
 - [x] Streak read: exposed via `profile-read` or dedicated EF (`reading_streaks` exists + trigger; no EF today)
 - [x] Streak writes locked to the trigger: authenticated can currently `UPDATE` own `reading_streaks` via Data API — prefer trigger-only writes
@@ -183,26 +172,21 @@ SQL RPCs exist; day-to-day CMS should not require SQL. Wrap:
 
 ### 6.3 Nice-to-have product APIs
 
-- [ ] Clarify FE “Saved lessons” → map to `wishlist` (product naming)
-- [ ] Support email / about: expose `app_settings.support_email` (already in settings) to app About if needed
-- [ ] Forgot-password is Auth-native — no custom EF required
+- [x] Clarify FE “Saved lessons” → map to `wishlist` (product naming) — in `docs/mobile-contract.md`
+- [x] Support email / about: expose `app_settings.support_email` as `home-feed.supportEmail`
+- [x] Forgot-password is Auth-native — no custom EF required
 
 ---
 
 ## 7. Security hardening (beast mode)
 
 - [x] Production paywall closed — the bypass flag is gone from the code, not merely defaulted off
-- [ ] Service role key never in the mobile app (anon + user JWT only)
+- [x] Service role key never in the mobile app (anon + user JWT only) — documented in mobile-contract + stack
 - [x] Reviewed `verify_jwt` flags in `config.toml` per function (public catalog + webhook + deprecated `signed-pdf` are `false`)
-- [ ] Decide fate of deprecated `signed-pdf` (keep 410 forever vs remove from deploy)
+- [x] Decide fate of deprecated `signed-pdf` (keep 410 forever for old clients; `smoke:rls` asserts it)
 - [ ] CORS: `_shared/http.ts` uses `Access-Control-Allow-Origin: *` — OK for mobile; tighten if admin web ships
 - [ ] Signed URL TTL short; no long-lived public PDF links; confirm **no client SELECT** on bucket `pdfs`
-- [ ] RLS regression suite (automated):
-  - anon cannot read unpublished books
-  - user cannot INSERT/UPDATE/DELETE `entitlements`
-  - user cannot UPDATE `profiles.role`
-  - non-admin cannot call admin EFs / RPCs
-  - non-entitled user gets `PREMIUM_REQUIRED` from `get-signed-pdf`
+- [x] RLS regression suite (automated): `npm run smoke:rls` — anon unpublished leak, entitlements insert, admin deny, signed-pdf 410, optional user/admin JWT cases
 - [ ] Last-admin demotion guard verified in e2e
 - [x] Streak column not client-writable
 - [x] Webhook: secret required, malformed envelopes rejected, shared helpers; rotation runbook written
@@ -261,24 +245,12 @@ Backend is not “beast” until the mobile contract is frozen. FE today is stil
 
 ### 11.1 Backend-owned contract work
 
-- [ ] Field map FE camelCase ↔ DB / EF snake_case documented and stable (`docs/schema.md` has a start — finish + fixtures)
-- [ ] Gate premium UI on `canAccessPremium` (not only `isActive`) — document in API + FE
-- [ ] Progress: `progress` (0–1) **or** `progress_percent` (0–100), never both
-- [ ] Partial update semantics documented and tested
-- [ ] Checked-in response fixtures for: `home-feed`, `book-detail`, `library-overview`, `entitlements-status`, `get-signed-pdf`
-- [ ] Document mock → real mappings:
-
-  | FE mock | Backend |
-  | --- | --- |
-  | `author: string` | nested `author` / `author_name` |
-  | `readTime: "4 hr read"` | `read_time_minutes` (format on client) |
-  | `price` float | `price_cents` + `currency` |
-  | `coverColor` / `coverColorDark` | `cover_color` / `cover_color_dark` (+ `cover_path`) |
-  | mock ids (`hero-1`, …) | UUIDs |
-  | `chapter` / `timeLeft` | `chapter_label`; `timeLeft` client-computed |
-  | `dateOfBirth` | `date_of_birth` (add to `profile-update`) |
-  | editable email | Auth-owned, not `profile-update` |
-  | `renewsOn` | `entitlements.expires_at` |
+- [x] Field map FE camelCase ↔ DB / EF snake_case documented and stable (`docs/mobile-contract.md` + fixtures)
+- [x] Gate premium UI on `canAccessPremium` (not only `isActive`) — document in API + FE
+- [x] Progress: `progress` (0–1) **or** `progress_percent` (0–100), never both
+- [x] Partial update semantics documented and tested
+- [x] Checked-in response fixtures for: `home-feed`, `book-detail`, `library-overview`, `entitlements-status`, `get-signed-pdf`
+- [x] Document mock → real mappings (see `docs/mobile-contract.md` field map)
 
 ### 11.2 FE wiring (tracked here so BE “done” is honest — implement in FE repo)
 
@@ -295,12 +267,12 @@ Backend is not “beast” until the mobile contract is frozen. FE today is stil
 
 - [x] Env matrix doc — `docs/ops/env-matrix.md`
 - [x] Fixture pack linked from README
-- [ ] Production ingest how-to (`BOOKS_DIR` layout, premium flags, publish, audit)
+- [x] Production ingest how-to (`docs/ops/books-ingest.md`)
 - [x] README scripts section documents every npm script
 - [x] Refreshed `docs/setup-guide.md` functions inventory (all 57)
-- [ ] Refresh `docs/backend-stack.md` checklist vs current EF surface
+- [x] Refresh `docs/backend-stack.md` checklist vs current EF surface
 - [x] `docs/runbooks/` written
-- [ ] Keep Cursor rule FE path correct
+- [x] Keep Cursor rule FE path correct (`D:\ilm-o-irfan-books-app`)
 
 ---
 
@@ -360,20 +332,21 @@ What remains needs infrastructure, not code:
 
 | Blocked on | Items |
 | --- | --- |
-| A Supabase project ref + CLI login | §2 hosted deploy, §3 Auth configuration, migration history verification |
-| Docker | §8 local E2E run |
+| Dashboard Email Auth + first admin SQL | §3 promote admin, JWT `app_role` re-login |
 | `BOOKS_DIR` with the real files | §4 catalog ingest, cover verification, storage audit |
 | RevenueCat + store accounts | §5 sandbox event matrix |
+| Google Cloud + Dashboard | §3 Google OAuth + redirects |
 | Your call | §1 merge to `main`, tag, branch protection |
+| Separate production project | §2 prod twin of staging |
 
 ---
 
 ## Suggested next
 
-1. **You:** project ref → link → `db:push` → `functions:deploy` → secrets → smoke (deploy checklist section G)
-2. **You:** books folder → `BOOKS_DIR=… npm run books:import` → `admin-storage-audit`
+1. **You:** Dashboard → Email Auth On → sign up admin → promote SQL (§F) → re-login
+2. **You:** books folder → `BOOKS_DIR=… npm run books:import` → `admin-storage-audit` ([books-ingest.md](./ops/books-ingest.md))
 3. **You:** RevenueCat project + Google OAuth in the Dashboards
-4. **Then:** run the §8 staging matrix, tag, and merge `dev` → `main`
+4. **Then:** `npm run smoke:rls` with user/admin JWTs, tag, and merge into `dev` / `main` when ready
 
 ---
 
@@ -386,7 +359,9 @@ What remains needs infrastructure, not code:
 - [x] Audit attribution: every CMS write names the admin who made it
 - [x] Unit tests, typecheck, lint, secret scan, CI
 - [x] Runbooks, env matrix, FE fixture pack
-- [ ] Hosted deploy + smoke
+- [x] Hosted deploy + smoke
 - [ ] Real books + storage audit
 - [ ] Google OAuth + RC sandbox
+- [ ] First admin promote (Email Auth + SQL — deploy-checklist §F)
 - [ ] Merge to `main`
+- [x] `supportEmail` on home-feed + books ingest doc + `smoke:rls`

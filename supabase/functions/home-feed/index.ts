@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
         .limit(10),
       supabase
         .from('app_settings')
-        .select('featured_collection_id')
+        .select('featured_collection_id, support_email')
         .eq('id', 1)
         .maybeSingle(),
     ])
@@ -117,7 +117,8 @@ Deno.serve(async (req) => {
       )
     }
 
-    // If shelves are empty (no membership yet), fall back to newest published books.
+    // Shelves are curated collections (not a most-read algorithm). Empty
+    // membership falls back to newest published books so Home is never blank.
     const newest = (booksRes.data ?? []) as BookCard[]
     if (newArrivals.length === 0) {
       newArrivals = newest
@@ -134,6 +135,7 @@ Deno.serve(async (req) => {
       books: withCoverUrls(newest),
       categories: categoriesRes.data ?? [],
       featuredCollectionId: settingsRes.data?.featured_collection_id ?? null,
+      supportEmail: settingsRes.data?.support_email ?? null,
       shelves: {
         hero: withCoverUrls(hero),
         trending: withCoverUrls(trending),

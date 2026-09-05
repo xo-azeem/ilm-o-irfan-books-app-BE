@@ -120,10 +120,27 @@ Library shelves nest a leaner `book` object (also with `coverUrl`):
 | `initials` / `memberSince` | derive from `full_name` / `created_at` |
 | `count: "24 books"` | `book_count` (number) |
 | Lucide `icon` | `icon_key` (string) |
+| About / support email | `home-feed.supportEmail` (`app_settings.support_email`) |
+| Saved lessons | `wishlist-*` endpoints |
 
 ---
 
-## Progress
+## Auth signup metadata
+
+Pass on `signUp` / OAuth so `handle_new_user` fills `profiles`:
+
+| Metadata key | Profile column | Notes |
+| --- | --- | --- |
+| `full_name` (or `name`) | `full_name` | Prefer `full_name` |
+| `phone` | `phone` | Optional |
+
+Email comes from Auth, not metadata. After admin promote, force re-login so JWT picks up `app_metadata.app_role`.
+
+---
+
+## Home shelves
+
+`shelves.trending` / `newArrivals` / `hero` are **curated** collection membership (`trending`, `new-arrivals`, `home-hero`), not a most-read algorithm. Empty shelves fall back to newest published books.
 
 - `progress` is a fraction **0.0–1.0**.
 - Or send `progress_percent` **0–100**. Never both.

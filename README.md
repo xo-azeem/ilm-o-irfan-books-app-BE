@@ -28,6 +28,7 @@ Schema reference: [`docs/schema.md`](docs/schema.md)
 **Runbooks:** [`docs/runbooks/`](docs/runbooks/)  
 **Env matrix:** [`docs/ops/env-matrix.md`](docs/ops/env-matrix.md)  
 **Deploy checklist:** [`docs/ops/deploy-checklist.md`](docs/ops/deploy-checklist.md)  
+**Book ingest:** [`docs/ops/books-ingest.md`](docs/ops/books-ingest.md)  
 **FE handoff:** [`docs/ops/fe-handoff.md`](docs/ops/fe-handoff.md)
 
 ## Repo layout
@@ -73,6 +74,7 @@ npm run db:push              # push migrations to the linked project
 npm run link                 # supabase link --project-ref … (interactive)
 npm run deploy:hosted        # one-pass: link → push → functions → secrets
 npm run smoke:hosted         # public EF smoke against SUPABASE_URL
+npm run smoke:rls            # RLS / paywall regression against hosted project
 npm run types:generate       # types from the linked project (run AFTER db:push)
 npm run types:generate:local # types from the local Docker stack instead
 npm run functions:serve      # local functions (needs Docker + supabase start)

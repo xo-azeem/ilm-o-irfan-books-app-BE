@@ -67,7 +67,8 @@ These are for tooling, not for the deployed functions.
 | `DEFAULT_IS_PREMIUM` | `npm run books:import` | Default flag when `meta.json` omits it |
 | `DRY_RUN` / `SQL_ONLY` | `npm run books:import` | Emit SQL without uploading |
 | `ANON` / `SERVICE` | `npm run test:e2e` | Optional override; read from `supabase status` otherwise |
-| `SUPABASE_USER_JWT` | `npm run smoke:hosted` | Optional authenticated smoke |
+| `SUPABASE_USER_JWT` | `smoke:hosted` / `smoke:rls` | Optional authenticated checks |
+| `SUPABASE_ADMIN_JWT` | `smoke:rls` | Optional admin checks (`isAdmin`) |
 
 CI runs static checks on every push (contracts, Deno typecheck/lint/unit tests). Hosted
 deploy is **manual only**:
@@ -93,6 +94,7 @@ staging when RevenueCat is not wired yet. Replace before any real purchase traff
 # One pass (preferred)
 DEPLOY_SEED=1 npm run deploy:hosted
 npm run smoke:hosted
+npm run smoke:rls
 npm run types:generate   # after migrations, with linked project
 
 # Or step by step
