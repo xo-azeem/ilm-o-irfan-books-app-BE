@@ -4,12 +4,12 @@
 **Companion FE:** `D:\ilm-o-irfan-books-app`  
 **Branch (working):** `feat/mobile-api-parity`  
 **Report started:** 2026-08-31  
-**Last updated:** 2026-09-06 (staging hosted live + `supportEmail` / ingest / `smoke:rls`)
+**Last updated:** 2026-09-07 (covers smoke, auth URIs, catalog env docs; PR #3 tip)
 
 This file tracks work done in the “absolute beast backend” stream.  
 Backlog: [`backend-beast-roadmap.md`](./backend-beast-roadmap.md) · Audit: [`backend-audit-remaining-work.md`](./backend-audit-remaining-work.md)
 
-**Hosted status:** Staging project `rwnmckrepvycydmtgvcq` linked — migrations, seed, all Edge Functions, secrets, and `npm run smoke:hosted` **passed**. Still open: Email Auth + first admin (§F), real catalog, RC/Google, prod twin.
+**Hosted status:** Staging `rwnmckrepvycydmtgvcq` live — migrations, seed, Edge Functions, secrets, `smoke:hosted` + `smoke:covers` green. Auth Email on; seed admin/test; catalog + sample PDFs. Still open externally: RevenueCat live webhook, Google OAuth, custom SMTP, production twin, merge/tag.
 
 ---
 
