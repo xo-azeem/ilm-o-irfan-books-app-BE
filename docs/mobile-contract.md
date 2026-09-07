@@ -110,7 +110,7 @@ Library shelves nest a leaner `book` object (also with `coverUrl`):
 | `coverColor` / `coverColorDark` | `cover_color` / `cover_color_dark` |
 | cover image | `coverUrl` |
 | `readTime: "4 hr read"` | `read_time_minutes` |
-| `price` float / `$` | `price_cents` + `currency` |
+| `price` float / `$` | `price_cents` + `currency` (marketing); checkout uses RevenueCat store price |
 | `hero-1` ids | UUIDs |
 | `chapter` / `timeLeft` | `chapter_label`; compute `timeLeft` from remaining progress |
 | `dateOfBirth` | `date_of_birth` (`YYYY-MM-DD`) |
@@ -163,6 +163,12 @@ Access for a PDF:
 3. book is premium and entitlement is active
 
 Otherwise `403 PREMIUM_REQUIRED`.
+
+### Plan prices vs store IAP
+
+- `plans-list` / plan rows expose `price_cents` + `currency` for **catalog copy** (e.g. PKR marketing).
+- The amount charged at purchase comes from **App Store / Play via RevenueCat** — show that localized price on buy buttons.
+- Never client-write `entitlements`. Comps: admin `admin-set-entitlement` (`store=promotional`); RC webhooks can overwrite.
 
 ---
 

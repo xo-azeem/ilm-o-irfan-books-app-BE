@@ -18,6 +18,7 @@
     "books:import": "node scripts/import-folder-books.mjs",
     "books:sample": "node scripts/create-sample-books.mjs",
     "smoke:pdf": "node scripts/verify-pdf-gates.mjs && node scripts/verify-premium-required.mjs",
+    "smoke:covers": "node scripts/verify-cover-urls.mjs",
     "test:e2e": "bash scripts/e2e-endpoints.sh",
     "test:unit": "deno test --allow-env --allow-net=esm.sh,jsr.io,deno.land,registry.npmjs.org tests/",
     "typecheck": "deno check supabase/functions/_shared/*.ts supabase/functions/*/index.ts",

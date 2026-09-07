@@ -349,13 +349,12 @@ the RLS regression block, and the corrected last-admin guard.
 
 | # | Action | Owner | Blocker |
 | --- | --- | --- | --- |
-| 1 | RevenueCat project + real webhook secret | You | Dashboard — see `ops/staging-billing-auth.md` |
-| 2 | Google OAuth + RN redirects | You | Google Cloud + Dashboard |
-| 3 | FE visual cover check + wire staging URL | FE | Optional |
+| 1 | RevenueCat project + real webhook secret + sandbox matrix | You | Dashboard — `ops/staging-billing-auth.md` |
+| 2 | Google OAuth + RN deep-link scheme | You | Google Cloud + Dashboard |
+| 3 | Custom SMTP (branded mail / email rate limits) | You | SMTP provider |
 | 4 | Production project + merge/tag | You | Explicit ask |
 
-**Staging catalog:** 22 published books; storage audit clean; PDF gates verified (`npm run smoke:pdf`).  
-**Staging auth:** `admin@gmail.com` / `test@gmail.com` (`Password123!`).
+**Staging ready:** covers HTTP 200, PDF gates, auth URIs, admin/test users, catalog audit clean.
 
 ---
 

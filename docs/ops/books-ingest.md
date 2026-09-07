@@ -2,6 +2,8 @@
 
 Import local book folders into a **linked** Supabase project (Storage + catalog rows).
 
+Related: [`catalog-environments.md`](./catalog-environments.md) (staging vs production data).
+
 ## Layout
 
 ```text

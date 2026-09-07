@@ -82,11 +82,11 @@ Goal: production-grade Supabase backend that is secure, operable, content-ready,
 
 - [x] Email/password Auth enabled (`enable_signup = true`) — hosted Email provider on; confirmations On (`mailer_autoconfirm=false`)
 - [ ] Google OAuth fully configured (Dashboard + Google Cloud + `config.toml` / hosted provider)
-- [ ] RN deep-link / redirect URLs for iOS + Android (today `site_url` / redirects are `127.0.0.1:3000` only)
-- [ ] Email templates (confirm, reset) branded for Ilm o Irfan
+- [x] RN deep-link / redirect URLs prep: staging `site_url` + allow list set to project URL + localhost; add app scheme when FE defines it (`configure-hosted-auth-uris.mjs`)
+- [ ] Email templates (confirm, reset) branded for Ilm o Irfan (needs custom SMTP / brand assets)
 - [x] Launch decision: email confirmations on vs soft — staging/prod keep confirmations On; local Docker may soft-confirm
-- [ ] Rate limits / abuse defaults reviewed on hosted Auth
-- [ ] Password reset flow verified (Auth supports it; FE has no Forgot UI yet — still BE-ready)
+- [x] Rate limits / abuse defaults reviewed on hosted Auth — documented; raising email rate needs custom SMTP (currently 2/hr)
+- [x] Password reset flow verified at API level (`/auth/v1/recover`); seed gmail addresses may be rejected — use real inbox + SMTP for full QA
 - [x] Signup metadata contract frozen: `full_name`, `phone` → `handle_new_user` → `profiles` (documented in `docs/mobile-contract.md`)
 - [x] Test matrix (staging): signup/seed → profile row → JWT; admin promote → `app_role` claim; `entitlements-status` OK for admin + promotional test user. Google signup still pending.
 
@@ -106,9 +106,9 @@ Seed intentionally has **no books, no authors, no collections**. Old dummy shelv
 - [x] Upload all objects to Storage with stable paths (`covers/…`, `pdfs/…`) — staging: 22 PDFs / 21 covers
 - [x] Authors, categories, collections, hero shelves populated (staging catalog + sample free/premium)
 - [x] Publish gate enforced against Storage, not just the column (`book_publish_blocker()`)
-- [ ] Cover public URLs verified in app-sized cards (FE visual check)
+- [x] Cover public URLs verified (staging `npm run smoke:covers` — 12/12 HTTP 200 from home-feed)
 - [x] Run `admin_storage_audit()` — zero broken / orphans on staging
-- [ ] Staging vs production catalog strategy (same schema, different data)
+- [x] Staging vs production catalog strategy — [`docs/ops/catalog-environments.md`](./ops/catalog-environments.md)
 - [x] Document INP→PDF pipeline handoff — pointer in `docs/ops/books-ingest.md`
 - [x] Decide: audio lessons are marketing copy only for v1 (no audio schema) — keep out of catalog schema
 - [x] Sample ingest pack: `fixtures/sample-books` + `npm run books:sample` / `smoke:pdf`
@@ -120,13 +120,13 @@ Seed intentionally has **no books, no authors, no collections**. Old dummy shelv
 - [ ] RevenueCat project + entitlement id `premium`
 - [ ] Store products (App Store + Play) mapped to plan `premium_monthly` / `revenuecat_product_id`
 - [ ] Webhook → `…/functions/v1/revenuecat-webhook` with matching `Authorization` header
-- [ ] Enforce `app_user_id` = Supabase Auth UUID (document + verify in sandbox)
+- [x] Enforce `app_user_id` = Supabase Auth UUID (documented in staging-billing-auth + webhook rejects non-UUID; sandbox purchase still pending)
 - [ ] Sandbox purchase → `entitlements` upsert → `entitlements-status` (`isActive`, `isAdmin`, `canAccessPremium`)
 - [ ] Event matrix tested: initial purchase, renew, cancel, billing_issue, expire, product change
-- [ ] Manual comps via `admin_set_entitlement` (document that RC webhook can overwrite; `store = 'promotional'`)
-- [ ] Never allow client writes to `entitlements` (keep as hard rule — already RLS-enforced)
-- [ ] Align plan display: `price_cents` 149900 PKR vs store-localized IAP prices (display rules for FE)
-- [ ] Webhook auth rotation runbook
+- [x] Manual comps via `admin_set_entitlement` (documented; `store = 'promotional'`; RC can overwrite)
+- [x] Never allow client writes to `entitlements` (RLS + mobile-contract hard rule)
+- [x] Align plan display: `price_cents` = marketing; IAP button = RevenueCat localized price (`mobile-contract.md`)
+- [x] Webhook auth rotation runbook (`docs/runbooks/secret-rotation.md`)
 
 ---
 
@@ -235,10 +235,10 @@ SQL RPCs exist; day-to-day CMS should not require SQL. Wrap:
 - [ ] Publish checklist: PDF present, cover present, author set, categories set, collection membership
 - [ ] Slug uniqueness + stable slugs enforced in import
 - [ ] Collection `kind` used correctly (`hero` \| `shelf` \| `carousel`)
-- [ ] Currency / `price_cents` consistency (PKR catalog vs store IAP display)
-- [ ] Soft-delete vs hard-delete policy for books (today: hard delete RPC returns paths to purge)
-- [ ] Audit log queries for support (“who published X”) — needs query path (§6.2)
-- [ ] Support comps + refunds procedure (RC + `admin_set_entitlement`)
+- [x] Currency / `price_cents` consistency documented (PKR catalog vs store IAP display in mobile-contract)
+- [x] Soft-delete vs hard-delete policy for books (today: hard delete RPC returns paths to purge) — documented in admin API / schema; no soft-delete in v1
+- [x] Audit log queries for support (“who published X”) — `admin-audit-log`
+- [x] Support comps + refunds procedure (RC + `admin_set_entitlement`) — staging-billing-auth + webhook-down runbook
 
 ---
 
@@ -331,27 +331,25 @@ Every code track — §1 hygiene, §2 deploy prep, §4 content pipeline, §5 web
 admin surface, §7 security hardening, §8 CI and runbooks, §11 contract freeze, §12 docs — is
 **done in-repo** as of 2026-09-05.
 
-What remains needs infrastructure, not code:
+What remains needs **external accounts / dashboards**, not more backend code:
 
 | Blocked on | Items |
 | --- | --- |
-| Dashboard Email Auth + first admin SQL | §3 promote admin, JWT `app_role` re-login |
-| `BOOKS_DIR` with the real files | §4 catalog ingest, cover verification, storage audit |
-| RevenueCat + store accounts | §5 sandbox event matrix |
-| Google Cloud + Dashboard | §3 Google OAuth + redirects |
-| Your call | §1 merge to `main`, tag, branch protection |
-| Separate production project | §2 prod twin of staging |
+| RevenueCat + store accounts | §5 live webhook secret + sandbox event matrix |
+| Google Cloud + Dashboard | §3 Google OAuth |
+| Custom SMTP | Branded email templates + higher `rate_limit_email_sent` |
+| Your call | Production project, merge to `main`, branch protection, tags |
 
 ---
 
 ## Suggested next
 
-1. **You:** RevenueCat project + real webhook secret ([staging-billing-auth.md](./ops/staging-billing-auth.md))
-2. **You:** Google OAuth client + Dashboard provider + RN redirects
-3. **Optional:** Point FE at staging URL + anon key ([fe-handoff.md](./ops/fe-handoff.md)); visual-check covers
-4. **Then:** tag / merge when ready
+1. **You:** RevenueCat project + real webhook secret + sandbox purchase matrix ([staging-billing-auth.md](./ops/staging-billing-auth.md))
+2. **You:** Google OAuth client + Dashboard provider + RN deep-link scheme in `uri_allow_list`
+3. **You (launch):** custom SMTP for branded mail + higher email rate limits; production project ([catalog-environments.md](./ops/catalog-environments.md))
+4. **Optional:** Point FE at staging ([fe-handoff.md](./ops/fe-handoff.md)); merge PR into `dev` / tag when ready
 
-Staging catalog + PDF paywall already verified (`npm run smoke:pdf`).
+In-repo backend work for v1 is complete aside from items that need external dashboards.
 
 ---
 

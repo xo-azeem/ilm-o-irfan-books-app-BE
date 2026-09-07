@@ -30,6 +30,7 @@ Schema reference: [`docs/schema.md`](docs/schema.md)
 **Deploy checklist:** [`docs/ops/deploy-checklist.md`](docs/ops/deploy-checklist.md)  
 **Book ingest:** [`docs/ops/books-ingest.md`](docs/ops/books-ingest.md)  
 **Staging RC / Google:** [`docs/ops/staging-billing-auth.md`](docs/ops/staging-billing-auth.md)  
+**Catalog environments:** [`docs/ops/catalog-environments.md`](docs/ops/catalog-environments.md)  
 **FE handoff:** [`docs/ops/fe-handoff.md`](docs/ops/fe-handoff.md)
 
 ## Repo layout
@@ -84,6 +85,7 @@ npm run functions:list       # list deployed functions
 npm run books:import         # BOOKS_DIR=… (or fixtures/sample-books); DRY_RUN=1 supported
 npm run books:sample         # write fixtures/sample-books tiny PDF+cover pack
 npm run smoke:pdf            # free/premium/admin PDF gates + PREMIUM_REQUIRED
+npm run smoke:covers         # HEAD/GET public coverUrl from home-feed
 npm run test:e2e             # bash e2e against local stack (Git Bash / WSL on Windows)
 npm run test:unit            # Deno unit tests for the shared helpers (no Docker)
 npm run typecheck            # deno check across every function
