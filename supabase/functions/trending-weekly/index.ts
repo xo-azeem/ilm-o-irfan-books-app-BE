@@ -1,4 +1,5 @@
 import { anonClient, requireMethod } from '../_shared/auth.ts'
+import { withCoverUrls } from '../_shared/covers.ts'
 import { failFromDbError, handleError, handleOptions, ok, publicCache } from '../_shared/http.ts'
 import { normalizePageSize } from '../_shared/pagination.ts'
 
@@ -65,7 +66,7 @@ Deno.serve(async (req) => {
         // When the current draw stops being current. A client can cache until
         // then instead of polling.
         expiresAt: end,
-        books: data ?? [],
+        books: withCoverUrls((data ?? []) as Record<string, unknown>[]),
       },
       200,
       publicCache(CACHE_SECONDS),

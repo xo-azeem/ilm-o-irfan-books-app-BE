@@ -40,11 +40,14 @@ from `books-list`. Reuse the existing model; do not write a new one.
 
 ```
 id, slug, title, author_name, author_id, cover_path, cover_color, cover_color_dark,
-rating, tag, genre, read_time_minutes, price_cents, currency, format, is_premium, published_at
+rating, tag, genre, read_time_minutes, price_cents, currency, format, is_premium,
+published_at, coverUrl
 ```
 
-`cover_path` is a storage path, not a URL — resolve it the same way the app already does for
-`books-list` cards.
+**Use `coverUrl`, not `cover_path`.** Every card from every endpoint below carries a ready-to-load
+`coverUrl` (or `null` when the book has no cover), exactly like `books-list` and `book-detail`
+already do. `cover_path` is the raw Storage key and is kept only for debugging — the app must not
+build a Storage URL from it.
 
 ---
 
@@ -68,6 +71,7 @@ only when refreshing the carousel on its own (e.g. pull-to-refresh on just that 
   "headline": "Ramadan reads",
   "subtitle": null,
   "image_path": "covers/book-1.jpg",
+  "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/covers/book-1.jpg",
   "accent": "#1F6F5C",
   "badge": "Featured",
   "cta_label": "Start reading",
@@ -75,7 +79,8 @@ only when refreshing the carousel on its own (e.g. pull-to-refresh on just that 
   "ends_at": null,
   "book_id": "cc1219c5-…",
   "slug": "book-1", "title": "Book 1", "author_name": "Al Ghazali",
-  "cover_path": "covers/book-1.jpg", "rating": 4.5, "is_premium": false
+  "cover_path": "covers/book-1.jpg", "rating": 4.5, "is_premium": false,
+  "coverUrl": "https://<project>.supabase.co/storage/v1/object/public/covers/book-1.jpg"
 } ] } }
 ```
 
@@ -85,9 +90,12 @@ only when refreshing the carousel on its own (e.g. pull-to-refresh on just that 
 
 - **Render in the order given.** `sort_order` is already applied; do not sort, filter, shuffle
   or top the list up from another source.
-- **`headline`, `image_path` and `accent` are already resolved.** The backend has substituted
-  the book's `title` / `cover_path` / `cover_color` wherever the admin left an override blank.
-  Render them directly; do not re-apply a fallback of your own.
+- **`headline`, `imageUrl` and `accent` are already resolved.** The backend has substituted the
+  book's `title` / cover / `cover_color` wherever the admin left an override blank. Render them
+  directly; do not re-apply a fallback of your own.
+- **Draw the slide from `imageUrl`.** That is the artwork, already falling back to the book's
+  cover when the admin set no override. `coverUrl` is the book's own cover, there if you need
+  both. Ignore `image_path` / `cover_path` — they are the raw Storage keys.
 - **`subtitle`, `badge` and `cta_label` are `null` when unset.** Hide the element rather than
   rendering an empty string. `cta_label` is the button text — fall back to your existing
   default label when it is `null`.
@@ -221,11 +229,13 @@ endpoint in a loop hoping for new results.
 
 ## What to keep
 
-- The existing `book_list_items` card model and cover-path resolution.
+- The existing `book_list_items` card model and its use of `coverUrl`.
 - The existing `reading-progress` sync — it is now also the input to recommendations, so it
   matters more than it did.
-- The existing `home-feed` handling of `shelves`. A **missing** `shelves` key still means a
-  legacy deployment; the keys are always present now, with `hero` and `newArrivals` empty.
+- The existing `home-feed` handling of `shelves`. **`hero` and `newArrivals` are unchanged**:
+  still curated collections, still falling back to the newest published books when a collection
+  is empty, so those rails are never blank. Only `shelves.trending` changed — it is now the
+  weekly draw described above, and it no longer needs a client-side fallback.
 
 ## Suggested Home layout
 

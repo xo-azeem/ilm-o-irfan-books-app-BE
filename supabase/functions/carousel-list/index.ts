@@ -1,4 +1,5 @@
 import { anonClient, requireMethod } from '../_shared/auth.ts'
+import { withCarouselUrls } from '../_shared/covers.ts'
 import { failFromDbError, handleError, handleOptions, ok, publicCache } from '../_shared/http.ts'
 
 // The carousel is small by design — a rail nobody swipes to the end of is a
@@ -39,7 +40,10 @@ Deno.serve(async (req) => {
       )
     }
 
-    return ok({ slides: data ?? [] }, 200, publicCache(CACHE_SECONDS))
+    // Same coverUrl / imageUrl contract as every other card the app receives.
+    const slides = withCarouselUrls((data ?? []) as Record<string, unknown>[])
+
+    return ok({ slides }, 200, publicCache(CACHE_SECONDS))
   } catch (error) {
     return handleError('carousel-list', error)
   }

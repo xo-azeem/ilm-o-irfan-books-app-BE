@@ -184,30 +184,31 @@ serve them. Free books do not need `canAccessPremium` to open.
 `home-feed` returns three rails under `shelves`. The app renders them verbatim — it does
 not re-sort them or top them up — so what the backend puts there is exactly what Home shows.
 
-| Rail | Source | Contents |
+`home-feed` returns three rails under `shelves`. The app renders them verbatim — it does
+not re-sort them or top them up — so what the backend puts there is exactly what Home shows.
+
+| Rail | Source | Empty-source fallback |
 | --- | --- | --- |
-| `trending` | `weekly_trending_books(12)` | The week's draw — see [Weekly trending](#weekly-trending) |
-| `hero` | — | `[]` |
-| `newArrivals` | — | `[]` |
+| `hero` | `collections.slug = 'home-hero'`, in `sort_order` | 5 newest published books |
+| `trending` | `weekly_trending_books(12)` — see [Weekly trending](#weekly-trending) | none needed |
+| `newArrivals` | `collections.slug = 'new-arrivals'`, in `sort_order` | 12 newest published books |
+
+`hero` and `newArrivals` are editorial shelves and keep their fallback, so Home is never
+blank while `collection_books` is unpopulated. `trending` is the one rail that claimed to
+describe the catalogue rather than an editor's taste, so it is now the weekly draw and needs
+no fallback: the draw already covers everything published.
 
 `home-feed` also returns a top-level `carousel` array, the same payload as `carousel-list`.
 It ships inside `home-feed` because it is the first thing on the screen and a second round
 trip to fill it is a second chance for Home to render half-empty. A `carousel` read failure
 degrades to `[]` rather than failing the screen; the other four reads still 500.
 
-Books are deliberately not filed into collections or categories -- `collection_books` and
-`book_categories` were emptied on the hosted project and are left that way -- so the curated
-rails have no members and are returned empty. The keys are always present: the app reads a
-**missing** `shelves` as a legacy deployment and falls back to deriving all three rails
-itself from `books-list`.
+Each entry is a full `book_list_items` row plus `coverUrl` — the same shape `books-list`
+returns — so a card never renders with a blank field and the app never builds a Storage URL.
 
-`trending` is drawn from whatever is published in the database at that moment. Book rows
-are not seeded from this repo, so a local `supabase db reset` gives an empty catalogue and
-all three rails come back `[]`; run `npm run books:import` if you need titles locally.
-
-Each entry is a full `book_list_items` row — the same shape `books-list` returns — so a card
-never renders with a blank field. Curation can be reintroduced by adding `collection_books`
-rows again and pointing the rails back at a collection slug.
+Book rows are not seeded from this repo, so a local `supabase db reset` gives an empty
+catalogue and every rail comes back `[]`; run `npm run books:import` if you need titles
+locally.
 
 ## Home carousel
 
@@ -222,6 +223,8 @@ rides along, so tapping a slide opens the book with no second fetch.
 | Field | Meaning |
 | --- | --- |
 | `slide_id` | Identity of the slide, for admin edit / delete / reorder |
+| `imageUrl` | Ready-to-load artwork URL: the override if set, else the book cover. **Draw the slide from this.** |
+| `coverUrl` | Ready-to-load URL for the book's own cover |
 | `book_id`, `slug`, `title`, `author_name`, `cover_path`, … | The book card, same shape as `books-list` |
 | `headline` | Slide title: override, falling back to `title` |
 | `subtitle` | Optional line under the headline; `null` when unset |

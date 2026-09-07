@@ -1,4 +1,5 @@
 import { requireMethod, requireUser } from '../_shared/auth.ts'
+import { withRecommendationCoverUrls } from '../_shared/covers.ts'
 import { handleError, handleOptions, ok } from '../_shared/http.ts'
 import { failFromRpcError } from '../_shared/rpc.ts'
 import { normalizePageSize } from '../_shared/pagination.ts'
@@ -64,7 +65,17 @@ Deno.serve(async (req) => {
       )
     }
 
-    return ok(data ?? { generatedAt: null, isPersonalized: false, sections: [], books: [] })
+    const payload = (data ?? {
+      generatedAt: null,
+      isPersonalized: false,
+      sections: [],
+      books: [],
+    }) as Record<string, unknown>
+
+    // The cards come out of Postgres, which has no business knowing
+    // SUPABASE_URL, so coverUrl is attached here — the same contract every
+    // other book card in the API carries.
+    return ok(withRecommendationCoverUrls(payload))
   } catch (error) {
     return handleError('recommendations', error)
   }
