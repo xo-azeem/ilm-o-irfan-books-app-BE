@@ -77,6 +77,7 @@ npm run link                 # supabase link --project-ref … (interactive)
 npm run deploy:hosted        # one-pass: link → push → functions → secrets
 npm run smoke:hosted         # public EF smoke against SUPABASE_URL
 npm run smoke:rls            # RLS / paywall regression against hosted project
+npm run smoke:failures       # webhook auth fail, admin deny, signed-pdf 410
 npm run types:generate       # types from the linked project (run AFTER db:push)
 npm run types:generate:local # types from the local Docker stack instead
 npm run functions:serve      # local functions (needs Docker + supabase start)
@@ -87,6 +88,7 @@ npm run books:sample         # write fixtures/sample-books tiny PDF+cover pack
 npm run smoke:pdf            # free/premium/admin PDF gates + PREMIUM_REQUIRED
 npm run smoke:covers         # HEAD/GET public coverUrl from home-feed
 npm run test:e2e             # bash e2e against local stack (Git Bash / WSL on Windows)
+npm run test:import          # Node tests for import slug/size rules
 npm run test:unit            # Deno unit tests for the shared helpers (no Docker)
 npm run typecheck            # deno check across every function
 npm run lint                 # deno lint

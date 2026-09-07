@@ -18,13 +18,20 @@ BOOKS_DIR/
 
 ```json
 {
+  "slug": "ihya-ulum-al-din",
   "isPremium": true,
   "categorySlug": "spirituality",
   "genre": "Spirituality"
 }
 ```
 
+`slug` is optional but recommended for live titles: it locks the catalog id so renaming the folder does not break deep links. Duplicate slugs in one import batch fail fast. PDF size budgets: see [`media-budgets.md`](./media-budgets.md). Publish readiness: [`publish-checklist.md`](./publish-checklist.md).
+
 Seeded category slugs: `quranic-studies`, `spirituality`, `history`, `fiqh-law`, `hadith`, `arabic`.
+
+## Collection `kind`
+
+Home collections use exactly: `hero` | `shelf` | `carousel` (seed: `home-hero` = hero, shelves = shelf, seasonal = carousel).
 
 ## Prerequisites
 
@@ -44,6 +51,9 @@ BOOKS_DIR=D:/Books npm run books:import
 
 # Default every book to premium unless meta says otherwise
 BOOKS_DIR=D:/Books DEFAULT_IS_PREMIUM=1 npm run books:import
+
+# Fail if any folder is missing cover.webp|jpg|png
+BOOKS_DIR=D:/Books REQUIRE_COVER=1 npm run books:import
 ```
 
 On Windows PowerShell:
@@ -77,5 +87,8 @@ Same migrations and import script; different `BOOKS_DIR` content and project ref
 ## Related
 
 - Script: `scripts/import-folder-books.mjs`
+- Rules + tests: `scripts/lib/import-rules.mjs`, `npm run test:import`
+- Publish checklist: [`publish-checklist.md`](./publish-checklist.md)
+- Media budgets: [`media-budgets.md`](./media-budgets.md)
 - Deploy checklist: [`deploy-checklist.md`](./deploy-checklist.md)
 - FE INP→PDF handoff (when used): FE repo `docs/inp-to-pdf-conversion.md` → Storage `pdfs/…`

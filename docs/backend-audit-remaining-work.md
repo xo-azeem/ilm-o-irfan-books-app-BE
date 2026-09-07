@@ -1,9 +1,9 @@
 # Backend Audit: Remaining Work
 
-**Opened:** 2026-08-31 · **Last updated:** 2026-09-06  
+**Opened:** 2026-08-31 · **Last updated:** 2026-09-07  
 **Scope:** Supabase/PostgreSQL backend for the Ilm o Irfan mobile app  
-**Status:** Code complete. Staging hosted deploy verified (`npm run deploy:hosted` + `smoke:hosted`).  
-Remaining: Email Auth / first admin, real catalog (`BOOKS_DIR`), RevenueCat, Google OAuth, prod project.
+**Status:** Code complete. Staging hosted deploy verified. Optional polish closed (e2e failure modes, import slug/size rules, media budgets, publish checklist).  
+Remaining: RevenueCat live project, Google OAuth, custom SMTP, production twin, FE wiring.
 
 ## Executive Summary
 

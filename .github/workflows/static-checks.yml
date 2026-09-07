@@ -59,6 +59,13 @@ jobs:
       - name: Unit tests
         run: deno test --allow-env --allow-net=esm.sh,jsr.io,deno.land,registry.npmjs.org tests/
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Import-rules unit tests
+        run: npm run test:import
+
   # Full e2e needs Docker plus `supabase start`, which this runner does not
   # provide. Run `npm run test:e2e` locally against a started stack, or against
   # staging using the checklist in docs/ops/deploy-checklist.md.

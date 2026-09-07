@@ -4,12 +4,12 @@
 **Companion FE:** `D:\ilm-o-irfan-books-app`  
 **Branch (working):** `feat/mobile-api-parity`  
 **Report started:** 2026-08-31  
-**Last updated:** 2026-09-07 (covers smoke, auth URIs, catalog env docs; PR #3 tip)
+**Last updated:** 2026-09-07 (optional polish: e2e failure modes, import rules, media budgets)
 
 This file tracks work done in the “absolute beast backend” stream.  
 Backlog: [`backend-beast-roadmap.md`](./backend-beast-roadmap.md) · Audit: [`backend-audit-remaining-work.md`](./backend-audit-remaining-work.md)
 
-**Hosted status:** Staging `rwnmckrepvycydmtgvcq` live — migrations, seed, Edge Functions, secrets, `smoke:hosted` + `smoke:covers` green. Auth Email on; seed admin/test; catalog + sample PDFs. Still open externally: RevenueCat live webhook, Google OAuth, custom SMTP, production twin, merge/tag.
+**Hosted status:** Staging `rwnmckrepvycydmtgvcq` live — migrations, seed, Edge Functions, secrets, `smoke:hosted` + `smoke:covers` + `smoke:failures` green. Auth Email on; seed admin/test; catalog + sample PDFs. Still open externally: RevenueCat live webhook, Google OAuth, custom SMTP, production twin, merge/tag.
 
 ---
 

@@ -16,6 +16,8 @@ Full mobile contract: [`../mobile-contract.md`](../mobile-contract.md).
 | `entitlements-status.response.json` | `GET /functions/v1/entitlements-status` |
 | `get-signed-pdf.response.json` | `POST /functions/v1/get-signed-pdf` (success) |
 | `get-signed-pdf.premium-required.json` | `POST /functions/v1/get-signed-pdf` (403) |
+| `get-signed-pdf.not-in-storage.json` | `POST /functions/v1/get-signed-pdf` (404) |
+| `revenuecat-webhook.auth-failed.json` | `POST /functions/v1/revenuecat-webhook` (401) |
 | `library-overview.response.json` | `GET /functions/v1/library-overview` |
 | `profile-read.response.json` | `GET /functions/v1/profile-read` |
 | `reading-progress.response.json` | `POST /functions/v1/reading-progress` |

@@ -148,7 +148,7 @@ Seed intentionally has **no books, no authors, no collections**. Old dummy shelv
 - [x] Avatar: signed upload URL EF (`avatar-upload-url`) + signed read URL on `profile-read` **or** documented direct Storage upload → then `profile-update.avatar_path`
 - [x] Contract freeze: checked-in response fixtures for FE (`docs/fixtures/`)
 - [x] Versioning / stability notes in README + fixtures README
-- [ ] Pagination + cold-start load-tested on `home-feed` + `books-search`
+- [~] Pagination + cold-start load-tested on `home-feed` + `books-search` — deferred to device soak; offset ceiling + pageSize clamps already in place
 
 ### 6.2 Admin CMS Edge Function completeness
 
@@ -187,14 +187,14 @@ SQL RPCs exist; day-to-day CMS should not require SQL. Wrap:
 - [x] Service role key never in the mobile app (anon + user JWT only) — documented in mobile-contract + stack
 - [x] Reviewed `verify_jwt` flags in `config.toml` per function (public catalog + webhook + deprecated `signed-pdf` are `false`)
 - [x] Decide fate of deprecated `signed-pdf` (keep 410 forever for old clients; `smoke:rls` asserts it)
-- [ ] CORS: `_shared/http.ts` uses `Access-Control-Allow-Origin: *` — OK for mobile; tighten if admin web ships
-- [ ] Signed URL TTL short; no long-lived public PDF links; confirm **no client SELECT** on bucket `pdfs`
+- [x] CORS: `_shared/http.ts` uses `Access-Control-Allow-Origin: *` — **accepted for v1** (RN client; tighten allow-list when admin web ships)
+- [x] Signed URL TTL short (`SIGNED_PDF_EXPIRES_IN` default 300); no long-lived public PDF links; **no client SELECT** on bucket `pdfs` (e2e + `smoke:rls`)
 - [x] RLS regression suite (automated): `npm run smoke:rls` — anon unpublished leak, entitlements insert, admin deny, signed-pdf 410, optional user/admin JWT cases
-- [ ] Last-admin demotion guard verified in e2e
+- [x] Last-admin demotion guard verified in e2e (`scripts/e2e-endpoints.sh`)
 - [x] Streak column not client-writable
 - [x] Webhook: secret required, malformed envelopes rejected, shared helpers; rotation runbook written
 - [x] Secrets scanning in CI (fails the build on a key-shaped string; also asserts `.env` is gitignored)
-- [ ] Dependency / `deno.lock` kept current
+- [x] Dependency / `deno.lock` kept current (CI `deno test` / `deno check` pin via lockfile)
 
 ---
 
@@ -204,8 +204,9 @@ SQL RPCs exist; day-to-day CMS should not require SQL. Wrap:
   - contract checks (folders / config / manifest / methods) and migration ordering
   - `deno check`, `deno lint`, `deno test`
   - secrets scan
+  - import-rules unit tests (`npm run test:import`)
 - [~] `scripts/e2e-endpoints.sh` still needs Docker + a local stack, so CI documents the skip rather than pretending to run it. Local keys now come from `supabase status` instead of a pinned copy.
-- [ ] Extend e2e beyond happy paths: webhook auth failure, storage miss (`PDF_NOT_IN_STORAGE`), premium gate, admin forbidden, import + storage audit
+- [x] Extend e2e beyond happy paths: webhook auth failure, storage miss (`PDF_NOT_IN_STORAGE` publish + reader), premium gate, admin forbidden, `admin-storage-audit`; hosted mirror via `npm run smoke:failures`
 - [ ] Staging project separate from production with promotion checklist
 - [ ] Structured logging + alert on webhook failures / 5xx spikes (Dashboard + optional Sentry)
 - [ ] Uptime checks on `home-feed` + `entitlements-status` + `get-signed-pdf` health path
@@ -221,20 +222,20 @@ SQL RPCs exist; day-to-day CMS should not require SQL. Wrap:
 
 ## 9. Performance & scale
 
-- [ ] `EXPLAIN ANALYZE` hot paths: `search_books`, home-feed views, `library-overview`
-- [ ] Re-check indexes after real catalog size (1k / 10k books)
-- [ ] PDF size budget + compression guidelines (egress cost)
-- [ ] CDN / cache headers for public covers
-- [ ] Edge Function cold-start budget acceptable on RN splash/home
-- [ ] No Redis unless measured need (default: no Redis for v1)
+- [~] `EXPLAIN ANALYZE` hot paths — deferred until catalog ≫ staging size; indexes already on search / collections / progress
+- [~] Re-check indexes after real catalog size (1k / 10k books) — ops milestone, not a code gap
+- [x] PDF size budget + compression guidelines (egress cost) — [`docs/ops/media-budgets.md`](./ops/media-budgets.md); enforced on import
+- [x] CDN / cache headers for public covers — documented (public bucket + Supabase CDN / Smart CDN on Pro)
+- [~] Edge Function cold-start budget — acceptable for v1; measure on device splash before adding Redis
+- [x] No Redis unless measured need (default: no Redis for v1)
 
 ---
 
 ## 10. Data quality & admin ops
 
-- [ ] Publish checklist: PDF present, cover present, author set, categories set, collection membership
-- [ ] Slug uniqueness + stable slugs enforced in import
-- [ ] Collection `kind` used correctly (`hero` \| `shelf` \| `carousel`)
+- [x] Publish checklist: PDF present, cover present, author set, categories set, collection membership — [`docs/ops/publish-checklist.md`](./ops/publish-checklist.md)
+- [x] Slug uniqueness + stable slugs enforced in import (`meta.slug`, duplicate-batch fail, `npm run test:import`)
+- [x] Collection `kind` used correctly (`hero` \| `shelf` \| `carousel`) — seed + CMS validation + docs
 - [x] Currency / `price_cents` consistency documented (PKR catalog vs store IAP display in mobile-contract)
 - [x] Soft-delete vs hard-delete policy for books (today: hard delete RPC returns paths to purge) — documented in admin API / schema; no soft-delete in v1
 - [x] Audit log queries for support (“who published X”) — `admin-audit-log`
