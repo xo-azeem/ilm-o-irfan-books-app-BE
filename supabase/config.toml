@@ -242,3 +242,33 @@ verify_jwt = true
 
 [functions.avatar-upload-url]
 verify_jwt = true
+
+# Home carousel — admin-curated, read by everyone.
+[functions.carousel-list]
+verify_jwt = false
+
+# Weekly trending draw — the same ten books for every caller until Monday UTC.
+[functions.trending-weekly]
+verify_jwt = false
+
+# Personalised rails. Needs a caller to personalise for.
+[functions.recommendations]
+verify_jwt = true
+
+[functions.admin-carousel]
+verify_jwt = true
+
+[functions.admin-carousel-upsert]
+verify_jwt = true
+
+[functions.admin-carousel-delete]
+verify_jwt = true
+
+[functions.admin-carousel-reorder]
+verify_jwt = true
+
+[functions.admin-carousel-set]
+verify_jwt = true
+
+[functions.admin-refresh-trending]
+verify_jwt = true

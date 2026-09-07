@@ -7,6 +7,7 @@ import {
   asOptionalDate,
   asOptionalInteger,
   asOptionalText,
+  asOptionalTimestamp,
   asOptionalUuid,
   asOptionalUuidArray,
   asStringArray,
@@ -118,4 +119,28 @@ Deno.test('requireUuidField reads any accepted spelling and reports the label', 
 Deno.test('requireUuidArrayField rejects a missing list', () => {
   assertEquals(requireUuidArrayField({ ids: [UUID] }, ['ids'], 'ids'), [UUID])
   assertThrows(() => requireUuidArrayField({}, ['ids'], 'ids'), BadRequestError)
+})
+
+Deno.test('asOptionalTimestamp normalises an offset to UTC', () => {
+  const coerce = asOptionalTimestamp('endsAt')
+
+  assertEquals(coerce('2027-01-01T00:00:00Z'), '2027-01-01T00:00:00.000Z')
+  // Same instant, written with an offset. A carousel scheduled from Karachi and
+  // one scheduled from London must land in the column identically.
+  assertEquals(coerce('2027-01-01T05:00:00+05:00'), '2027-01-01T00:00:00.000Z')
+})
+
+Deno.test('asOptionalTimestamp treats empty and null as "no value"', () => {
+  const coerce = asOptionalTimestamp('startsAt')
+
+  assertEquals(coerce(''), null)
+  assertEquals(coerce(null), null)
+  assertEquals(coerce(undefined), null)
+})
+
+Deno.test('asOptionalTimestamp rejects anything that is not a timestamp', () => {
+  const coerce = asOptionalTimestamp('endsAt')
+
+  assertThrows(() => coerce('not-a-date'), BadRequestError, 'endsAt must be a valid')
+  assertThrows(() => coerce(1735689600000), BadRequestError, 'endsAt must be an ISO-8601')
 })

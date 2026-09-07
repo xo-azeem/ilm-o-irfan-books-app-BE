@@ -12,7 +12,7 @@ The Edge Function endpoint base is `/functions/v1/...`.
 
 | Endpoint | Method | Auth | Purpose |
 | --- | --- | --- | --- |
-| `/functions/v1/home-feed` | GET | Public | Collections, categories, newest books, `shelves.hero` / `trending` / `newArrivals`, `featuredCollectionId`, `supportEmail` (book cards include `coverUrl`) |
+| `/functions/v1/home-feed` | GET | Public | Collections, categories, newest books, `carousel`, `shelves.hero` / `trending` / `newArrivals`, `featuredCollectionId`, `supportEmail` (book cards include `coverUrl`) — see [Home shelves](#home-shelves) |
 | `/functions/v1/books-list` | GET | Public | Paginated published books; optional `category=<uuid-or-slug>` |
 | `/functions/v1/book-detail?id=<bookId>` | GET | Public | Book detail with author and metadata (`coverUrl`; no `pdf_path`) |
 | `/functions/v1/books-search?q=<query>` | GET | Public | Search by text using the Postgres full-text index |
@@ -20,6 +20,8 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | `/functions/v1/collections-list` | GET | Public | Returns collections and shelves |
 | `/functions/v1/collection-books?id=` or `?slug=` | GET | Public | Paginated books in one published collection (`sort_order`) |
 | `/functions/v1/plans-list` | GET | Public | Plan catalog for premium screen |
+| `/functions/v1/carousel-list` | GET | Public | The admin-curated home carousel — see [Home carousel](#home-carousel) |
+| `/functions/v1/trending-weekly?limit=10` | GET | Public | Ten books drawn at random once a week — see [Weekly trending](#weekly-trending) |
 
 ## Authenticated endpoints
 
@@ -39,6 +41,7 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | `/functions/v1/entitlements-status` | GET | User | Current premium state |
 | `/functions/v1/get-signed-pdf` | POST | User | Signed PDF URL for premium or allowed access |
 | `/functions/v1/avatar-upload-url` | POST | User | One-shot signed upload URL for the caller's avatar |
+| `/functions/v1/recommendations` | GET | User | Personalised "Because you read …" rails — see [Recommendations](#recommendations) |
 
 ## Admin endpoints
 
@@ -78,6 +81,12 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | `/functions/v1/admin-plan-update` | PATCH | Admin | Update plan pricing, interval, features, RC product id |
 | `/functions/v1/admin-plan-delete` | POST | Admin | Delete plan; 409 while entitlements reference it unless `force` |
 | `/functions/v1/admin-audit-log` | GET | Admin | Who changed what: filter by `entityType`, `entityId`, `actorId`, `action`, `since` |
+| `/functions/v1/admin-carousel` | GET | Admin | Every carousel slide, including inactive and scheduled ones (`is_live` says which are showing) |
+| `/functions/v1/admin-carousel-set` | POST | Admin | Replace the whole carousel with an ordered `bookIds` list |
+| `/functions/v1/admin-carousel-upsert` | POST/PATCH | Admin | Add a book to the carousel, or edit the slide already there |
+| `/functions/v1/admin-carousel-delete` | POST | Admin | Remove slides, by slide id or book id |
+| `/functions/v1/admin-carousel-reorder` | POST | Admin | Persist a drag-reorder of the carousel |
+| `/functions/v1/admin-refresh-trending` | POST | Admin | Redraw this week's trending picks without waiting for Monday |
 
 ## Webhooks
 
@@ -169,6 +178,132 @@ and holds no active entitlement.
 
 Gating on `isActive` alone would show an admin a locked button on a file the backend would
 serve them. Free books do not need `canAccessPremium` to open.
+
+## Home shelves
+
+`home-feed` returns three rails under `shelves`. The app renders them verbatim — it does
+not re-sort them or top them up — so what the backend puts there is exactly what Home shows.
+
+| Rail | Source | Contents |
+| --- | --- | --- |
+| `trending` | `weekly_trending_books(12)` | The week's draw — see [Weekly trending](#weekly-trending) |
+| `hero` | — | `[]` |
+| `newArrivals` | — | `[]` |
+
+`home-feed` also returns a top-level `carousel` array, the same payload as `carousel-list`.
+It ships inside `home-feed` because it is the first thing on the screen and a second round
+trip to fill it is a second chance for Home to render half-empty. A `carousel` read failure
+degrades to `[]` rather than failing the screen; the other four reads still 500.
+
+Books are deliberately not filed into collections or categories -- `collection_books` and
+`book_categories` were emptied on the hosted project and are left that way -- so the curated
+rails have no members and are returned empty. The keys are always present: the app reads a
+**missing** `shelves` as a legacy deployment and falls back to deriving all three rails
+itself from `books-list`.
+
+`trending` is drawn from whatever is published in the database at that moment. Book rows
+are not seeded from this repo, so a local `supabase db reset` gives an empty catalogue and
+all three rails come back `[]`; run `npm run books:import` if you need titles locally.
+
+Each entry is a full `book_list_items` row — the same shape `books-list` returns — so a card
+never renders with a blank field. Curation can be reintroduced by adding `collection_books`
+rows again and pointing the rails back at a collection slug.
+
+## Home carousel
+
+The carousel is admin-owned. The app renders `carousel-list` (or `home-feed`'s `carousel`)
+in the order it arrives and picks nothing itself.
+
+One row per slide in `carousel_slides`, one slide per book. `headline`, `image_path` and
+`accent` come back already resolved: the admin's override where there is one, the book's own
+`title` / `cover_path` / `cover_color` where there is not. Every `book_list_items` column
+rides along, so tapping a slide opens the book with no second fetch.
+
+| Field | Meaning |
+| --- | --- |
+| `slide_id` | Identity of the slide, for admin edit / delete / reorder |
+| `book_id`, `slug`, `title`, `author_name`, `cover_path`, … | The book card, same shape as `books-list` |
+| `headline` | Slide title: override, falling back to `title` |
+| `subtitle` | Optional line under the headline; `null` when unset |
+| `image_path` | Artwork: override, falling back to `cover_path` |
+| `accent` | Accent colour: override, falling back to `cover_color` |
+| `badge`, `cta_label` | Optional chip and button label; `null` when unset |
+| `sort_order` | The admin's order. Already applied; do not re-sort |
+
+A slide is only in the payload when it is active, inside its `starts_at`/`ends_at` window,
+and its book is still published — enforced by the `carousel_items` view and again by RLS on
+`carousel_slides`, so an unpublished title cannot leak through the carousel. `admin-carousel`
+returns every slide regardless, each with `is_live` saying whether the app is showing it.
+
+Writes go through the `admin_carousel_*` RPCs, never a direct table write, so the admin check
+and the audit-log entry cannot be skipped. `admin-carousel-set` replaces the whole rail in one
+statement — the app never observes a half-applied carousel — and slides that survive the save
+keep the headline and artwork already written for them.
+
+Cached `public, max-age=60`. Editorial changes reach the app within about a minute.
+
+## Weekly trending
+
+Ten books drawn at random from the published catalogue, **once a week**. Every caller sees
+the same ten until Monday 00:00 UTC, when the next draw happens on the first request of the
+week. This is what `random_published_books` could not do: it re-drew per call, so the rail
+changed under a user who pulled to refresh.
+
+```json
+{ "data": { "weekStart": "2026-09-07T00:00:00.000Z",
+            "expiresAt": "2026-09-14T00:00:00.000Z",
+            "books": [ /* book_list_items rows */ ] } }
+```
+
+The draw is stored in `trending_weekly`, so a read is an indexed ten-row lookup rather than
+an `order by random()` over the catalogue. Thirty picks are stored and the first ten still
+published are returned, so a title unpublished mid-week shortens the spare pool instead of
+leaving a hole in the rail. Rows older than eight weeks are pruned on the next draw.
+
+Cached `public, max-age=900`. `admin-refresh-trending` redraws the current week when the
+draw surfaced something that should not be leading Home.
+
+## Recommendations
+
+`GET /functions/v1/recommendations?limit=20&sections=3&perSection=10`
+
+Built from what the caller actually did — `reading_progress` (weighted by how far in and how
+recently), `downloads`, `wishlist` and `highlights` — with each signal decaying over about a
+month so last year's binge stops outvoting this month's reading. Those weights roll up into
+author, genre, category and tag affinities; candidates are scored against all four, and the
+dimension that contributed most becomes the reason shown to the user.
+
+```json
+{ "data": {
+  "generatedAt": "2026-09-07T22:11:44.677Z",
+  "isPersonalized": true,
+  "sections": [ {
+    "id": "seed:<bookId>",
+    "seedBookId": "<bookId>",
+    "reasonType": "author",
+    "reasonLabel": "Ibn Sina",
+    "title": "Because you read The Book of Healing",
+    "subtitle": "More from Ibn Sina",
+    "seedBook": { /* book_list_items row */ },
+    "books": [ { /* book_list_items row */, "reason": { "type": "author", "label": "Ibn Sina", "seedBookId": "…" } } ]
+  } ],
+  "books": [ /* the same cards, flat and ranked, for a see-all screen */ ]
+} }
+```
+
+`title` and `subtitle` are composed server-side, so the app never has to assemble the caption
+and never captions a rail with a book the recommendation had nothing to do with. Anything the
+user has already read, downloaded or wishlisted is excluded.
+
+`isPersonalized: false` with `sections: []` is the cold-start answer for an account with no
+history: `books` is then well-rated recent titles, every `reason.type` is `"popular"`, and the
+app should render them under a neutral heading rather than "Because you read …".
+
+Scale: results are materialised per user in `user_recommendations` and served from a
+primary-key read. A rebuild only runs when the user's signals have moved since the last one
+(and at most every 30 minutes), or once a day regardless — so a user who reads all evening is
+recomputed twice, and one who never opens a book is never recomputed. The endpoint is
+per-user and sends no cache headers; never cache it across users.
 
 ## Publishing a book
 

@@ -25,15 +25,38 @@ export const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 }
 
-export function json(payload: unknown, status = 200): Response {
+export function json(
+  payload: unknown,
+  status = 200,
+  extraHeaders: Record<string, string> = {},
+): Response {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json', ...extraHeaders },
   })
 }
 
-export function ok(data: unknown, status = 200): Response {
-  return json({ data }, status)
+export function ok(
+  data: unknown,
+  status = 200,
+  extraHeaders: Record<string, string> = {},
+): Response {
+  return json({ data }, status, extraHeaders)
+}
+
+// Cache-Control for a response the whole audience shares.
+//
+// Only for genuinely public, non-personalised payloads: the carousel and the
+// weekly trending draw, which are the same bytes for every caller until an
+// admin edits them or the week rolls over. `stale-while-revalidate` is what
+// keeps a Monday-morning cache expiry from turning into a thundering herd on
+// the database.
+export function publicCache(maxAgeSeconds: number): Record<string, string> {
+  const swr = Math.max(60, Math.floor(maxAgeSeconds / 2))
+  return {
+    'Cache-Control':
+      `public, max-age=${maxAgeSeconds}, s-maxage=${maxAgeSeconds}, stale-while-revalidate=${swr}`,
+  }
 }
 
 export function fail(code: string, message: string, status: number): Response {

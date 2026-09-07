@@ -78,6 +78,28 @@ export function asOptionalDate(label: string) {
   }
 }
 
+/** Accepts an ISO-8601 timestamp or null/empty to clear. */
+export function asOptionalTimestamp(label: string) {
+  return (value: unknown): string | null => {
+    if (value === null || value === undefined || value === '') {
+      return null
+    }
+
+    if (typeof value !== 'string') {
+      throw new BadRequestError(`${label} must be an ISO-8601 timestamp string`)
+    }
+
+    const ms = Date.parse(value)
+    if (!Number.isFinite(ms)) {
+      throw new BadRequestError(`${label} must be a valid ISO-8601 timestamp`)
+    }
+
+    // Normalised to UTC so a client that sends a local offset and one that
+    // sends Z end up with the same instant in the column.
+    return new Date(ms).toISOString()
+  }
+}
+
 export function asBoolean(label: string) {
   return (value: unknown): boolean => {
     if (typeof value === 'boolean') {

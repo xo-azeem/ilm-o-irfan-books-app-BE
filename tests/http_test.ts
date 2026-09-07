@@ -10,6 +10,7 @@ import {
   handleOptions,
   list,
   ok,
+  publicCache,
   readJsonBody,
 } from '../supabase/functions/_shared/http.ts'
 import { requireMethod } from '../supabase/functions/_shared/auth.ts'
@@ -96,4 +97,42 @@ Deno.test('readJsonBody returns an empty object rather than throwing on junk', a
   assertEquals(await readJsonBody(post('not json')), {})
   assertEquals(await readJsonBody(post([1, 2])), {}, 'a top-level array is not a payload')
   assertEquals(await readJsonBody(post('null')), {})
+})
+
+Deno.test('publicCache sets a shared cache directive with a revalidation window', () => {
+  const headers = publicCache(900)
+
+  assertEquals(
+    headers['Cache-Control'],
+    'public, max-age=900, s-maxage=900, stale-while-revalidate=450',
+  )
+})
+
+Deno.test('publicCache keeps a revalidation window even for a short max-age', () => {
+  // Half of 30 is 15 seconds, which is short enough that a cache expiry turns
+  // straight back into a database read. The floor is what makes the stale
+  // window worth having.
+  assertEquals(
+    publicCache(30)['Cache-Control'],
+    'public, max-age=30, s-maxage=30, stale-while-revalidate=60',
+  )
+})
+
+Deno.test('ok carries cache headers alongside the CORS ones', async () => {
+  const response = ok({ slides: [] }, 200, publicCache(60))
+
+  assertEquals(
+    response.headers.get('Cache-Control'),
+    'public, max-age=60, s-maxage=60, stale-while-revalidate=60',
+  )
+  assertEquals(response.headers.get('Access-Control-Allow-Origin'), '*')
+  assertEquals(response.headers.get('Content-Type'), 'application/json')
+  assertEquals(await response.json(), { data: { slides: [] } })
+})
+
+Deno.test('a response with no extra headers is unchanged', async () => {
+  const response = ok({ id: 1 })
+
+  assertEquals(response.headers.get('Cache-Control'), null)
+  assertEquals(await response.json(), { data: { id: 1 } })
 })
