@@ -19,12 +19,19 @@ Supabase + PostgreSQL backend for the **Ilm o Irfan** React Native e-book app.
 
 Design & cost notes: [`docs/backend-stack.md`](docs/backend-stack.md)  
 Schema reference: [`docs/schema.md`](docs/schema.md)  
+**Mobile contract (FE team):** [`docs/mobile-contract.md`](docs/mobile-contract.md)  
+**FE/BE parity audit:** [`docs/audits/2026-09-06-fe-be-parity.md`](docs/audits/2026-09-06-fe-be-parity.md)  
 **Setup + pgAdmin steps:** [`docs/setup-guide.md`](docs/setup-guide.md)  
 **Beast backlog:** [`docs/backend-beast-roadmap.md`](docs/backend-beast-roadmap.md)  
 **Work progress report:** [`docs/backend-work-progress.md`](docs/backend-work-progress.md)  
 **FE fixtures:** [`docs/fixtures/`](docs/fixtures/)  
 **Runbooks:** [`docs/runbooks/`](docs/runbooks/)  
-**Env matrix:** [`docs/ops/env-matrix.md`](docs/ops/env-matrix.md)
+**Env matrix:** [`docs/ops/env-matrix.md`](docs/ops/env-matrix.md)  
+**Deploy checklist:** [`docs/ops/deploy-checklist.md`](docs/ops/deploy-checklist.md)  
+**Book ingest:** [`docs/ops/books-ingest.md`](docs/ops/books-ingest.md)  
+**Staging RC / Google:** [`docs/ops/staging-billing-auth.md`](docs/ops/staging-billing-auth.md)  
+**Catalog environments:** [`docs/ops/catalog-environments.md`](docs/ops/catalog-environments.md)  
+**FE handoff:** [`docs/ops/fe-handoff.md`](docs/ops/fe-handoff.md)
 
 ## Repo layout
 
@@ -37,13 +44,17 @@ sql/pgadmin/      # run in pgAdmin Query Tool
 docs/             # stack, schema, setup
 ```
 
-## Quick start (recommended)
+## Deploy staging (one pass)
 
-1. Create a free project at [supabase.com](https://supabase.com/dashboard).
-2. Follow **Path A** in [`docs/setup-guide.md`](docs/setup-guide.md) to apply migrations + seed.
-3. Register that database in **pgAdmin** (host `db.<project-ref>.supabase.co`, SSL required).
-4. Copy `.env.example` → `.env` and fill API + DB values.
-5. Deploy Edge Functions and set RevenueCat webhook secrets.
+1. Create a Supabase project; copy the project ref.
+2. `npx supabase login` (or set `SUPABASE_ACCESS_TOKEN`).
+3. Put in `.env`: `SUPABASE_PROJECT_REF`, `REVENUECAT_WEBHOOK_AUTH` (or use `DEPLOY_ALLOW_PLACEHOLDER_RC=1`), `REVENUECAT_ENTITLEMENT_ID=premium`, `SIGNED_PDF_EXPIRES_IN=300`, plus `SUPABASE_URL` / anon key for smoke.
+4. `DEPLOY_SEED=1 npm run deploy:hosted`
+5. `npm run smoke:hosted`
+6. Enable Email Auth; promote first admin; give FE URL + anon key ([`docs/ops/fe-handoff.md`](docs/ops/fe-handoff.md)).
+
+Details: [`docs/ops/deploy-checklist.md`](docs/ops/deploy-checklist.md).  
+Path A walkthrough: [`docs/setup-guide.md`](docs/setup-guide.md).
 
 ### Local schema-only (pgAdmin)
 
@@ -63,13 +74,21 @@ npm run supabase:stop
 npm run db:reset             # local: migrations + seed
 npm run db:push              # push migrations to the linked project
 npm run link                 # supabase link --project-ref … (interactive)
+npm run deploy:hosted        # one-pass: link → push → functions → secrets
+npm run smoke:hosted         # public EF smoke against SUPABASE_URL
+npm run smoke:rls            # RLS / paywall regression against hosted project
+npm run smoke:failures       # webhook auth fail, admin deny, signed-pdf 410
 npm run types:generate       # types from the linked project (run AFTER db:push)
 npm run types:generate:local # types from the local Docker stack instead
 npm run functions:serve      # local functions (needs Docker + supabase start)
 npm run functions:deploy     # deploy all Edge Functions to linked project
 npm run functions:list       # list deployed functions
-npm run books:import         # BOOKS_DIR=D:/Books required (DRY_RUN=1 supported)
+npm run books:import         # BOOKS_DIR=… (or fixtures/sample-books); DRY_RUN=1 supported
+npm run books:sample         # write fixtures/sample-books tiny PDF+cover pack
+npm run smoke:pdf            # free/premium/admin PDF gates + PREMIUM_REQUIRED
+npm run smoke:covers         # HEAD/GET public coverUrl from home-feed
 npm run test:e2e             # bash e2e against local stack (Git Bash / WSL on Windows)
+npm run test:import          # Node tests for import slug/size rules
 npm run test:unit            # Deno unit tests for the shared helpers (no Docker)
 npm run typecheck            # deno check across every function
 npm run lint                 # deno lint
@@ -79,7 +98,7 @@ npm run ci                   # everything CI runs, in order
 
 Only `test:e2e`, `functions:serve`, `supabase:start` and `db:reset` need Docker.
 `test:unit`, `typecheck` and `lint` need [Deno](https://deno.com) on PATH; `ci:static`
-runs on Node alone.
+runs on Node alone. `deploy:hosted` / `smoke:hosted` need a real project (no Docker).
 
 API response fixtures for the FE: [`docs/fixtures/`](docs/fixtures/).  
 Full hosted steps: [`docs/ops/deploy-checklist.md`](docs/ops/deploy-checklist.md).  
@@ -146,6 +165,11 @@ reader one page in.
   them any PDF regardless. Gating on `isActive` would show an admin a locked button on a file
   the backend would hand over.
 - `POST /functions/v1/signed-pdf` is gone; it answers 410. Use `get-signed-pdf`.
+- Use `coverUrl` on book cards; do not invent Storage public URLs on the client.
+- Filter Search by category with `GET books-list?category=<uuid-or-slug>`.
+- Collection detail: `GET collection-books?id=` or `?slug=`.
+
+Mobile contract: [`docs/mobile-contract.md`](docs/mobile-contract.md).
 
 ## Pagination contract
 
@@ -207,16 +231,18 @@ The backend is now structured in functional phases for the app's real product fl
 
 Included endpoints:
 
-- `GET /functions/v1/books-list` — paginated list of published books
+- `GET /functions/v1/books-list` — paginated list of published books (`?category=` optional)
 - `GET /functions/v1/book-detail?id=<bookId>` — single book detail lookup
 - `GET /functions/v1/books-search?q=<query>` — full-text search over title, author name,
   description, genre and tags, ranked by relevance
 - `GET /functions/v1/categories-list` — category list with counts
 - `GET /functions/v1/collections-list` — collection and shelf summaries
+- `GET /functions/v1/collection-books?id=` or `?slug=` — books in one collection
 - `GET /functions/v1/plans-list` — active premium plans
 - `GET /functions/v1/home-feed` — home feed with collections, categories, and featured books
 
-These endpoints live under `supabase/functions/` and use the shared pagination helper for list responses.
+Catalog and library book cards include a computed `coverUrl`. Full field map:
+[`docs/mobile-contract.md`](docs/mobile-contract.md).
 
 ### Authenticated user phase
 

@@ -10,6 +10,14 @@
 // `code` is the stable value to branch on. `message` is for logs and
 // developer-facing surfaces; it is never a raw Postgres error.
 
+// CORS for Edge Functions.
+//
+// v1 decision: `Access-Control-Allow-Origin: *` is intentional. The product
+// client is React Native (no browser origin), and admin CMS today is Edge
+// Function + service tooling, not a browser SPA. When a browser admin web
+// app ships, replace `*` with an allow-list from env (e.g. ALLOWED_ORIGINS)
+// and keep OPTIONS + the same method/header lists.
+
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -34,7 +42,8 @@ export function fail(code: string, message: string, status: number): Response {
 
 // Paginated list response. The envelope already carries `data`, so it is
 // serialised as-is rather than nested under another `data` key.
-export function list(envelope: { data: unknown[] }): Response {
+// Extra keys (e.g. collection meta on collection-books) are allowed.
+export function list(envelope: { data: unknown[] } & Record<string, unknown>): Response {
   return json(envelope)
 }
 

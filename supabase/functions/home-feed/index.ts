@@ -1,4 +1,5 @@
 import { anonClient, requireMethod } from '../_shared/auth.ts'
+import { withCoverUrls } from '../_shared/covers.ts'
 import { failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
 
 type BookCard = Record<string, unknown> & { id: string }
@@ -81,7 +82,7 @@ Deno.serve(async (req) => {
         .limit(10),
       supabase
         .from('app_settings')
-        .select('featured_collection_id')
+        .select('featured_collection_id, support_email')
         .eq('id', 1)
         .maybeSingle(),
     ])
@@ -116,7 +117,8 @@ Deno.serve(async (req) => {
       )
     }
 
-    // If shelves are empty (no membership yet), fall back to newest published books.
+    // Shelves are curated collections (not a most-read algorithm). Empty
+    // membership falls back to newest published books so Home is never blank.
     const newest = (booksRes.data ?? []) as BookCard[]
     if (newArrivals.length === 0) {
       newArrivals = newest
@@ -130,13 +132,14 @@ Deno.serve(async (req) => {
 
     return ok({
       collections: collectionsRes.data ?? [],
-      books: newest,
+      books: withCoverUrls(newest),
       categories: categoriesRes.data ?? [],
       featuredCollectionId: settingsRes.data?.featured_collection_id ?? null,
+      supportEmail: settingsRes.data?.support_email ?? null,
       shelves: {
-        hero,
-        trending,
-        newArrivals,
+        hero: withCoverUrls(hero),
+        trending: withCoverUrls(trending),
+        newArrivals: withCoverUrls(newArrivals),
       },
     })
   } catch (error) {

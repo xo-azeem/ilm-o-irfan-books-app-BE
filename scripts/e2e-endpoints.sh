@@ -30,6 +30,7 @@ DB=supabase_db_ilm-o-irfan
 BOOK=aaaaaaaa-0000-0000-0000-000000000001
 FREE=aaaaaaaa-0000-0000-0000-000000000002
 DRAFT=aaaaaaaa-0000-0000-0000-000000000003
+MISSING=aaaaaaaa-0000-0000-0000-000000000004
 
 PASS=0; FAIL=0
 ok(){ PASS=$((PASS+1)); printf '  \033[32mPASS\033[0m %s\n' "$1"; }
@@ -49,8 +50,9 @@ docker exec -i "$DB" psql -U postgres -d postgres -q >/dev/null <<'SQL'
 delete from public.books
  where id in ('aaaaaaaa-0000-0000-0000-000000000001',
               'aaaaaaaa-0000-0000-0000-000000000002',
-              'aaaaaaaa-0000-0000-0000-000000000003')
-    or slug in ('ihya','masnavi','draft');
+              'aaaaaaaa-0000-0000-0000-000000000003',
+              'aaaaaaaa-0000-0000-0000-000000000004')
+    or slug in ('ihya','masnavi','draft','missing-pdf');
 delete from public.authors
  where id in ('11111111-1111-1111-1111-111111111111',
               '22222222-2222-2222-2222-222222222222')
@@ -62,7 +64,8 @@ insert into public.authors (id, slug, name) values
 insert into public.books (id, slug, title, description, author_id, genre, tag, tags, pdf_path, is_published, published_at, is_premium) values
   ('aaaaaaaa-0000-0000-0000-000000000001','ihya','Ihya Ulum al-Din','A revival of the religious sciences.','11111111-1111-1111-1111-111111111111','Spirituality','Classic', array['fiqh','ethics'], 'pdfs/ihya.pdf', true, now(), true),
   ('aaaaaaaa-0000-0000-0000-000000000002','masnavi','The Masnavi','Poetry of the soul and divine love.','22222222-2222-2222-2222-222222222222','Poetry','Featured', array['sufism'], 'pdfs/masnavi.pdf', true, now(), false),
-  ('aaaaaaaa-0000-0000-0000-000000000003','draft','Unpublished Draft','Hidden work in progress.','22222222-2222-2222-2222-222222222222','Poetry',null, array[]::text[], null, false, null, false) on conflict (slug) do nothing;
+  ('aaaaaaaa-0000-0000-0000-000000000003','draft','Unpublished Draft','Hidden work in progress.','22222222-2222-2222-2222-222222222222','Poetry',null, array[]::text[], null, false, null, false),
+  ('aaaaaaaa-0000-0000-0000-000000000004','missing-pdf','Missing Storage Object','Published free book whose object was never uploaded.','22222222-2222-2222-2222-222222222222','Poetry',null, array[]::text[], 'pdfs/does-not-exist-e2e.pdf', true, now(), false) on conflict (slug) do nothing;
 SQL
 printf '%%PDF-1.4\ntrailer<</Root 1 0 R>>\n%%%%EOF\n' > /tmp/e2e.pdf
 curl -s -X POST "http://127.0.0.1:54321/storage/v1/object/pdfs/ihya.pdf" -H "Authorization: Bearer $SERVICE" -H "Content-Type: application/pdf" --data-binary @/tmp/e2e.pdf >/dev/null
@@ -82,11 +85,20 @@ is "books-list 200"       "$(code "$B/books-list" "${P[@]}")" 200
 is "book-detail 200"      "$(code "$B/book-detail?id=$BOOK" "${P[@]}")" 200
 is "categories-list 200"  "$(code "$B/categories-list" "${P[@]}")" 200
 is "collections-list 200" "$(code "$B/collections-list" "${P[@]}")" 200
+is "collection-books needs id" "$(code "$B/collection-books" "${P[@]}")" 400
+is "collection-books by slug" "$(code "$B/collection-books?slug=home-hero" "${P[@]}")" 200
+has "books-list coverUrl" "$(curl -s "$B/books-list" "${P[@]}")" '"coverUrl"'
+has "book-detail no pdf_path" "$(curl -s "$B/book-detail?id=$BOOK" "${P[@]}")" '"coverUrl"'
+case "$(curl -s "$B/book-detail?id=$BOOK" "${P[@]}")" in *pdf_path*) no "pdf_path not leaked" "absent" "present";; *) ok "pdf_path not leaked";; esac
 is "plans-list 200"       "$(code "$B/plans-list" "${P[@]}")" 200
 is "book-detail bad uuid 400" "$(code "$B/book-detail?id=nope" "${P[@]}")" 400
 is "book-detail draft 404"    "$(code "$B/book-detail?id=$DRAFT" "${P[@]}")" 404
 has "books-list has no tsvector" "$(curl -s "$B/books-list" "${P[@]}")" '"published_at"'
 case "$(curl -s "$B/books-list" "${P[@]}")" in *search_vector*) no "tsvector not leaked" "absent" "present";; *) ok "tsvector not leaked";; esac
+
+# Category filter: spirituality is seeded; unknown slug 404s.
+is "books-list bad category 404" "$(code "$B/books-list?category=not-a-real-category" "${P[@]}")" 404
+is "books-list category slug" "$(code "$B/books-list?category=spirituality" "${P[@]}")" 200
 
 echo
 echo "== search =="
@@ -155,6 +167,8 @@ echo "== paywall =="
 psqlq "delete from public.entitlements where user_id=(select id from public.profiles where email='$EMAIL');" >/dev/null
 has "free book without entitlement -> signedUrl" "$(curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$FREE\"}")" 'signedUrl'
 has "premium book without entitlement -> PREMIUM_REQUIRED" "$(curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$BOOK\"}")" 'PREMIUM_REQUIRED'
+has "published free book missing object -> PDF_NOT_IN_STORAGE" \
+  "$(curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$MISSING\"}")" 'PDF_NOT_IN_STORAGE'
 psqlq "insert into public.entitlements (user_id,status,store,starts_at,expires_at) select id,'active','stripe',now(),now()+interval '30 days' from public.profiles where email='$EMAIL' on conflict (user_id) do update set status='active',expires_at=now()+interval '30 days';" >/dev/null
 R=$(curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$BOOK\"}")
 has "premium book with entitlement -> signedUrl" "$R" 'signedUrl'
@@ -162,6 +176,24 @@ URL=$(echo "$R" | sed -n 's/.*"signedUrl":"\([^"]*\)".*/\1/p' | sed 's|http://ko
 is "signed url serves pdf 200" "$(code "$URL")" 200
 is "unsigned object denied"    "$(code 'http://127.0.0.1:54321/storage/v1/object/pdfs/ihya.pdf')" 400
 is "deprecated alias 410"      "$(code -X POST "$B/signed-pdf" -H 'Content-Type: application/json' -d '{}')" 410
+
+echo
+echo "== revenuecat webhook auth =="
+# Local serve may omit REVENUECAT_WEBHOOK_AUTH → 500 WEBHOOK_CONFIG_ERROR; wrong
+# secret when configured → 401 WEBHOOK_AUTH_FAILED. Both prove the gate runs.
+WH=$(curl -s -X POST "$B/revenuecat-webhook" -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer WRONG_E2E_SECRET' \
+  -d '{"event":{"id":"00000000-0000-0000-0000-000000000099"}}')
+WH_CODE=$(code -X POST "$B/revenuecat-webhook" -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer WRONG_E2E_SECRET' -d '{}')
+case "$WH" in
+  *WEBHOOK_AUTH_FAILED*|*WEBHOOK_CONFIG_ERROR*) ok "webhook rejects bad/missing secret body";;
+  *) no "webhook rejects bad/missing secret body" "WEBHOOK_AUTH_FAILED|WEBHOOK_CONFIG_ERROR" "${WH:0:150}";;
+esac
+case "$WH_CODE" in
+  401|500) ok "webhook auth gate HTTP $WH_CODE";;
+  *) no "webhook auth gate HTTP" "401|500" "$WH_CODE";;
+esac
 
 echo
 echo "== admin gate =="
@@ -174,7 +206,8 @@ for e in admin-books admin-users admin-categories admin-collections admin-settin
 done
 is "admin-analytics 200" "$(code "$B/admin-analytics?days=30" "${A[@]}")" 200
 has "analytics payload"  "$(curl -s "$B/admin-analytics?days=30" "${A[@]}")" 'top_books'
-
+is "admin-storage-audit 200" "$(code "$B/admin-storage-audit" "${A[@]}")" 200
+has "storage audit payload" "$(curl -s "$B/admin-storage-audit" "${A[@]}")" 'broken'
 echo
 echo "== admin settings partial patch =="
 curl -s -X PATCH "$B/admin-settings" "${A[@]}" -d '{"maintenance_message":"msg","signup_enabled":true}' >/dev/null

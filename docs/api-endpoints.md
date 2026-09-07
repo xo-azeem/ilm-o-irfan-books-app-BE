@@ -12,12 +12,13 @@ The Edge Function endpoint base is `/functions/v1/...`.
 
 | Endpoint | Method | Auth | Purpose |
 | --- | --- | --- | --- |
-| `/functions/v1/home-feed` | GET | Public | Collections, categories, newest books, plus `shelves.hero` / `trending` / `newArrivals` and `featuredCollectionId` |
-| `/functions/v1/books-list` | GET | Public | Paginated published books |
-| `/functions/v1/book-detail?id=<bookId>` | GET | Public | Book detail with author and metadata |
+| `/functions/v1/home-feed` | GET | Public | Collections, categories, newest books, `shelves.hero` / `trending` / `newArrivals`, `featuredCollectionId`, `supportEmail` (book cards include `coverUrl`) |
+| `/functions/v1/books-list` | GET | Public | Paginated published books; optional `category=<uuid-or-slug>` |
+| `/functions/v1/book-detail?id=<bookId>` | GET | Public | Book detail with author and metadata (`coverUrl`; no `pdf_path`) |
 | `/functions/v1/books-search?q=<query>` | GET | Public | Search by text using the Postgres full-text index |
 | `/functions/v1/categories-list` | GET | Public | Browse categories |
 | `/functions/v1/collections-list` | GET | Public | Returns collections and shelves |
+| `/functions/v1/collection-books?id=` or `?slug=` | GET | Public | Paginated books in one published collection (`sort_order`) |
 | `/functions/v1/plans-list` | GET | Public | Plan catalog for premium screen |
 
 ## Authenticated endpoints

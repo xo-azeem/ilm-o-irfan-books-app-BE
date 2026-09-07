@@ -1,7 +1,29 @@
 {
   "data": {
     "limit": 20,
-    "wishlist": { "items": [], "totalCount": 0, "hasMore": false },
+    "wishlist": {
+      "items": [
+        {
+          "book_id": "aaaaaaaa-0000-0000-0000-000000000001",
+          "created_at": "2026-09-01T10:00:00.000Z",
+          "book": {
+            "id": "aaaaaaaa-0000-0000-0000-000000000001",
+            "slug": "ihya",
+            "title": "Ihya Ulum al-Din",
+            "cover_path": "covers/ihya.webp",
+            "coverUrl": "https://<ref>.supabase.co/storage/v1/object/public/covers/ihya.webp",
+            "cover_color": "#2F5D50",
+            "cover_color_dark": "#1A332C",
+            "genre": "Spirituality",
+            "is_premium": true,
+            "read_time_minutes": 360,
+            "author": { "name": "Imam Al Ghazali" }
+          }
+        }
+      ],
+      "totalCount": 1,
+      "hasMore": false
+    },
     "readingProgress": { "items": [], "totalCount": 0, "hasMore": false },
     "finished": { "items": [], "totalCount": 0, "hasMore": false },
     "downloads": { "items": [], "totalCount": 0, "hasMore": false },

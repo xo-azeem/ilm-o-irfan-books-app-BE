@@ -96,6 +96,9 @@ verify_jwt = false
 [functions.collections-list]
 verify_jwt = false
 
+[functions.collection-books]
+verify_jwt = false
+
 [functions.plans-list]
 verify_jwt = false
 

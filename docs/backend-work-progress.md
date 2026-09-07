@@ -2,12 +2,14 @@
 
 **Repo:** `D:\ilm-o-irfan-books-app-BE`  
 **Companion FE:** `D:\ilm-o-irfan-books-app`  
-**Branch (working):** `feat/app-optimization`  
+**Branch (working):** `feat/mobile-api-parity`  
 **Report started:** 2026-08-31  
-**Last updated:** 2026-09-05 (release hardening, CMS completion, tests/CI/runbooks — then **hosted unblocked**: migrations applied to staging/production remote + local, functions deployed)
+**Last updated:** 2026-09-07 (optional polish: e2e failure modes, import rules, media budgets)
 
 This file tracks work done in the “absolute beast backend” stream.  
 Backlog: [`backend-beast-roadmap.md`](./backend-beast-roadmap.md) · Audit: [`backend-audit-remaining-work.md`](./backend-audit-remaining-work.md)
+
+**Hosted status:** Staging `rwnmckrepvycydmtgvcq` live — migrations, seed, Edge Functions, secrets, `smoke:hosted` + `smoke:covers` + `smoke:failures` green. Auth Email on; seed admin/test; catalog + sample PDFs. Still open externally: RevenueCat live webhook, Google OAuth, custom SMTP, production twin, merge/tag.
 
 ---
 
@@ -26,14 +28,13 @@ Backlog: [`backend-beast-roadmap.md`](./backend-beast-roadmap.md) · Audit: [`ba
 
 | Item | Why it is not happening |
 | --- | --- |
-| `supabase link` / `db push` / `functions:deploy` to hosted | **No Supabase project ref** and no `.supabase/project-ref` or `.env` on this machine |
 | Local `supabase start` / `db reset` / `npm run test:e2e` | **Docker is not installed** (`docker` command missing) |
-| Uploading real book PDFs/covers via `books:import` | **No `BOOKS_DIR`** on disk (`D:/Books`, `D:/Projects/Books`, etc. all missing) and no linked project / `.env` with service role |
-| Creating staging/production Supabase projects | Requires your Supabase Dashboard account |
+| Uploading real book PDFs/covers via `books:import` | **No `BOOKS_DIR`** on disk yet — see [`ops/books-ingest.md`](./ops/books-ingest.md) |
+| Creating production Supabase project | Requires your Supabase Dashboard account |
 | Google OAuth / App Store / Play / RevenueCat live projects | Dashboard + store credentials — ops on your side |
 | Wiring the React Native app to Supabase/RC | FE work in `D:\ilm-o-irfan-books-app` (out of this BE pass unless you ask) |
 | Merging to `main` / deleting stale remote branches | Ops decision — not done without your explicit ask |
-| Regenerating `types/database.ts` from hosted schema | Needs linked project after migrations are pushed |
+| First admin promote | Needs you to enable Email Auth + sign up, then SQL (§F) |
 
 **Unblocked work continued anyway** (below): seed shelves, import script, home-feed/library/profile APIs, streak lock, admin CMS Edge Function wrappers, docs.
 
@@ -240,12 +241,17 @@ Deno, which is not installed on this machine; they run in CI.
 
 ---
 
-## Phase 8 — Hosted sync (Done, 2026-09-05)
+## Phase 8 — Hosted sync (2026-09-05, re-verify required)
 
-The project ref and database credentials turned up in `.env`, and Docker was installed but
-not running. Both blockers cleared, so the hosted work in §2 finally ran.
+A prior session applied migrations through `fix_last_admin_guard` and deployed functions when
+credentials were present in `.env`. That does **not** replace a current checklist §G sign-off.
 
-### 8.1 Migrations
+**As of 2026-09-06:** the ship-ready path is `npm run deploy:hosted` + `npm run smoke:hosted`
+([`ops/deploy-checklist.md`](./ops/deploy-checklist.md)). Re-run against staging before calling
+hosted “verified.” Later migrations (e.g. `restrict_covers_listing`) and `collection-books` /
+`coverUrl` work on `feat/mobile-api-parity` must be included in that re-deploy.
+
+### 8.1 Migrations (historical note)
 
 The remote ledger was healthy and in sync through `20260831130000` — no repair needed. Four
 migrations were pending on **both** databases, and the same set was applied to each:
@@ -343,14 +349,12 @@ the RLS regression block, and the corrected last-admin guard.
 
 | # | Action | Owner | Blocker |
 | --- | --- | --- | --- |
-| 1 | Create Supabase project + send **project ref** | You | — |
-| 2 | Provide / place books under `BOOKS_DIR` | You | No books folder found |
-| 3 | Install Docker (optional local Path C + e2e) | You | Docker missing |
-| 4 | link → `db:push` → deploy EFs → secrets → smoke | Agent | Needs #1 |
-| 5 | `BOOKS_DIR=… npm run books:import` then storage audit | Agent | Needs #1 + #2 |
-| 6 | Google OAuth + RC sandbox | You + agent | Dashboards |
-| 7 | FE wiring to Supabase/RC | FE repo | Optional parallel track |
-| 8 | Deploy workflow with secrets | Agent | Needs your Supabase CI credentials |
+| 1 | RevenueCat project + real webhook secret + sandbox matrix | You | Dashboard — `ops/staging-billing-auth.md` |
+| 2 | Google OAuth + RN deep-link scheme | You | Google Cloud + Dashboard |
+| 3 | Custom SMTP (branded mail / email rate limits) | You | SMTP provider |
+| 4 | Production project + merge/tag | You | Explicit ask |
+
+**Staging ready:** covers HTTP 200, PDF gates, auth URIs, admin/test users, catalog audit clean.
 
 ---
 
@@ -358,11 +362,13 @@ the RLS regression block, and the corrected last-admin guard.
 
 ### §2 Hosted — not done until
 
-- [ ] Project linked, migrations applied (incl. RC events + streak lock), all EFs deployed, paywall closed, admin promoted, smoke OK
+- [x] Project linked, migrations applied, all EFs deployed, paywall closed, smoke OK
+- [x] Admin promoted (seed `admin@gmail.com` + verified JWT)
+- [x] Confirmations On for Email Auth
 
 ### §4 Content — code done; data not done until
 
-- [ ] Seed applied on target DB  
-- [ ] Real books imported + Storage objects present  
-- [ ] `admin_storage_audit()` clean  
-- [ ] `home-feed.shelves` returns real membership (not only newest fallback)
+- [x] Seed applied on staging DB  
+- [x] Real books imported + Storage objects present (staging)  
+- [x] `admin_storage_audit()` clean  
+- [x] `home-feed.shelves` can return membership (catalog present; sample books joined to shelves)

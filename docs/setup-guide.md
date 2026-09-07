@@ -7,14 +7,14 @@ This repo is the **Supabase** backend for Ilm o Irfan. PostgreSQL is the databas
 | Path | Purpose |
 | --- | --- |
 | `supabase/migrations/` | Production schema, RLS, storage buckets, admin CMS, search |
-| `supabase/functions/` | Full app/admin API (~28 Edge Functions): catalog, library, PDF, webhook, admin |
+| `supabase/functions/` | Full app/admin API (**58** Edge Functions): catalog, library, PDF, webhook, admin |
 | `supabase/seed.sql` | Baseline categories, subscription plan, local-only test users |
 | `sql/pgadmin/` | Same schema/seed for running in pgAdmin Query Tool |
 | `.env.example` | Keys / connection placeholders (paywall bypass defaults **off**) |
 
 ---
 
-## Path A (recommended): Supabase cloud + pgAdmin
+## Path A (recommended): Supabase cloud + one-pass deploy
 
 Use this for the real app (Auth, Storage, Edge Functions, RLS).
 
@@ -24,9 +24,25 @@ Use this for the real app (Auth, Storage, Edge Functions, RLS).
 2. **New project** → pick org, name (e.g. `ilm-o-irfan`), database password (save it), region closest to you.
 3. Wait until the project is healthy.
 
-### 2. Apply schema
+### 2–4. Link, migrate, deploy functions, set secrets
 
-**Option 2a — Dashboard SQL (fastest first time)**
+```bash
+cd D:/ilm-o-irfan-books-app-BE
+npm install
+npx supabase login
+# Put in .env (gitignored): SUPABASE_PROJECT_REF, REVENUECAT_*, SIGNED_PDF_EXPIRES_IN
+DEPLOY_SEED=1 npm run deploy:hosted
+npm run smoke:hosted   # needs SUPABASE_URL + SUPABASE_ANON_KEY in .env
+```
+
+Full checklist: [`docs/ops/deploy-checklist.md`](./ops/deploy-checklist.md).  
+FE values: [`docs/ops/fe-handoff.md`](./ops/fe-handoff.md).
+
+`YOUR_PROJECT_REF` is the subdomain in `https://YOUR_PROJECT_REF.supabase.co`.
+
+### Manual schema (only if you cannot use the CLI)
+
+**Option 2a — Dashboard SQL (emergency)**
 
 1. In Supabase: **SQL Editor** → New query.
 2. Paste and run, in order (skip the empty stub `20260802110539_new-migration.sql`):
@@ -43,11 +59,12 @@ Use this for the real app (Auth, Storage, Edge Functions, RLS).
    - contents of `supabase/migrations/20260831150000_lock_reading_streaks.sql`
    - contents of `supabase/migrations/20260905120000_release_hardening.sql`
    - contents of `supabase/migrations/20260905130000_fix_last_admin_guard.sql`
+   - contents of `supabase/migrations/20260905140000_restrict_covers_listing.sql`
    - contents of `supabase/seed.sql`
 
-Prefer **Option 2b** (`db push`) so migration history stays consistent.
+Prefer **`npm run deploy:hosted`** / `db push` so migration history stays consistent.
 
-**Option 2b — CLI (best long-term)**
+**Option 2b — CLI steps without the wrapper**
 
 ```bash
 cd D:/ilm-o-irfan-books-app-BE
@@ -55,18 +72,17 @@ npm install
 npx supabase login
 npx supabase link --project-ref YOUR_PROJECT_REF
 npx supabase db push
-npx supabase db query --file supabase/seed.sql
+npx supabase db query --linked --file supabase/seed.sql
 ```
 
-`YOUR_PROJECT_REF` is the subdomain in `https://YOUR_PROJECT_REF.supabase.co`.
-
-### 3. Deploy Edge Functions
+### 3. Deploy Edge Functions (if not using deploy:hosted)
 
 Deploy everything at once — this also picks up `supabase/functions/_shared/`, which every
 function now imports:
 
 ```bash
 npx supabase functions deploy
+# or: npm run functions:deploy
 ```
 
 Or one at a time:
@@ -81,6 +97,7 @@ npx supabase functions deploy book-detail
 npx supabase functions deploy books-search
 npx supabase functions deploy categories-list
 npx supabase functions deploy collections-list
+npx supabase functions deploy collection-books
 npx supabase functions deploy plans-list
 npx supabase functions deploy profile-read
 npx supabase functions deploy profile-update
@@ -246,16 +263,23 @@ Then refresh **Tables** — you should see catalog data.
 
 ### Local development accounts
 
-`supabase/seed.sql` creates two sign-in-ready accounts on every `supabase start` / `db reset`,
-mirroring the hosted project. Both use the password `Password123!`.
+`supabase/seed.sql` creates two sign-in-ready accounts on every `supabase start` / `db reset`.
+Both use the password `Password123!`.
 
 | Email | Role | Premium access via |
 | --- | --- | --- |
 | `admin@gmail.com` | `admin` | admin role bypass — no subscription needed |
 | `test@gmail.com` | `user` | comped entitlement (promotional, never expires) |
 
-`seed.sql` runs against the **local stack only** — `supabase db push` does not execute it, so
-these accounts cannot reach the hosted project.
+On **hosted**, apply seed with `npx supabase db query --linked --file supabase/seed.sql` (or `DEPLOY_SEED=1 npm run deploy:hosted`).  
+If password login fails after seed (hash mismatch across GoTrue versions), reset with:
+
+```bash
+node scripts/reset-hosted-user-password.mjs admin@gmail.com 'Password123!'
+node scripts/reset-hosted-user-password.mjs test@gmail.com 'Password123!'
+```
+
+Then verify: `node scripts/verify-hosted-admin.mjs` or `node scripts/run-authenticated-smokes.mjs`.
 
 > Script 08 is required. `books-search` calls `public.search_books()`, which only exists after
 > it runs, and the admin endpoints cannot read `app_settings` without the `service_role`

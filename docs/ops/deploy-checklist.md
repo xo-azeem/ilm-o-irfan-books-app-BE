@@ -3,148 +3,85 @@
 Use this after a Supabase project exists. **Never commit real secrets.**  
 Canonical schema source: `supabase/migrations/` (prefer `db push` over pasting SQL).
 
-Companion FE: `D:\ilm-o-irfan-books-app`
+Companion FE: `D:\ilm-o-irfan-books-app`  
+FE handoff values: [`fe-handoff.md`](./fe-handoff.md)
+
+---
+
+## Recommended: one-pass script
+
+```bash
+cd D:/ilm-o-irfan-books-app-BE
+npx supabase login   # or set SUPABASE_ACCESS_TOKEN
+
+# Required in env / .env (gitignored):
+#   SUPABASE_PROJECT_REF
+#   REVENUECAT_WEBHOOK_AUTH          # or DEPLOY_ALLOW_PLACEHOLDER_RC=1 for staging
+#   REVENUECAT_ENTITLEMENT_ID=premium
+#   SIGNED_PDF_EXPIRES_IN=300
+
+DEPLOY_SEED=1 npm run deploy:hosted
+```
+
+That runs: **link → db push → optional seed → functions deploy → secrets → unset dead PDF bypass**.
+
+CI equivalent (manual only): Actions → **Deploy hosted (staging)** — needs repo secrets listed in [`env-matrix.md`](./env-matrix.md).
+
+- [ ] `npm run deploy:hosted` exited 0
+- [ ] `npx supabase functions list` shows all **58** functions
+
+Manual A–D below is the same work if you prefer step-by-step.
 
 ---
 
 ## Prerequisites
 
 - [ ] Supabase CLI available (`npx supabase --version`)
-- [ ] Logged in: `npx supabase login`
-- [ ] Project ref known (URL subdomain: `https://YOUR_PROJECT_REF.supabase.co`)
-- [ ] Local branch has the code you intend to ship (`feat/app-optimization` / `dev`)
-- [ ] `.env` created from `.env.example` (gitignored) with real keys for your machine only
+- [ ] Logged in: `npx supabase login` **or** `SUPABASE_ACCESS_TOKEN` set
+- [ ] Project ref known (`https://YOUR_PROJECT_REF.supabase.co`)
+- [ ] Branch to ship is checked out (`dev` / `feat/mobile-api-parity` / tagged release)
+- [ ] `.env` from `.env.example` (gitignored) for local tooling only
 
-Docker is **optional** (local Path C). Hosted Path A does not need Docker.
+Docker is **optional** (local Path C). Hosted deploy does not need Docker.
 
 ---
 
-## A. Link project
+## A–D. Manual equivalent (optional)
 
 ```bash
-cd D:/ilm-o-irfan-books-app-BE
 npx supabase link --project-ref YOUR_PROJECT_REF
-```
-
-- [ ] Link succeeded (creates local `.supabase/` — gitignored)
-
----
-
-## B. Apply migrations
-
-```bash
 npm run db:push
+DEPLOY_SEED=1 npx supabase db query --linked --file supabase/seed.sql   # optional
+npm run functions:deploy
+npx supabase secrets set REVENUECAT_WEBHOOK_AUTH="Bearer YOUR_SHARED_SECRET"
+npx supabase secrets set REVENUECAT_ENTITLEMENT_ID="premium"
+npx supabase secrets set SIGNED_PDF_EXPIRES_IN="300"
+npx supabase secrets unset ALLOW_PDF_WITHOUT_ENTITLEMENT   # if present
 ```
 
-- [ ] All migrations applied (including app_settings, admin CMS v2, search views)
-- [ ] Prefer **not** pasting SQL by hand unless emergency; if you must, follow the full list in `docs/setup-guide.md` Option 2a
+Seed notes:
 
-Seed on hosted (categories + plan only — **no** local test passwords unless you intentionally run seed):
+- Categories + collections + `premium_monthly` plan are safe on hosted.
+- Local auth users in `seed.sql` are for Docker `db reset`. On hosted, **sign up real users** then promote admin (§F).
 
-```bash
-npx supabase db query --file supabase/seed.sql
-```
-
-Note: `seed.sql` local auth users are intended for Docker `db reset`. On hosted, create real users via Auth signup, then promote admin with SQL.
-
-- [ ] Categories + `premium_monthly` plan present
-- [ ] `app_settings` row `id = 1` exists
-- [ ] Migration `20260831140000_revenuecat_events_idempotency.sql` applied (`revenuecat_events` table exists)
+Verify migrations:
 
 ```sql
 select to_regclass('public.revenuecat_events');
 -- expect: revenuecat_events
 ```
 
-- [ ] Migration `20260905120000_release_hardening.sql` applied
-
-```sql
--- expect one row per function; a missing row means the migration did not run
-select proname
-from pg_proc
-where pronamespace = 'public'::regnamespace
-  and proname in (
-    'storage_object_exists', 'book_publish_blocker', 'upsert_reading_progress',
-    'admin_upsert_category', 'admin_upsert_collection', 'admin_upsert_plan'
-  )
-order by proname;
-```
-
----
-
-## C. Deploy every Edge Function
-
-```bash
-npm run functions:deploy
-```
-
-Or: `npx supabase functions deploy`
-
-Deploy list (must all succeed):
-
-| Public | User | Admin | Special |
-| --- | --- | --- | --- |
-| home-feed | profile-read | admin-books | get-signed-pdf |
-| books-list | profile-update | admin-book-create | signed-pdf (410) |
-| book-detail | reading-progress | admin-book-update | revenuecat-webhook |
-| books-search | wishlist-list | admin-book-delete | |
-| categories-list | wishlist-toggle | admin-authors | |
-| collections-list | downloads-list | admin-author-create | |
-| plans-list | downloads-create | admin-author-update | |
-| | highlights-list | admin-author-delete | |
-| | highlights-upsert | admin-bulk-update-books | |
-| | highlights-delete | admin-set-book-relations | |
-| | library-overview | admin-set-collection-books | |
-| | entitlements-status | admin-reorder | |
-| | avatar-upload-url | admin-audit-log | |
-| | | admin-set-entitlement | |
-| | | admin-set-user-role | |
-| | | admin-user-detail | |
-| | | admin-storage-audit | |
-| | | admin-delete-storage-object | |
-| | | admin-dashboard-stats | |
-| | | admin-categories | |
-| | | admin-collections | |
-| | | admin-users | |
-| | | admin-analytics | |
-| | | admin-settings | |
-| | | admin-category-create | |
-| | | admin-category-update | |
-| | | admin-category-delete | |
-| | | admin-collection-create | |
-| | | admin-collection-update | |
-| | | admin-collection-delete | |
-| | | admin-plans | |
-| | | admin-plan-create | |
-| | | admin-plan-update | |
-| | | admin-plan-delete | |
-
-- [ ] `npx supabase functions list` shows all expected functions
-
----
-
-## D. Secrets (paywall CLOSED on public projects)
-
-```bash
-npx supabase secrets set REVENUECAT_WEBHOOK_AUTH="Bearer YOUR_SHARED_SECRET"
-npx supabase secrets set REVENUECAT_ENTITLEMENT_ID="premium"
-npx supabase secrets set SIGNED_PDF_EXPIRES_IN="300"
-```
-
-- [ ] No `ALLOW_PDF_WITHOUT_ENTITLEMENT` secret set — it is no longer read; unset it if an
-      earlier deploy created it (`npx supabase secrets unset ALLOW_PDF_WITHOUT_ENTITLEMENT`)
-- [ ] Webhook auth matches RevenueCat Dashboard Authorization header
-- [ ] Service role / anon keys only in Dashboard / local `.env` — never in the RN app except anon
+Prefer **not** pasting SQL by hand. If you must, follow `docs/setup-guide.md` Option 2a (includes `20260905140000_restrict_covers_listing.sql`).
 
 ---
 
 ## E. Storage buckets
 
-Confirm buckets exist with expected policies (created by migrations):
+Created by migrations:
 
 | Bucket | Public | Notes |
 | --- | --- | --- |
-| covers | yes | catalog images |
+| covers | yes | catalog images; FE uses `coverUrl` from APIs |
 | pdfs | **no** | signed URL only via `get-signed-pdf` |
 | avatars | no | `{user_id}/…` |
 
@@ -153,10 +90,14 @@ Confirm buckets exist with expected policies (created by migrations):
 
 ---
 
-## F. First admin
+## F. Auth + first admin
 
-1. Sign up in the app (or Dashboard → Authentication → Users).
-2. Run:
+**Now (email/password):**
+
+1. Dashboard → Authentication → Providers → **Email** enabled.
+2. Confirmations **On** for staging/production (Off only on local Docker).
+3. Sign up the first admin (app or Dashboard → Users).
+4. Promote:
 
 ```sql
 update public.profiles
@@ -164,42 +105,50 @@ set role = 'admin'
 where email = 'YOUR_ADMIN_EMAIL';
 ```
 
-3. Sign out and sign back in (JWT must refresh `app_metadata.app_role`).
+5. Sign out and back in (JWT must refresh `app_metadata.app_role`).
 
-- [ ] `entitlements-status` returns `isAdmin: true` and `canAccessPremium: true`
-- [ ] Admin can open unpublished draft PDFs via `get-signed-pdf`
+Staging note: seed may already create `admin@gmail.com` / `test@gmail.com`. If login fails, run `node scripts/reset-hosted-user-password.mjs …` then `node scripts/run-authenticated-smokes.mjs`.
+
+- [x] `entitlements-status` returns `isAdmin: true` and `canAccessPremium: true` (staging seed admin verified)
+
+**Later (Google):** Dashboard Google provider + iOS/Android redirect / deep links when the FE ships Google login.
+
+**Later (RevenueCat):** Point RC webhook at  
+`https://YOUR_PROJECT_REF.supabase.co/functions/v1/revenuecat-webhook`  
+with Authorization matching `REVENUECAT_WEBHOOK_AUTH`. Replace any staging placeholder.
+
+**Later (catalog):** `BOOKS_DIR=… npm run books:import` then `admin_storage_audit()` clean. Seed alone is enough to prove deploy.
 
 ---
 
 ## G. Smoke checks
+
+Automated public envelope checks (no Docker):
+
+```bash
+# SUPABASE_URL + SUPABASE_ANON_KEY in env / .env
+npm run smoke:hosted
+# optional: SUPABASE_USER_JWT=… for entitlements-status + profile-read
+```
+
+Manual / SQL:
 
 ```sql
 select count(*) from public.books where is_published;
 select code, is_active from public.plans;
 ```
 
-```bash
-# Replace URL, anon key, and user JWT
-curl -s "$SUPABASE_URL/functions/v1/home-feed" \
-  -H "apikey: $SUPABASE_ANON_KEY" \
-  -H "Authorization: Bearer $SUPABASE_ANON_KEY"
-```
-
-- [ ] `home-feed` returns 200 envelope
-- [ ] Free published book (`is_premium=false`) opens for signed-in user without entitlement
-- [ ] Premium book returns `PREMIUM_REQUIRED` without entitlement
-- [ ] Premium book opens with active entitlement or admin
-- [ ] Publishing a book whose PDF is not uploaded is refused with `PDF_NOT_IN_STORAGE`
+- [ ] `npm run smoke:hosted` passes (or `home-feed` curl returns 200 `{ data }`)
+- [ ] `npm run smoke:rls` passes (anon checks; optional JWTs)
+- [ ] Free published book opens for signed-in user without entitlement *(needs catalog)*
+- [ ] Premium book returns `PREMIUM_REQUIRED` without entitlement *(needs catalog)*
+- [ ] Premium book opens with active entitlement or admin *(needs RC or admin)*
+- [ ] Publishing without PDF → `PDF_NOT_IN_STORAGE`
 - [ ] `POST reading-progress { book_id, progress }` alone does not reset `current_page`
-- [ ] A CMS edit shows the admin's email in `admin-audit-log`, not `system`
-- [ ] `GET books-list?page=100000` returns `PAGE_OUT_OF_RANGE`, not a slow 200
-- [ ] `admin-storage-audit` reports no broken references
-
-```sql
--- Supabase's own review of the deployed schema; address security findings before launch
--- npx supabase db advisors --project-ref YOUR_PROJECT_REF
-select * from public.admin_storage_audit();
-```
+- [ ] CMS edit attributes admin email in `admin-audit-log`
+- [ ] `GET books-list?page=100000` → `PAGE_OUT_OF_RANGE`
+- [ ] `admin-storage-audit` clean after import
+- [ ] `npx supabase db advisors` reviewed before launch
 
 ---
 
@@ -208,36 +157,30 @@ select * from public.admin_storage_audit();
 | | Staging | Production |
 | --- | --- | --- |
 | Separate Supabase project | required | required |
-| Paywall | closed — no bypass exists in code | closed |
-| Catalog data | sample OK | real titles only |
+| Paywall | closed — no bypass in code | closed |
+| Catalog | sample OK | real titles |
 | RevenueCat | sandbox | production |
+| Secrets | never reuse across envs | rotated |
 
-- [ ] Staging project created and checklist A–G done
-- [ ] Production project created and checklist A–G done (do not reuse staging secrets)
+- [ ] Staging: deploy script + smoke free path
+- [ ] Production: same checklist; **different** `REVENUECAT_WEBHOOK_AUTH`
 
 ---
 
-## I. Private ops note (keep offline / password manager)
+## I. Private ops note (offline / password manager)
 
-Record outside git:
-
-- Staging project ref + webhook URL
-- Production project ref + webhook URL
-- Where `REVENUECAT_WEBHOOK_AUTH` is stored
+- Staging + production project refs
+- Webhook URLs
+- Where `REVENUECAT_WEBHOOK_AUTH` lives
 - First admin email
-
-Webhook URL shape:
-
-`https://YOUR_PROJECT_REF.supabase.co/functions/v1/revenuecat-webhook`
+- FE handoff: `SUPABASE_URL` + anon key (see [`fe-handoff.md`](./fe-handoff.md))
 
 ---
 
 ## Blocked without you
 
-These cannot be finished from the repo alone:
+1. Create Supabase project(s)  
+2. Provide `SUPABASE_PROJECT_REF` + CLI login / access token  
+3. Real RC / Google / book files when those paths go live  
 
-1. Create the Supabase project(s) in the Dashboard  
-2. Provide `YOUR_PROJECT_REF` (and ensure CLI login works on this machine)  
-3. Paste real secrets into Dashboard / `supabase secrets set`  
-
-Once you send the **project ref**, the next step is: link → `db:push` → `functions:deploy` → secrets → smoke checks.
+Repo path after you send the ref: `npm run deploy:hosted` → `npm run smoke:hosted` → §F admin → FE handoff.

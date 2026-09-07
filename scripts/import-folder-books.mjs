@@ -10,8 +10,13 @@
  * Env:
  *   BOOKS_DIR          required path to the books root (no silent wrong default)
  *   DEFAULT_IS_PREMIUM true|false (default false)
+ *   REQUIRE_COVER=1    fail import when a folder has no cover image
+ *   MAX_PDF_BYTES      hard ceiling (default 80 MiB)
+ *   WARN_PDF_BYTES     soft warn (default 25 MiB)
  *   DRY_RUN=1          scan + write SQL only; skip Storage upload and db query
  *   SQL_ONLY=1         same as DRY_RUN but still requires no .env for upload
+ *
+ * meta.json may set { "slug": "stable-id" } so renaming the folder does not change the slug.
  *
  * Usage:
  *   BOOKS_DIR=D:/Books npm run books:import
@@ -23,9 +28,23 @@ import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from '
 import { basename, extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import {
+  assertUniqueSlugs,
+  checkPdfBudget,
+  DEFAULT_MAX_PDF_BYTES,
+  DEFAULT_WARN_PDF_BYTES,
+  resolveBookSlug,
+  slugify,
+} from './lib/import-rules.mjs'
+
 const ROOT = join(fileURLToPath(new URL('..', import.meta.url)))
 const SQL_PATH = join(ROOT, 'scripts', '.import-books.sql')
 const DRY_RUN = process.env.DRY_RUN === '1' || process.env.SQL_ONLY === '1'
+const REQUIRE_COVER = ['true', '1', 'yes', 'on'].includes(
+  (process.env.REQUIRE_COVER ?? 'false').trim().toLowerCase(),
+)
+const MAX_PDF_BYTES = Number(process.env.MAX_PDF_BYTES ?? DEFAULT_MAX_PDF_BYTES)
+const WARN_PDF_BYTES = Number(process.env.WARN_PDF_BYTES ?? DEFAULT_WARN_PDF_BYTES)
 const DEFAULT_IS_PREMIUM = ['true', '1', 'yes', 'on'].includes(
   (process.env.DEFAULT_IS_PREMIUM ?? 'false').trim().toLowerCase(),
 )
@@ -79,15 +98,6 @@ function resolveBooksDir() {
     'BOOKS_DIR is required. Example: BOOKS_DIR=D:/Books npm run books:import\n' +
       'Expected layout: BOOKS_DIR/<title>/<title> - <author>.pdf (+ optional cover.webp)',
   )
-}
-
-function slugify(input) {
-  return String(input)
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
 }
 
 function sqlStr(value) {
@@ -176,10 +186,23 @@ function scanBooks(booksDir) {
     const coverName = files.find((f) => /^cover\.(webp|jpg|jpeg|png)$/i.test(f))
     const meta = readMeta(folderPath)
     const { author } = parsePdfName(pdfName)
-    const slug = slugify(dir.name)
+    const slug = resolveBookSlug(dir.name, meta)
     const pdfPath = join(folderPath, pdfName)
     const pdfStat = statSync(pdfPath)
+    const budget = checkPdfBudget(pdfStat.size, { max: MAX_PDF_BYTES, warn: WARN_PDF_BYTES })
+    if (budget.ok === false && budget.level === 'error') {
+      throw new Error(`${dir.name}: ${budget.message}`)
+    }
+    if (budget.ok === false && budget.level === 'warn') {
+      console.warn(`WARN ${dir.name}: ${budget.message}`)
+    }
     const coverPath = coverName ? join(folderPath, coverName) : null
+    if (!coverPath && REQUIRE_COVER) {
+      throw new Error(`${dir.name}: cover.webp|jpg|png required (REQUIRE_COVER=1)`)
+    }
+    if (!coverPath) {
+      console.warn(`WARN ${dir.name}: no cover image (Home cards will use color fallback only)`)
+    }
     const coverExt = coverName ? extname(coverName).toLowerCase() : null
     const [coverColor, coverColorDark] =
       COVER_COLORS[
@@ -216,6 +239,7 @@ function scanBooks(booksDir) {
     })
   }
 
+  assertUniqueSlugs(books)
   return books
 }
 
@@ -334,9 +358,17 @@ on conflict do nothing;`)
     lines.push('')
   }
 
-  lines.push(`-- Publish checklist hint (informational)
--- select slug, is_published, pdf_path, cover_path from public.books
--- where slug in (${slugList});`)
+  lines.push(`-- Publish checklist (informational — run after import)
+-- PDF + cover paths, author, categories, home-shelf membership:
+-- select b.slug, b.is_published, b.pdf_path, b.cover_path, b.author_id is not null as has_author,
+--   exists (select 1 from public.book_categories bc where bc.book_id = b.id) as has_category,
+--   exists (
+--     select 1 from public.collection_books cb
+--     join public.collections c on c.id = cb.collection_id
+--     where cb.book_id = b.id and c.slug in ('home-hero','trending','new-arrivals')
+--   ) as on_home_shelf
+-- from public.books b
+-- where b.slug in (${slugList});`)
 
   return `${lines.join('\n')}\n`
 }
@@ -358,10 +390,11 @@ function loadEnv() {
 }
 
 function supabase(args) {
-  const cli = join(ROOT, 'node_modules', 'supabase', 'dist', 'supabase.js')
-  execFileSync(process.execPath, [cli, ...args], {
+  execFileSync('npx', ['supabase', ...args], {
     cwd: ROOT,
     stdio: 'inherit',
+    shell: true,
+    env: process.env,
   })
 }
 

@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "PDF_NOT_IN_STORAGE",
+    "message": "PDF file not found in storage"
+  }
+}

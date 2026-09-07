@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "WEBHOOK_AUTH_FAILED",
+    "message": "Invalid webhook authorization"
+  }
+}

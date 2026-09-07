@@ -48,6 +48,10 @@ Deno.test('every response carries the CORS headers the app needs', () => {
   assertEquals(response.headers.get('Content-Type'), 'application/json')
 })
 
+Deno.test('v1 CORS stays wide-open for React Native (tighten when admin web ships)', () => {
+  assertEquals(corsHeaders['Access-Control-Allow-Origin'], '*')
+})
+
 Deno.test('handleOptions answers preflight and passes everything else through', () => {
   const preflight = handleOptions(new Request('https://example.test/fn', { method: 'OPTIONS' }))
   assertEquals(preflight?.status, 200)

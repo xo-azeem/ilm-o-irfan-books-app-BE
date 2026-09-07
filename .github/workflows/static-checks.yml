@@ -55,8 +55,16 @@ jobs:
       - name: Lint
         run: deno lint
 
+      # registry.npmjs.org: Deno 2.8+ pulls npm:@types/node for supabase-js → @types/ws.
       - name: Unit tests
-        run: deno test --allow-env --allow-net=esm.sh,jsr.io,deno.land tests/
+        run: deno test --allow-env --allow-net=esm.sh,jsr.io,deno.land,registry.npmjs.org tests/
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Import-rules unit tests
+        run: npm run test:import
 
   # Full e2e needs Docker plus `supabase start`, which this runner does not
   # provide. Run `npm run test:e2e` locally against a started stack, or against

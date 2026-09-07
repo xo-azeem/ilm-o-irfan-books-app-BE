@@ -28,7 +28,8 @@ export const endpointManifest: EndpointDefinition[] = [
     method: 'GET',
     access: 'public',
     description: 'Returns a paginated catalog of published books.',
-    notes: 'Use page and pageSize for server-side pagination.',
+    notes:
+      'Use page and pageSize for server-side pagination. Optional category=<uuid-or-slug> filters via book_categories. Each card includes coverUrl.',
   },
   {
     name: 'book-detail',
@@ -36,6 +37,7 @@ export const endpointManifest: EndpointDefinition[] = [
     method: 'GET',
     access: 'public',
     description: 'Returns one book, author info, and related metadata.',
+    notes: 'Includes coverUrl. Does not include pdf_path.',
   },
   {
     name: 'books-search',
@@ -57,6 +59,15 @@ export const endpointManifest: EndpointDefinition[] = [
     method: 'GET',
     access: 'public',
     description: 'Returns hero and shelf collections.',
+  },
+  {
+    name: 'collection-books',
+    route: '/functions/v1/collection-books?id=<uuid>|slug=<slug>',
+    method: 'GET',
+    access: 'public',
+    description: 'Returns paginated books in one published collection, ordered by sort_order.',
+    notes:
+      'Pass id or slug (not both). Envelope includes collection meta beside page fields. Pagination count excludes unpublished membership.',
   },
   {
     name: 'plans-list',
@@ -85,6 +96,14 @@ export const endpointManifest: EndpointDefinition[] = [
     method: 'GET',
     access: 'authenticated',
     description: 'Returns read progress for the current user.',
+  },
+  {
+    name: 'reading-progress',
+    route: '/functions/v1/reading-progress',
+    method: 'POST',
+    access: 'authenticated',
+    description: 'Upserts read progress for one book (partial merge).',
+    notes: 'Send progress (0–1) or progress_percent (0–100), never both.',
   },
   {
     name: 'wishlist-list',

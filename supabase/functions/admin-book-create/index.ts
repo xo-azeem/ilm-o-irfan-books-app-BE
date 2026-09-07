@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
 
     const authorId = asUuid('authorId')(payload.authorId ?? payload.author_id)
 
-    let slug =
+    const slug =
       typeof payload.slug === 'string' && payload.slug.trim()
         ? slugify(payload.slug.trim())
         : slugify(title)
