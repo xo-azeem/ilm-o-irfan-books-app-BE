@@ -30,6 +30,7 @@ import {
   readJsonBody,
 } from '../_shared/http.ts'
 import { requireUuidField } from '../_shared/payload.ts'
+import { type AccessState, clampSignedUrlTtl } from '../_shared/entitlement.ts'
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)
@@ -47,9 +48,14 @@ Deno.serve(async (req) => {
 
     const admin = serviceClient()
 
-    // The role and the book row are independent reads.
-    const [profileRes, bookRes] = await Promise.all([
-      admin.from('profiles').select('role').eq('id', ctx.user.id).maybeSingle(),
+    // Access state and the book row are independent reads.
+    //
+    // user_access_state() is the same rule entitlements-status reports, so the
+    // app can never be shown an unlocked book it is then refused - the two
+    // used to test `status = 'active'` separately and disagreed about trials
+    // and cancelled-but-paid-for months.
+    const [stateRes, bookRes] = await Promise.all([
+      admin.rpc('user_access_state', { p_user_id: ctx.user.id }),
       admin
         .from('books')
         // is_premium is not selected: it no longer decides anything here, and
@@ -63,14 +69,31 @@ Deno.serve(async (req) => {
       return failFromDbError('get-signed-pdf', 'BOOK_READ_FAILED', 'Unable to load book', bookRes.error)
     }
 
-    // A role lookup that fails must not silently promote the caller, but it
-    // must not lock out a real admin either, so the JWT claim still stands.
-    if (profileRes.error) {
-      console.error('[get-signed-pdf] role lookup failed', profileRes.error.message)
+    if (stateRes.error) {
+      return failFromDbError(
+        'get-signed-pdf',
+        'ENTITLEMENT_READ_FAILED',
+        'Unable to verify subscription',
+        stateRes.error,
+      )
     }
 
-    const isAdmin =
-      ctx.user.app_metadata?.app_role === 'admin' || profileRes.data?.role === 'admin'
+    const state = stateRes.data as AccessState | null
+
+    // No state means the rule could not be evaluated. Fail closed: an
+    // unreadable entitlement is not a reason to hand out a PDF.
+    if (!state) {
+      return failFromDbError(
+        'get-signed-pdf',
+        'ENTITLEMENT_READ_FAILED',
+        'Unable to verify subscription',
+        { message: 'user_access_state returned null' },
+      )
+    }
+
+    // The JWT claim still stands on its own so a real admin is not locked out
+    // by a profiles read that went wrong.
+    const isAdmin = ctx.user.app_metadata?.app_role === 'admin' || state.isAdmin
 
     const book = bookRes.data
 
@@ -85,33 +108,19 @@ Deno.serve(async (req) => {
 
     // Every book requires a membership. Admins are the only exception, and
     // they are served drafts too - the app relies on that for previews.
-    if (!isAdmin) {
-      const { data: entitlement, error: entError } = await admin
-        .from('entitlements')
-        .select('status, expires_at')
-        .eq('user_id', ctx.user.id)
-        .maybeSingle()
-
-      if (entError) {
-        return failFromDbError(
-          'get-signed-pdf',
-          'ENTITLEMENT_READ_FAILED',
-          'Unable to verify subscription',
-          entError,
-        )
-      }
-
-      const active =
-        entitlement?.status === 'active' &&
-        (entitlement.expires_at == null ||
-          new Date(entitlement.expires_at).getTime() > Date.now())
-
-      if (!active) {
-        return fail('PREMIUM_REQUIRED', 'Active subscription required', 403)
-      }
+    if (!isAdmin && !state.isActive) {
+      return fail('PREMIUM_REQUIRED', 'Active subscription required', 403)
     }
 
-    const expiresIn = Number(Deno.env.get('SIGNED_PDF_EXPIRES_IN') ?? '300')
+    // A signed URL must not outlive the subscription that justified it.
+    // Without this clamp, asking for a book ten seconds before expiry buys a
+    // full five minutes of reading - and unlike the app's own lock, a minted
+    // URL cannot be recalled: it already works from any client, offline of
+    // any session. Admins have no end date and are not clamped.
+    const expiresIn = clampSignedUrlTtl(
+      Number(Deno.env.get('SIGNED_PDF_EXPIRES_IN') ?? '300'),
+      isAdmin ? null : state.secondsRemaining,
+    )
     const rawPath = book.pdf_path.replace(/^\/+/, '')
     const stripped = rawPath.replace(/^pdfs\//, '')
     const candidates = [...new Set([stripped, rawPath].filter(Boolean))]
@@ -141,6 +150,18 @@ Deno.serve(async (req) => {
       signedUrl,
       expiresIn,
       fileSizeBytes: book.file_size_bytes ?? null,
+
+      // Opening a book is the moment the reader is most likely to be in the
+      // app and least likely to tolerate a stale lock, so the countdown is
+      // re-anchored here rather than waiting for the next entitlements-status
+      // poll. serverTime travels with it so the client can re-measure its own
+      // clock offset on every open.
+      access: {
+        expiresAt: state.expiresAt,
+        secondsRemaining: isAdmin ? null : state.secondsRemaining,
+        serverTime: state.serverTime,
+        reason: state.reason,
+      },
     })
   } catch (error) {
     return handleError('get-signed-pdf', error)

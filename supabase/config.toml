@@ -28,7 +28,10 @@ enabled = true
 sql_paths = ["./seed.sql"]
 
 [realtime]
-enabled = false
+# The app subscribes to a private per-reader topic (entitlement:<user_id>) to
+# be told the moment a subscription ends. Off locally meant that path could
+# only ever be tested against production.
+enabled = true
 
 [studio]
 enabled = true

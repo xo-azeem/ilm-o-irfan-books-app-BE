@@ -163,7 +163,34 @@ Email comes from Auth, not metadata. After admin promote, force re-login so JWT 
 
 ## Premium gate
 
-`GET entitlements-status` → `{ isActive, isAdmin, canAccessPremium, entitlement }`.
+`GET entitlements-status` →
+
+```jsonc
+{ "data": {
+    "isActive": true,            // the subscription alone
+    "isAdmin": false,            // profiles.role or the app_role JWT claim
+    "canAccessPremium": true,    // isActive || isAdmin  <- gate on THIS
+    "entitlement": { /* row + nested plan */ },
+
+    "status": "active",          // active|trial|cancelled|grace|billing_issue|expired
+    "startsAt": "2026-09-09T12:00:00Z",
+    "expiresAt": "2026-10-09T12:00:00Z",   // null = no end date (lifetime / admin)
+    "secondsRemaining": 2592000,           // null when expiresAt is null; never negative
+    "reason": "active",
+    "serverTime": "2026-09-09T12:00:00Z",  // for clock-skew correction
+
+    "realtime": { "channel": "entitlement:<user_id>",
+                  "event": "entitlement_changed", "private": true } } }
+```
+
+`reason` tells the paywall what to say. `active` · `trial` · `cancelled_paid_through` ·
+`grace` · `billing_issue_paid_through` · `admin` · `lapsed` · `expired` · `none`.
+Never having subscribed (`none`) deserves a different screen from a failed card
+(`billing_issue_paid_through`, still reading) or a lapse (`lapsed`).
+
+**Do not read `status` to decide access.** `trial`, `cancelled` (will not renew, but paid
+through the month), `grace` and `billing_issue` all still grant it. `canAccessPremium` is
+the only field that decides.
 
 **Gate premium UI and Read CTAs on `canAccessPremium`, not `isActive`.**  
 Admins have no subscription but `get-signed-pdf` still serves them.
@@ -189,6 +216,53 @@ reader access on it.
 | Signed in, no active subscription | `403` | `PREMIUM_REQUIRED` |
 | Signed in, active subscription | `200` | — (`signedUrl`) |
 | Admin, no subscription | `200` | — (drafts included) |
+
+### When the subscription ends mid-read
+
+Access ends **exactly** at `expiresAt`, not at the end of the session, and not when the
+next request happens to go out. Three layers make that true, and the app owns one of them.
+
+| Layer | Owner | Role |
+| --- | --- | --- |
+| `get-signed-pdf` re-checks every open | backend | Truth. Refuses the instant `expiresAt` passes. |
+| Minutely sweep → Realtime broadcast | backend | Pushes the change out, within ~60s. |
+| **Countdown to `expiresAt`** | **app** | **Exactness. Locks to the second, offline, with no socket.** |
+
+**The socket is not the lock.** Build the timer first. If the broadcast were the only
+mechanism, turning off wifi one second before expiry would buy unlimited reading — and
+that is the one thing this whole feature exists to prevent.
+
+Subscribe to the **private** channel named in `entitlements-status.realtime.channel`. Its
+payload is the same shape as the `entitlements-status` body (minus `entitlement`), so one
+reducer handles both:
+
+```jsonc
+{ "userId": "...", "status": "expired", "expiresAt": "...", "isActive": false,
+  "isAdmin": false, "canAccessPremium": false, "reason": "expired",
+  "serverTime": "...", "secondsRemaining": 0 }
+```
+
+The channel is read-only and scoped to one reader by RLS. A device cannot broadcast itself
+an unlock, and cannot join another reader's topic. It carries no billing internals.
+
+Rules that matter:
+
+- **Correct for clock skew.** Store `serverTime - Date.now()` at every sync and apply the
+  offset to the countdown. Otherwise moving the device clock backwards buys free reading.
+- **`get-signed-pdf` re-anchors it.** Every successful open returns `access.expiresAt`,
+  `access.secondsRemaining` and `access.serverTime`. Re-arm the timer from those.
+- **Re-check on foreground**, always. Expiry that happens while backgrounded produces no
+  timer callback you can rely on.
+- **Signed URLs are clamped** to the remaining subscription — a reader with 40 seconds left
+  gets a ~40s URL, not the usual 300s. Do not assume `expiresIn` is constant.
+- **Locking is not deleting.** Keep reading progress, highlights and download rows. A
+  reader who resubscribes should find their library exactly as they left it.
+- A **renewal** arriving seconds after a lapse broadcasts an unlock. Let the paywall
+  recover from that without a restart rather than tearing down state on lock.
+
+`downloads-list` rows survive expiry on purpose. A downloaded file on disk is **not**
+permission to open it — gate the reader screen on `canAccessPremium`, never on file
+presence.
 
 ### Book price fields
 

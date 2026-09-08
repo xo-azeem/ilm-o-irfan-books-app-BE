@@ -185,6 +185,101 @@ is "unsigned object denied"    "$(code 'http://127.0.0.1:54321/storage/v1/object
 is "deprecated alias 410"      "$(code -X POST "$B/signed-pdf" -H 'Content-Type: application/json' -d '{}')" 410
 
 echo
+echo "== subscription lifecycle: the access rule =="
+# 'expired' is the only status that denies on its own. Everything else grants
+# right up to expires_at. The gate used to test status='active' and locked out
+# trials and cancelled-but-paid-for months; these assertions are why.
+ent() { psqlq "update public.entitlements set status='$1', expires_at=$2 where user_id=(select id from public.profiles where email='$EMAIL');" >/dev/null; }
+gate() { curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$BOOK\"}"; }
+
+ent 'trial' "now()+interval '1 day'"
+has "trial -> served"                    "$(gate)" 'signedUrl'
+ent 'cancelled' "now()+interval '1 day'"
+has "cancelled but paid through -> served" "$(gate)" 'signedUrl'
+ent 'grace' "now()+interval '1 day'"
+has "grace -> served"                    "$(gate)" 'signedUrl'
+ent 'billing_issue' "now()+interval '1 day'"
+has "billing issue inside paid period -> served" "$(gate)" 'signedUrl'
+ent 'cancelled' "now()-interval '1 second'"
+has "cancelled and past expiry -> PREMIUM_REQUIRED" "$(gate)" 'PREMIUM_REQUIRED'
+ent 'expired' "now()+interval '30 days'"
+has "explicitly expired beats a future date (refund) -> PREMIUM_REQUIRED" "$(gate)" 'PREMIUM_REQUIRED'
+
+echo
+echo "== subscription lifecycle: expiry is enforced before the sweep runs =="
+# The sweep is only what makes expiry *pushable*. Access must already be gone
+# the instant now() passes expires_at, with no cron run in between.
+ent 'active' "now()-interval '1 second'"
+is "lapsed one second ago, row still says active" \
+  "$(psqlq "select status from public.entitlements where user_id=(select id from public.profiles where email='$EMAIL');" | tr -d ' ')" "active"
+has "...but the gate already refuses" "$(gate)" 'PREMIUM_REQUIRED'
+has "...and entitlements-status agrees" \
+  "$(curl -s "$B/entitlements-status" "${A[@]}")" '"canAccessPremium":false'
+
+echo
+echo "== subscription lifecycle: the sweep and the broadcast =="
+psqlq "delete from realtime.messages;" >/dev/null
+is "sweep flips exactly the lapsed row" "$(psqlq "select public.expire_lapsed_entitlements();" | tr -d ' ')" "1"
+is "status is now expired" \
+  "$(psqlq "select status from public.entitlements where user_id=(select id from public.profiles where email='$EMAIL');" | tr -d ' ')" "expired"
+is "sweep is idempotent" "$(psqlq "select public.expire_lapsed_entitlements();" | tr -d ' ')" "0"
+is "one broadcast, on the reader's own private topic" \
+  "$(psqlq "select count(*) from realtime.messages where topic='entitlement:'||(select id from public.profiles where email='$EMAIL') and private and extension='broadcast';" | tr -d ' ')" "1"
+has "broadcast carries the lock, not a row diff" \
+  "$(psqlq "select payload::text from realtime.messages limit 1;")" '"canAccessPremium": false'
+has "broadcast names the reason" \
+  "$(psqlq "select payload::text from realtime.messages limit 1;")" '"reason": "expired"'
+# A device must not be able to talk itself back in.
+case "$(psqlq "select payload::text from realtime.messages limit 1;")" in
+  *raw_event*|*store*) no "broadcast does not leak billing internals" "absent" "present";;
+  *) ok "broadcast does not leak billing internals";;
+esac
+
+# Renewal after the sweep already locked them: the row must move again, and
+# the sweep must not have poisoned the webhook ordering guard.
+psqlq "delete from realtime.messages;" >/dev/null
+ent 'active' "now()+interval '30 days'"
+is "renewal broadcasts an unlock" \
+  "$(psqlq "select count(*) from realtime.messages;" | tr -d ' ')" "1"
+has "unlock says access is back" \
+  "$(psqlq "select payload::text from realtime.messages limit 1;")" '"canAccessPremium": true'
+has "renewal restores the gate" "$(gate)" 'signedUrl'
+# Noise must not wake every device the reader owns.
+psqlq "delete from realtime.messages;" >/dev/null
+psqlq "update public.entitlements set raw_event='{\"noise\":true}'::jsonb where user_id=(select id from public.profiles where email='$EMAIL');" >/dev/null
+is "an irrelevant write broadcasts nothing" "$(psqlq "select count(*) from realtime.messages;" | tr -d ' ')" "0"
+# A lifetime / promotional comp has no end date and must never be swept.
+ent 'active' 'null'
+is "lifetime comp is never swept" "$(psqlq "select public.expire_lapsed_entitlements();" | tr -d ' ')" "0"
+has "lifetime comp still reads" "$(gate)" 'signedUrl'
+
+echo
+echo "== subscription lifecycle: what the app is told =="
+ent 'active' "now()+interval '30 days'"
+ES=$(curl -s "$B/entitlements-status" "${A[@]}")
+has "canAccessPremium"   "$ES" '"canAccessPremium":true'
+has "expiresAt"          "$ES" '"expiresAt"'
+has "secondsRemaining"   "$ES" '"secondsRemaining"'
+has "reason"             "$ES" '"reason":"active"'
+has "serverTime for clock-skew correction" "$ES" '"serverTime"'
+has "the channel to subscribe to" "$ES" '"channel":"entitlement:'
+has "marked private"     "$ES" '"private":true'
+
+# A signed URL must not outlive the subscription. 40 seconds left, 300s default.
+# Asserted as a range, not an exact number: the value depends on how long the
+# request itself took, and a flaky test on a paywall gets muted rather than fixed.
+ent 'active' "now()+interval '40 seconds'"
+TTL=$(gate | sed -n 's/.*"expiresIn":\([0-9]*\).*/\1/p')
+if [ -n "$TTL" ] && [ "$TTL" -ge 15 ] && [ "$TTL" -le 40 ]; then
+  ok "signed url clamped to the remaining subscription (${TTL}s <= 40s)"
+else
+  no "signed url clamped to the remaining subscription" "15-40" "$TTL"
+fi
+ent 'active' "now()+interval '30 days'"
+has "plenty of time left -> full default TTL" "$(gate)" '"expiresIn":300'
+has "open re-anchors the client countdown" "$(gate)" '"access"'
+
+echo
 echo "== revenuecat webhook auth =="
 # Local serve may omit REVENUECAT_WEBHOOK_AUTH → 500 WEBHOOK_CONFIG_ERROR; wrong
 # secret when configured → 401 WEBHOOK_AUTH_FAILED. Both prove the gate runs.

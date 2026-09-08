@@ -182,6 +182,47 @@ from the schema. An entitlement is the only way in.
 A book that does not exist, or an unpublished one requested by a non-admin, is `404
 NOT_FOUND` — the gate never reveals that a draft exists.
 
+### What ends a subscription
+
+`expires_at`, and nothing else. The rule is `public.entitlement_has_access(status,
+expires_at)` and every gate calls it rather than testing `status` directly:
+
+> Access = status is not `expired`, **and** (`expires_at` is null or still in the future).
+
+So `trial`, `cancelled` (will not renew, but paid through the period), `grace` and
+`billing_issue` (card failing, still inside the paid period) all keep reading right up to
+`expires_at`. A null `expires_at` is a lifetime or promotional grant and never lapses.
+`expired` denies on its own, whatever the date says — that is how a refund revokes
+immediately.
+
+This used to be `status = 'active'`, duplicated in two endpoints, which locked out every
+trial and every cancelled-but-paid-for month.
+
+### Expiry, and how it reaches the device
+
+Nothing writes to the database when `now()` crosses `expires_at`, so there is no event to
+push. Three layers cover it:
+
+1. **The gate.** `get-signed-pdf` re-evaluates on every open and refuses the instant the
+   date passes — with no cron run and no socket involved.
+2. **The sweep.** `public.expire_lapsed_entitlements()` runs minutely under pg_cron and
+   flips lapsed rows to `expired`, turning the passage of time into an UPDATE. That fires a
+   Realtime broadcast on the reader's private topic, bounding the pushed lock at ~60s.
+3. **The client countdown.** The app knows `expires_at` and locks to the second, offline.
+
+The socket is a correction channel, not the lock — see
+[mobile-contract.md](./mobile-contract.md#when-the-subscription-ends-mid-read).
+
+Signed URLs are **clamped to the remaining subscription** (floor 15s). A minted URL cannot
+be recalled, so one issued ten seconds before expiry must not stay valid for five minutes.
+
+### The live channel
+
+Private Realtime topic `entitlement:<user_id>`, event `entitlement_changed`, payload
+identical to the `entitlements-status` body minus `entitlement`. RLS on
+`realtime.messages` pins a reader to their own topic and grants no INSERT, so a device can
+neither eavesdrop nor forge itself an unlock.
+
 `entitlements-status` reports:
 
 ```jsonc
@@ -189,7 +230,15 @@ NOT_FOUND` — the gate never reveals that a draft exists.
     "isActive": false,          // the subscription alone
     "isAdmin": true,            // profiles.role or the app_role JWT claim
     "canAccessPremium": true,   // isActive || isAdmin  <- gate premium UI on this
-    "entitlement": null } }
+    "entitlement": null,
+    "status": null,             // active|trial|cancelled|grace|billing_issue|expired
+    "startsAt": null,
+    "expiresAt": null,          // null = no end date (lifetime, comp, or admin)
+    "secondsRemaining": null,   // null when expiresAt is null; never negative
+    "reason": "admin",          // why, so the paywall can say something useful
+    "serverTime": "2026-09-09T12:00:00Z",   // client clock-skew correction
+    "realtime": { "channel": "entitlement:<user_id>",
+                  "event": "entitlement_changed", "private": true } } }
 ```
 
 Gating on `isActive` alone would show an admin a locked button on a file the backend would
