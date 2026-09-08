@@ -7,9 +7,12 @@ import {
   ok,
   readJsonBody,
 } from '../_shared/http.ts'
+import { LANGUAGES } from '../_shared/catalog-filters.ts'
 import {
   asBoolean,
   asInteger,
+  asOptionalEnum,
+  asOptionalInteger,
   asOptionalText,
   asStringArray,
   pickProvided,
@@ -44,6 +47,18 @@ const EDITABLE_FIELDS: FieldSpec[] = [
     column: 'read_time_minutes',
     aliases: ['read_time_minutes', 'readTimeMinutes'],
     coerce: asInteger('read_time_minutes', { min: 0 }),
+  },
+  // A real page count, when someone knows it. It overrides the estimate the
+  // length filter otherwise derives from read_time_minutes.
+  {
+    column: 'page_count',
+    aliases: ['page_count', 'pageCount'],
+    coerce: asOptionalInteger('page_count', { min: 1 }),
+  },
+  {
+    column: 'language',
+    aliases: ['language'],
+    coerce: asOptionalEnum('language', LANGUAGES),
   },
 ]
 

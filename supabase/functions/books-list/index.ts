@@ -1,16 +1,9 @@
 import { anonClient, requireMethod } from '../_shared/auth.ts'
+import { catalogArgsFromRequest, splitCatalogRows } from '../_shared/catalog-filters.ts'
 import { withCoverUrls } from '../_shared/covers.ts'
-import {
-  fail,
-  failFromDbError,
-  handleError,
-  handleOptions,
-  list,
-} from '../_shared/http.ts'
-import { isRangeNotSatisfiable, paginate, rangeFromRequest } from '../_shared/pagination.ts'
-import { asUuid } from '../_shared/payload.ts'
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+import { handleError, handleOptions, list } from '../_shared/http.ts'
+import { paginate, rangeFromRequest } from '../_shared/pagination.ts'
+import { failFromRpcError } from '../_shared/rpc.ts'
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)
@@ -20,89 +13,33 @@ Deno.serve(async (req) => {
     const notAllowed = requireMethod(req, ['GET'])
     if (notAllowed) return notAllowed
 
-    const { page, pageSize, from, to } = rangeFromRequest(req)
-    const url = new URL(req.url)
-    const categoryParam = (url.searchParams.get('category') ?? '').trim()
-    const supabase = anonClient()
+    const { page, pageSize, from } = rangeFromRequest(req)
 
-    let bookIds: string[] | null = null
+    // Browsing is the same query as searching, minus the text term. Sharing
+    // catalog_books is what keeps `premium=true` from meaning one thing here
+    // and another in books-search.
+    //
+    // Every filter is applied before LIMIT/OFFSET inside the function, so the
+    // page meta below describes the matches, not the page that happened to
+    // arrive. That is the whole point of moving these off the phone.
+    const args = catalogArgsFromRequest(req, { limit: pageSize, offset: from })
 
-    if (categoryParam) {
-      // Accept category UUID or slug so the Search chip can send either.
-      let categoryId: string
-
-      if (UUID_RE.test(categoryParam)) {
-        categoryId = asUuid('category')(categoryParam)
-      } else {
-        const { data: category, error: categoryError } = await supabase
-          .from('categories')
-          .select('id')
-          .eq('slug', categoryParam)
-          .maybeSingle()
-
-        if (categoryError) {
-          return failFromDbError(
-            'books-list',
-            'BOOKS_READ_FAILED',
-            'Unable to load books',
-            categoryError,
-          )
-        }
-
-        if (!category) {
-          return fail('NOT_FOUND', 'Category not found', 404)
-        }
-
-        categoryId = category.id as string
-      }
-
-      const { data: membership, error: membershipError } = await supabase
-        .from('book_categories')
-        .select('book_id')
-        .eq('category_id', categoryId)
-
-      if (membershipError) {
-        return failFromDbError(
-          'books-list',
-          'BOOKS_READ_FAILED',
-          'Unable to load books',
-          membershipError,
-        )
-      }
-
-      bookIds = (membership ?? []).map((row) => row.book_id as string).filter(Boolean)
-
-      if (bookIds.length === 0) {
-        return list(paginate([], 0, page, pageSize))
-      }
-    }
-
-    // published_at can be null, so id is the tiebreaker that keeps paging
-    // stable across requests.
-    let query = supabase
-      .from('book_list_items')
-      .select('*', { count: 'exact' })
-      .order('published_at', { ascending: false, nullsFirst: false })
-      .order('id', { ascending: true })
-
-    if (bookIds) {
-      query = query.in('id', bookIds)
-    }
-
-    const { data, count, error } = await query.range(from, to)
+    const { data, error } = await anonClient().rpc('catalog_books', args)
 
     if (error) {
-      // The last call of a "load more" loop asks for a page that starts past
-      // the end. That is an empty page, not a failure.
-      if (isRangeNotSatisfiable(error)) {
-        return list(paginate([], count ?? null, page, pageSize))
-      }
-
-      return failFromDbError('books-list', 'BOOKS_READ_FAILED', 'Unable to load books', error)
+      // An unknown category slug raises P0002, which failFromRpcError turns
+      // into the 404 books-list has always answered with. The app reads that
+      // as an empty shelf.
+      return failFromRpcError('books-list', 'BOOKS_READ_FAILED', 'Unable to load books', error)
     }
 
-    const items = withCoverUrls((data ?? []) as Record<string, unknown>[])
-    return list(paginate(items, count ?? null, page, pageSize))
+    const { items, totalCount } = splitCatalogRows(data ?? [])
+
+    // A page that starts past the end is an empty page, not a failure: it is
+    // the last call of every load-more loop. The RPC returns no rows rather
+    // than the PGRST103 that a PostgREST .range() would, so there is nothing
+    // to special-case here.
+    return list(paginate(withCoverUrls(items), totalCount, page, pageSize))
   } catch (error) {
     return handleError('books-list', error)
   }

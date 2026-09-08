@@ -100,6 +100,33 @@ export function asOptionalTimestamp(label: string) {
   }
 }
 
+/**
+ * One of a fixed set, or null to clear. Unlike the query-string filters — where
+ * an unknown value is ignored so old and new app builds interoperate — an
+ * unknown value here is a 400: this is an admin writing a column with a CHECK
+ * constraint, and silently dropping their input would look like a save that
+ * worked.
+ */
+export function asOptionalEnum(label: string, allowed: readonly string[]) {
+  return (value: unknown): string | null => {
+    if (value === null || value === undefined || value === '') {
+      return null
+    }
+
+    if (typeof value !== 'string') {
+      throw new BadRequestError(`${label} must be a string`)
+    }
+
+    const normalized = value.trim().toLowerCase()
+
+    if (!allowed.includes(normalized)) {
+      throw new BadRequestError(`${label} must be one of: ${allowed.join(', ')}`)
+    }
+
+    return normalized
+  }
+}
+
 export function asBoolean(label: string) {
   return (value: unknown): boolean => {
     if (typeof value === 'boolean') {

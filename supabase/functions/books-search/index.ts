@@ -1,9 +1,9 @@
 import { anonClient, requireMethod } from '../_shared/auth.ts'
+import { catalogArgsFromRequest, splitCatalogRows } from '../_shared/catalog-filters.ts'
 import { withCoverUrls } from '../_shared/covers.ts'
-import { failFromDbError, handleError, handleOptions, list } from '../_shared/http.ts'
+import { handleError, handleOptions, list } from '../_shared/http.ts'
 import { paginate, rangeFromRequest } from '../_shared/pagination.ts'
-
-type SearchRow = Record<string, unknown> & { total_count?: number | string | null }
+import { failFromRpcError } from '../_shared/rpc.ts'
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)
@@ -17,39 +17,28 @@ Deno.serve(async (req) => {
     const query = (url.searchParams.get('q') ?? '').trim()
     const { page, pageSize, from } = rangeFromRequest(req)
 
-    const empty = paginate([], 0, page, pageSize)
-
+    // No term is still an empty result, as it always has been: the app switches
+    // to books-list the moment the field is cleared, and returning the whole
+    // catalogue here would change that contract underneath it.
     if (!query) {
-      return list(empty)
+      return list(paginate([], 0, page, pageSize))
     }
 
-    // search_books() runs websearch_to_tsquery against the GIN-indexed
-    // search_vector, which covers title, author, description, genre and tags.
-    // Sanitising is the database's job here - the query text is a bound
-    // parameter, never string-concatenated into a filter.
-    const { data, error } = await anonClient().rpc('search_books', {
-      p_query: query,
-      p_limit: pageSize,
-      p_offset: from,
-    })
+    // Same function as books-list, so `category`, `premium`, `minRating`,
+    // `language`, `length` and `sort` behave identically whether or not the
+    // reader has typed. `category` in particular used to be silently dropped
+    // here, so searching inside a subject ignored the subject.
+    const args = catalogArgsFromRequest(req, { query, limit: pageSize, offset: from })
+
+    const { data, error } = await anonClient().rpc('catalog_books', args)
 
     if (error) {
-      return failFromDbError('books-search', 'SEARCH_FAILED', 'Search failed', error)
+      return failFromRpcError('books-search', 'SEARCH_FAILED', 'Search failed', error)
     }
 
-    const rows = (data ?? []) as SearchRow[]
+    const { items, totalCount } = splitCatalogRows(data ?? [])
 
-    if (rows.length === 0) {
-      return list(empty)
-    }
-
-    // Every row carries the same window count; strip it from the payload.
-    const totalCount = Number(rows[0].total_count ?? 0)
-    const items = withCoverUrls(
-      rows.map(({ total_count: _ignored, ...book }) => book as Record<string, unknown>),
-    )
-
-    return list(paginate(items, Number.isFinite(totalCount) ? totalCount : null, page, pageSize))
+    return list(paginate(withCoverUrls(items), totalCount, page, pageSize))
   } catch (error) {
     return handleError('books-search', error)
   }

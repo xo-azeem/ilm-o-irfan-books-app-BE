@@ -29,7 +29,7 @@ export const endpointManifest: EndpointDefinition[] = [
     access: 'public',
     description: 'Returns a paginated catalog of published books.',
     notes:
-      'Use page and pageSize for server-side pagination. Optional category=<uuid-or-slug> filters via book_categories. Each card includes coverUrl.',
+      'Filters (category, premium, minRating, language, length, sort) apply before LIMIT, so totalCount describes matches. Unknown params are ignored. Each card includes coverUrl.',
   },
   {
     name: 'book-detail',
@@ -44,7 +44,9 @@ export const endpointManifest: EndpointDefinition[] = [
     route: '/functions/v1/books-search?q=<query>',
     method: 'GET',
     access: 'public',
-    description: 'Searches books by text using the tsvector search index.',
+    description: 'Prefix search over title, description, genre, tags and author name.',
+    notes:
+      'Takes the same filters as books-list, applied before LIMIT. Prefix matching means "jan" finds "Jannat" on the first keystroke. Empty q returns an empty page.',
   },
   {
     name: 'categories-list',

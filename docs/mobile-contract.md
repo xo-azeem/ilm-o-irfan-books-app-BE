@@ -37,6 +37,15 @@ Every Edge Function returns one of:
 | Search (browse) | GET | `/functions/v1/books-list?page=&pageSize=` | Public |
 | Search (category) | GET | `/functions/v1/books-list?category=<uuid-or-slug>` | Public |
 | Search (query) | GET | `/functions/v1/books-search?q=` | Public |
+
+Discover filters — `category`, `premium`, `minRating`, `language`, `length`, `sort` — are
+accepted by **both** `books-list` and `books-search` and applied before pagination, so the
+page meta describes the matches. Unknown parameters and unknown values are ignored rather
+than rejected. Full reference: [api-endpoints.md → Discover filters](./api-endpoints.md#discover-filters).
+
+The "Downloaded only" toggle stays on the client: `books-list` is public and
+unauthenticated, so it cannot know what this reader downloaded. That state comes from
+`downloads-list`.
 | Categories chips | GET | `/functions/v1/categories-list` | Public |
 | Collection tap | GET | `/functions/v1/collection-books?id=` or `?slug=` | Public |
 
@@ -78,7 +87,10 @@ Returned by `books-list`, `books-search`, `home-feed` shelves/books, and `collec
 | `rating` | number \| null | |
 | `tag` | string \| null | |
 | `genre` | string \| null | |
-| `read_time_minutes` | number \| null | Format on client (`"4 hr read"`) |
+| `read_time_minutes` | number \| null | Format on client (`"4 hr read"`). Derived from file size — an estimate, not a measurement |
+| `page_count` | number \| null | Real page count when known (admin, or learned from the reader) |
+| `length_bucket` | `short` \| `medium` \| `long` \| null | Computed; `null` when the book has no length signal |
+| `language` | `urdu` \| `english` \| `arabic` \| null | `null` = not recorded, and matches no language filter |
 | `price_cents` | number | |
 | `currency` | string | e.g. `PKR` |
 | `format` | string \| null | |

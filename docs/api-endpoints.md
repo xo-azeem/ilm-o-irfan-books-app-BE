@@ -13,9 +13,9 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | Endpoint | Method | Auth | Purpose |
 | --- | --- | --- | --- |
 | `/functions/v1/home-feed` | GET | Public | Collections, categories, newest books, `carousel`, `shelves.hero` / `trending` / `newArrivals`, `featuredCollectionId`, `supportEmail` (book cards include `coverUrl`) — see [Home shelves](#home-shelves) |
-| `/functions/v1/books-list` | GET | Public | Paginated published books; optional `category=<uuid-or-slug>` |
+| `/functions/v1/books-list` | GET | Public | Paginated published books — see [Discover filters](#discover-filters) |
 | `/functions/v1/book-detail?id=<bookId>` | GET | Public | Book detail with author and metadata (`coverUrl`; no `pdf_path`) |
-| `/functions/v1/books-search?q=<query>` | GET | Public | Search by text using the Postgres full-text index |
+| `/functions/v1/books-search?q=<query>` | GET | Public | Prefix search, plus the same [Discover filters](#discover-filters) as `books-list` |
 | `/functions/v1/categories-list` | GET | Public | Browse categories |
 | `/functions/v1/collections-list` | GET | Public | Returns collections and shelves |
 | `/functions/v1/collection-books?id=` or `?slug=` | GET | Public | Paginated books in one published collection (`sort_order`) |
@@ -209,6 +209,77 @@ returns — so a card never renders with a blank field and the app never builds 
 Book rows are not seeded from this repo, so a local `supabase db reset` gives an empty
 catalogue and every rail comes back `[]`; run `npm run books:import` if you need titles
 locally.
+
+## Discover filters
+
+`books-list` and `books-search` take the same filters and run the same query
+(`public.catalog_books`), so a filter cannot mean one thing while browsing and another
+while searching. Browsing is simply the query with no text term.
+
+**Everything is applied before `LIMIT`/`OFFSET`**, so `totalCount`, `totalPages` and
+`hasNextPage` describe the matches rather than the page that happened to arrive. That is
+the point: filtering on the client made `totalCount` describe the wrong set and turned
+`hasNextPage` into "more rows", which forced a load-more loop to walk the catalogue to
+fill one screen.
+
+| Parameter | Values | Meaning |
+| --- | --- | --- |
+| `category` | uuid or slug | Membership in `book_categories`. Unknown value → `404 NOT_FOUND` |
+| `premium` | `true` \| `false` (`1`/`0`) | `books.is_premium` |
+| `minRating` | number 0–5 | `rating >= minRating`, clamped into range |
+| `language` | `urdu` \| `english` \| `arabic`, comma-separated | `books.language`; `NULL` matches nothing |
+| `length` | `short` \| `medium` \| `long`, comma-separated | see below |
+| `sort` | `newest` \| `rating` \| `title` \| `relevance` | default `newest`, or `relevance` when `q` is present |
+
+- Different parameters **AND** together; repeated values inside one parameter **OR**
+  together (`length=short,long`). A repeated key (`?language=urdu&language=english`) is
+  equivalent to the comma form.
+- **Unknown parameters and unknown values are ignored, never a 400.** An older app build
+  has to keep working against a newer deployment and vice versa. `language=urdu,klingon`
+  filters on `urdu`; `language=klingon` filters on nothing.
+- Zero matches is `200` with `data: []`.
+- `pageSize` is still capped at 100.
+
+### Length buckets
+
+`length` is a named bucket, not a minutes range, because the chips are multi-select — a
+reader can pick "short" *and* "long", which no single min/max can express — and because
+the boundary then lives in one place instead of being duplicated in the client.
+
+| Bucket | Pages |
+| --- | --- |
+| `short` | < 200 |
+| `medium` | 200 – 599 |
+| `long` | >= 600 |
+
+Pages come from `books.page_count` when it is set, and otherwise from
+`ceil(read_time_minutes / 1.5)` — the same 1.5 min/page constant the app was already
+using, so nothing changes shelf on the day this ships. A book with neither signal is in
+**no** bucket and is excluded from every `length` filter.
+
+Be aware what the fallback actually measures: `read_time_minutes` is not a measured
+reading time. `scripts/import-folder-books.mjs` derives it from PDF file size at 40 KB
+per minute. `page_count` is the honest field — it is admin-editable, and it is filled in
+automatically the first time a reader opens the book, because
+`reading-progress.total_pages` is a real count reported by the reader itself. Once set it
+is never overwritten by the estimate.
+
+`book_list_items` and `book-detail` both expose `language`, `page_count` and the computed
+`length_bucket`, so the app can label a chip without recomputing the boundary.
+
+### Search
+
+`books-search` matches a **prefix** against a `simple`-configuration tsvector, so `jan`
+finds *Jannat Ki Talash* and *Janooniyat* on the first keystroke. The `english`
+configuration is deliberately not used: it stems, and this catalogue is transliterated
+Urdu, which an English stemmer mangles.
+
+A trigram `ILIKE` arm runs alongside it for queries of 3 characters or more, which is how
+author names are searchable at all — authors live on their own table and were never in
+the books search vector.
+
+Search terms are reduced to word characters before they reach `to_tsquery`, so a query
+containing `&`, `|` or `:*` is data rather than syntax.
 
 ## Home carousel
 
