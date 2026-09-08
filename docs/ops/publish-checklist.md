@@ -12,7 +12,7 @@ A book is safe to show in the catalog only when all of the following hold. The C
 | **Category** membership (`book_categories`) | Search chips / browse |
 | **Collection** membership for Home shelves | `home-hero` / `trending` / `new-arrivals` as needed |
 | **Stable slug** | Folder name or `meta.slug`; never change a live slug casually (breaks deep links) |
-| **`is_premium` correct** | Drives `PREMIUM_REQUIRED` on `get-signed-pdf` |
+| **`is_premium` correct** | Catalogue label and the `premium` Discover filter. Does **not** drive access — `get-signed-pdf` requires an entitlement for every book. Defaults to `true` |
 
 ## After bulk import
 

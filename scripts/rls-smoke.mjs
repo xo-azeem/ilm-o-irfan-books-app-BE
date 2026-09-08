@@ -188,9 +188,12 @@ if (userJwt) {
   {
     const list = await ef('books-list', { query: '?page=1&pageSize=20' })
     const books = Array.isArray(list.json?.data) ? list.json.data : []
-    const premium = books.find((b) => b.is_premium === true)
+    // Subscription-only catalogue: every published book must refuse a
+    // non-entitled reader, so any book is a valid subject. An is_premium=false
+    // one is preferred because it is the case most likely to regress.
+    const premium = books.find((b) => b.is_premium === false) ?? books[0]
     if (!premium) {
-      console.log('== PREMIUM_REQUIRED skipped (no published premium book) ==')
+      console.log('== PREMIUM_REQUIRED skipped (no published book) ==')
     } else {
       const { status, json } = await ef('get-signed-pdf', {
         method: 'POST',

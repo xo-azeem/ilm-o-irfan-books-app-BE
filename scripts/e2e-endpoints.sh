@@ -165,13 +165,20 @@ has "color survived"   "$R" '"color":"amber"'
 echo
 echo "== paywall =="
 psqlq "delete from public.entitlements where user_id=(select id from public.profiles where email='$EMAIL');" >/dev/null
-has "free book without entitlement -> signedUrl" "$(curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$FREE\"}")" 'signedUrl'
+# The catalogue is subscription-only. $FREE is seeded with is_premium=false on
+# purpose: it proves the flag no longer opens the gate. If this assertion ever
+# flips back to expecting a signedUrl, the paywall has a hole in it.
+has "is_premium=false book without entitlement -> PREMIUM_REQUIRED" \
+  "$(curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$FREE\"}")" 'PREMIUM_REQUIRED'
 has "premium book without entitlement -> PREMIUM_REQUIRED" "$(curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$BOOK\"}")" 'PREMIUM_REQUIRED'
-has "published free book missing object -> PDF_NOT_IN_STORAGE" \
-  "$(curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$MISSING\"}")" 'PDF_NOT_IN_STORAGE'
 psqlq "insert into public.entitlements (user_id,status,store,starts_at,expires_at) select id,'active','stripe',now(),now()+interval '30 days' from public.profiles where email='$EMAIL' on conflict (user_id) do update set status='active',expires_at=now()+interval '30 days';" >/dev/null
 R=$(curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$BOOK\"}")
 has "premium book with entitlement -> signedUrl" "$R" 'signedUrl'
+has "is_premium=false book with entitlement -> signedUrl" \
+  "$(curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$FREE\"}")" 'signedUrl'
+# Missing object is checked after the gate, so it needs the entitlement first.
+has "published book missing object -> PDF_NOT_IN_STORAGE" \
+  "$(curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$MISSING\"}")" 'PDF_NOT_IN_STORAGE'
 URL=$(echo "$R" | sed -n 's/.*"signedUrl":"\([^"]*\)".*/\1/p' | sed 's|http://kong:8000|http://127.0.0.1:54321|')
 is "signed url serves pdf 200" "$(code "$URL")" 200
 is "unsigned object denied"    "$(code 'http://127.0.0.1:54321/storage/v1/object/pdfs/ihya.pdf')" 400
@@ -208,6 +215,26 @@ is "admin-analytics 200" "$(code "$B/admin-analytics?days=30" "${A[@]}")" 200
 has "analytics payload"  "$(curl -s "$B/admin-analytics?days=30" "${A[@]}")" 'top_books'
 is "admin-storage-audit 200" "$(code "$B/admin-storage-audit" "${A[@]}")" 200
 has "storage audit payload" "$(curl -s "$B/admin-storage-audit" "${A[@]}")" 'broken'
+
+echo
+echo "== paywall: admin bypass (runs here because it needs the admin role) =="
+# Admins hold no subscription and must still be served, drafts included. The
+# app relies on this for previews, so it is the one branch that stays open.
+psqlq "delete from public.entitlements where user_id=(select id from public.profiles where email='$EMAIL');" >/dev/null
+has "admin without entitlement -> signedUrl" \
+  "$(curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$BOOK\"}")" 'signedUrl'
+# Point the draft at a real object so the draft case reaches the gate rather
+# than tripping over a missing pdf_path.
+psqlq "update public.books set pdf_path='pdfs/masnavi.pdf' where id='$DRAFT';" >/dev/null
+has "admin without entitlement -> unpublished draft signedUrl" \
+  "$(curl -s -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$DRAFT\"}")" 'signedUrl'
+psqlq "update public.profiles set role='user' where email='$EMAIL';" >/dev/null
+is "non-admin draft -> 404 (existence not revealed)" \
+  "$(code -X POST "$B/get-signed-pdf" "${A[@]}" -d "{\"bookId\":\"$DRAFT\"}")" 404
+psqlq "update public.profiles set role='admin' where email='$EMAIL';" >/dev/null
+# Put the draft back: the publish-gate section below needs it with no pdf_path.
+psqlq "update public.books set pdf_path=null where id='$DRAFT';" >/dev/null
+
 echo
 echo "== admin settings partial patch =="
 curl -s -X PATCH "$B/admin-settings" "${A[@]}" -d '{"maintenance_message":"msg","signup_enabled":true}' >/dev/null
@@ -224,6 +251,17 @@ has "partial edit"  "$(curl -s -X PATCH "$B/admin-book-update" "${A[@]}" -d "{\"
 is  "bad price 400" "$(code -X PATCH "$B/admin-book-update" "${A[@]}" -d "{\"id\":\"$DRAFT\",\"price_cents\":-5}")" 400
 is  "unknown 404"   "$(code -X PATCH "$B/admin-book-update" "${A[@]}" -d '{"id":"99999999-9999-9999-9999-999999999999","genre":"x"}')" 404
 is  "no fields 400" "$(code -X PATCH "$B/admin-book-update" "${A[@]}" -d "{\"id\":\"$DRAFT\"}")" 400
+
+echo
+echo "== new books default to premium =="
+# The catalogue is subscription-only. A book created without an explicit flag
+# must not land free - that is how the hole reopens quietly.
+NEWB=$(curl -s -X POST "$B/admin-book-create" "${A[@]}" -d "{\"title\":\"E2E Premium Default\",\"authorId\":\"11111111-1111-1111-1111-111111111111\"}")
+has "is_premium omitted -> true" "$NEWB" '"is_premium":true'
+# An admin can still mark a deliberate free sampler; access does not depend on it.
+has "is_premium false honoured when explicit" \
+  "$(curl -s -X POST "$B/admin-book-create" "${A[@]}" -d "{\"title\":\"E2E Explicit Free\",\"authorId\":\"11111111-1111-1111-1111-111111111111\",\"is_premium\":false}")" '"is_premium":false'
+psqlq "delete from public.books where slug in ('e2e-premium-default','e2e-explicit-free');" >/dev/null
 
 echo
 echo "== publish gate (storage-aware) =="

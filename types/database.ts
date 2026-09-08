@@ -87,7 +87,6 @@ export type Database = {
       }
       app_settings: {
         Row: {
-          allow_pdf_without_entitlement: boolean
           featured_collection_id: string | null
           id: number
           maintenance_message: string | null
@@ -98,7 +97,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          allow_pdf_without_entitlement?: boolean
           featured_collection_id?: string | null
           id?: number
           maintenance_message?: string | null
@@ -109,7 +107,6 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          allow_pdf_without_entitlement?: boolean
           featured_collection_id?: string | null
           id?: number
           maintenance_message?: string | null

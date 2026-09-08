@@ -9,7 +9,7 @@
  *
  * Env:
  *   BOOKS_DIR          required path to the books root (no silent wrong default)
- *   DEFAULT_IS_PREMIUM true|false (default false)
+ *   DEFAULT_IS_PREMIUM true|false (default true - the catalogue is paid)
  *   REQUIRE_COVER=1    fail import when a folder has no cover image
  *   MAX_PDF_BYTES      hard ceiling (default 80 MiB)
  *   WARN_PDF_BYTES     soft warn (default 25 MiB)
@@ -45,8 +45,11 @@ const REQUIRE_COVER = ['true', '1', 'yes', 'on'].includes(
 )
 const MAX_PDF_BYTES = Number(process.env.MAX_PDF_BYTES ?? DEFAULT_MAX_PDF_BYTES)
 const WARN_PDF_BYTES = Number(process.env.WARN_PDF_BYTES ?? DEFAULT_WARN_PDF_BYTES)
-const DEFAULT_IS_PREMIUM = ['true', '1', 'yes', 'on'].includes(
-  (process.env.DEFAULT_IS_PREMIUM ?? 'false').trim().toLowerCase(),
+// The catalogue is subscription-only, so an import defaults to premium and
+// only an explicit false/0/no/off opts a title out. Anything unrecognised
+// fails closed rather than importing a folder of free books.
+const DEFAULT_IS_PREMIUM = !['false', '0', 'no', 'off'].includes(
+  (process.env.DEFAULT_IS_PREMIUM ?? 'true').trim().toLowerCase(),
 )
 
 const REQUIRED_COLLECTION_SLUGS = ['home-hero', 'trending', 'new-arrivals']

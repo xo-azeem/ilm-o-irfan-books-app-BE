@@ -1,17 +1,24 @@
 // Edge Function: get-signed-pdf
 // JWT required. Admins may preview drafts.
 //
+// The catalogue is subscription-only: every title requires a membership.
 // Access is granted on exactly these conditions, and there is no other:
-//   - JWT / profile role is admin
-//   - the book is published and free (is_premium = false)
-//   - the book is premium and the user has an active entitlement
+//   - JWT / profile role is admin, or
+//   - the book is published and the user has an active entitlement
+//
+// is_premium is deliberately NOT consulted. It used to carve out a "free and
+// published" branch, which meant a single unset flag - one bulk-action
+// misclick, one importer default, one seed script - silently handed a paid PDF
+// to every signed-in reader. The flag still labels a book in the catalogue,
+// but it stopped being load-bearing for access, so getting it wrong is now a
+// merchandising bug rather than a revenue hole.
 //
 // The former ALLOW_PDF_WITHOUT_ENTITLEMENT env flag and the
-// app_settings.allow_pdf_without_entitlement column are both gone from this
-// path on purpose. Either one could silently hand every premium PDF to every
-// signed-in reader, from a place no code review would look, and the app has no
-// way to observe them. If the paywall ever needs opening again, that is a
-// product decision that belongs in entitlements, not a hidden switch.
+// app_settings.allow_pdf_without_entitlement column are both gone for the same
+// reason. Either one could open the paywall globally from a place no code
+// review would look, and the app has no way to observe them. If the paywall
+// ever needs opening, that is a product decision that belongs in entitlements,
+// not a hidden switch.
 
 import { requireMethod, requireUser, serviceClient } from '../_shared/auth.ts'
 import {
@@ -45,7 +52,9 @@ Deno.serve(async (req) => {
       admin.from('profiles').select('role').eq('id', ctx.user.id).maybeSingle(),
       admin
         .from('books')
-        .select('id, title, pdf_path, is_published, is_premium, file_size_bytes')
+        // is_premium is not selected: it no longer decides anything here, and
+        // reading it would invite someone to branch on it again.
+        .select('id, title, pdf_path, is_published, file_size_bytes')
         .eq('id', bookId)
         .maybeSingle(),
     ])
@@ -74,11 +83,9 @@ Deno.serve(async (req) => {
       return fail('PDF_NOT_AVAILABLE', 'PDF not available for this book', 404)
     }
 
-    // Free published books are available to any signed-in user.
-    // Premium books require admin or an active entitlement.
-    const requiresEntitlement = book.is_premium === true
-
-    if (!isAdmin && requiresEntitlement) {
+    // Every book requires a membership. Admins are the only exception, and
+    // they are served drafts too - the app relies on that for previews.
+    if (!isAdmin) {
       const { data: entitlement, error: entError } = await admin
         .from('entitlements')
         .select('status, expires_at')

@@ -151,20 +151,36 @@ handler does not implement is a `405`, never a silent fallthrough to the GET pat
 
 ## Premium access
 
-Access to a PDF through `get-signed-pdf` is granted when **any** of the following is true:
+The catalogue is **subscription-only**: every title requires an active membership. There
+is no free tier and no per-book purchase.
+
+Access to a PDF through `get-signed-pdf` is granted when **either** of the following is
+true, and there is no third case:
 
 1. `profiles.role = 'admin'` (or JWT `app_metadata.app_role = 'admin'`) — admins read any
    PDF, published or draft, with no subscription.
-2. The book is **free** (`books.is_premium = false`) and published — any signed-in user.
-3. The book is **premium** (`is_premium = true`) and the user has an active entitlement
+2. The book is published and the caller has an active entitlement
    (`status = 'active'` and `expires_at` null or in the future).
-Those three are the whole list. There is no global override: the
-`ALLOW_PDF_WITHOUT_ENTITLEMENT` env flag and the
-`app_settings.allow_pdf_without_entitlement` column are no longer read by
-`get-signed-pdf`, so the only way to open a premium book is an entitlement.
 
-`PREMIUM_REQUIRED` is returned only for **premium** books when the caller is not an admin
-and holds no active entitlement.
+`books.is_premium` is **not** consulted. It used to carve out a "published and free"
+branch, which meant one unset flag — a bulk-action misclick, an importer default, a seed
+script — handed a paid PDF to every signed-in reader. The flag still labels a book and
+still drives the `premium` Discover filter, but it stopped being load-bearing for access.
+It defaults to `true` for new rows.
+
+There is no global override either: the `ALLOW_PDF_WITHOUT_ENTITLEMENT` env flag was
+removed from the code, and `app_settings.allow_pdf_without_entitlement` has been dropped
+from the schema. An entitlement is the only way in.
+
+| Caller | Status | `error.code` |
+| --- | --- | --- |
+| No token / invalid token | 401 | `AUTH_REQUIRED` |
+| Signed in, no active entitlement | 403 | `PREMIUM_REQUIRED` |
+| Signed in, active entitlement | 200 | — |
+| Admin, no entitlement | 200 | — (drafts included) |
+
+A book that does not exist, or an unpublished one requested by a non-admin, is `404
+NOT_FOUND` — the gate never reveals that a draft exists.
 
 `entitlements-status` reports:
 
@@ -177,7 +193,8 @@ and holds no active entitlement.
 ```
 
 Gating on `isActive` alone would show an admin a locked button on a file the backend would
-serve them. Free books do not need `canAccessPremium` to open.
+serve them. Every book now needs `canAccessPremium` to open — there is no book that
+bypasses it.
 
 ## Home shelves
 

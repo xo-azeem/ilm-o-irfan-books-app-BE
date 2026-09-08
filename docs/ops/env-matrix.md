@@ -48,9 +48,10 @@ the values) with `npx supabase secrets list`.
 
 ### Variables that no longer exist
 
-`ALLOW_PDF_WITHOUT_ENTITLEMENT` and `app_settings.allow_pdf_without_entitlement` are not
-read by any function. `get-signed-pdf` grants access on admin, free-and-published, or an
-active entitlement — nothing else. If either name turns up in a config, delete it; leaving
+`ALLOW_PDF_WITHOUT_ENTITLEMENT` is not read by any function, and
+`app_settings.allow_pdf_without_entitlement` has been dropped from the schema.
+`get-signed-pdf` grants access on the admin role or an active entitlement — nothing else,
+and `is_premium` is not consulted. If either name turns up in a config, delete it; leaving
 it there implies a switch that does not exist.
 
 ## Script and CI variables

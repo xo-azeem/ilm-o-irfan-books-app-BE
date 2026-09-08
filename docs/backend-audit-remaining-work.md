@@ -50,12 +50,16 @@ linked Supabase project, a RevenueCat project, the book files, and Docker. See
 
 ### 4. Close the production PDF bypass
 
-**Status:** Fixed, and then removed outright. `get-signed-pdf` no longer reads
-`ALLOW_PDF_WITHOUT_ENTITLEMENT` or `app_settings.allow_pdf_without_entitlement`. A default
-of `false` still leaves a switch that one misconfigured deploy can flip from a place no code
-review looks, so the switch is gone: access is admin, or free-and-published, or an active
-entitlement, and there is no fourth branch. The deploy checklist tells operators to unset the
-secret if an earlier deploy created it.
+**Status:** Fixed, then removed outright, then narrowed again. `get-signed-pdf` no longer
+reads `ALLOW_PDF_WITHOUT_ENTITLEMENT`, and `app_settings.allow_pdf_without_entitlement` has
+been dropped from the schema. A default of `false` still leaves a switch that one
+misconfigured deploy can flip from a place no code review looks, so the switch is gone.
+
+The "free and published" branch is gone too (2026-09-09). The catalogue is
+subscription-only, and that branch meant a single unset `is_premium` — one bulk-action
+misclick, one importer default — silently served a paid PDF to every signed-in reader.
+Access is now admin, or an active entitlement, and there is no third branch. The deploy
+checklist tells operators to unset the secret if an earlier deploy created it.
 
 **Owner:** `supabase/functions/get-signed-pdf/index.ts`, `.env.example`, `docs/setup-guide.md`
 

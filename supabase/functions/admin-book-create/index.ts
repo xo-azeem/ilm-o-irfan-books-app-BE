@@ -122,11 +122,17 @@ Deno.serve(async (req) => {
       await assertPublishable(ctx.admin, optional.pdf_path as string | null | undefined)
     }
 
+    // The catalogue is subscription-only, so an omitted is_premium means
+    // premium. The column default says the same thing; stating it here too
+    // means a future insert that stops relying on the default cannot quietly
+    // create a free book. Access does not depend on this - get-signed-pdf
+    // requires an entitlement either way - but the flag should still be right.
     const row = {
       title,
       slug,
       author_id: authorId,
       description: (optional.description as string | null | undefined) ?? '',
+      is_premium: true,
       ...optional,
     }
 

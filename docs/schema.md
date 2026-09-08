@@ -61,7 +61,7 @@ books.pdf_path   → Storage pdfs/
 - **plans** — Premium definition + RevenueCat product id + features JSON
 - **entitlements** — active/expired status, expiry, RC ids, store, `last_revenuecat_event_id` / `last_revenuecat_event_at`
 - **revenuecat_events** — webhook idempotency ledger (service role only; unique event id)
-- **app_settings** — singleton product flags (maintenance, sign-ups, featured collection). `allow_pdf_without_entitlement` is retained but unread: nothing consults it, and PDF access follows the admin role, `books.is_premium` and the entitlement alone.
+- **app_settings** — singleton product flags (maintenance, sign-ups, featured collection). `allow_pdf_without_entitlement` has been **dropped**: it was already unread, and a dormant column that means "serve paid content to everyone" is a liability. PDF access follows the admin role and the entitlement alone — `books.is_premium` does not enter into it.
 
 ## FE field mapping
 

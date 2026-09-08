@@ -1,5 +1,12 @@
 /**
- * Verify get-signed-pdf gates for free / premium / admin on hosted staging.
+ * Verify get-signed-pdf gates on hosted staging.
+ *
+ * The catalogue is subscription-only: every book needs an active entitlement,
+ * and is_premium does not enter into it. So this checks the two things that
+ * are still allowed to differ - who is asking, not which book - plus the one
+ * that must not: a book flagged is_premium=false is gated exactly like any
+ * other. Signed-out and no-subscription callers are covered by
+ * verify-premium-required.mjs, which can make a throwaway user.
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -63,24 +70,34 @@ const listRes = await fetch(`${base}/functions/v1/books-list?page=1&pageSize=20`
 })
 const list = await listRes.json()
 const books = Array.isArray(list?.data) ? list.data : []
-const free = books.find((b) => b.is_premium === false)
-const premium = books.find((b) => b.is_premium === true)
-
 console.log('books', books.map((b) => ({ slug: b.slug, premium: b.is_premium, id: b.id })))
 
-if (!free || !premium) {
-  console.error('Need at least one free and one premium published book')
+const anyBook = books[0]
+if (!anyBook) {
+  console.error('Need at least one published book')
   process.exit(1)
 }
+
+// A book carrying is_premium=false is the interesting case: it must be gated
+// like everything else. There may not be one - the catalogue is all premium -
+// in which case there is simply nothing extra to prove here.
+const flaggedFree = books.find((b) => b.is_premium === false) ?? null
 
 const userJwt = await login('test@gmail.com')
 const adminJwt = await login('admin@gmail.com')
 
+// Both subjects hold access: the test user via a promotional entitlement, the
+// admin via role. Absence of access is verify-premium-required.mjs's job.
 const cases = [
-  ['user+free', userJwt, free.id, 200, null],
-  ['user+premium', userJwt, premium.id, 200, null], // promotional entitlement
-  ['admin+premium', adminJwt, premium.id, 200, null],
+  ['subscriber+book', userJwt, anyBook.id, 200],
+  ['admin+book', adminJwt, anyBook.id, 200],
 ]
+
+if (flaggedFree) {
+  cases.push(['subscriber+is_premium=false', userJwt, flaggedFree.id, 200])
+} else {
+  console.log('SKIP no is_premium=false book in the catalogue (expected)')
+}
 
 let failed = 0
 for (const [label, token, bookId, expectStatus] of cases) {
@@ -91,10 +108,6 @@ for (const [label, token, bookId, expectStatus] of cases) {
   console.log(ok ? 'PASS' : 'FAIL', label, status, json?.error?.code ?? 'ok')
   if (!ok) failed += 1
 }
-
-// Strip promotional entitlement temporarily? Hard without service role mutate.
-// Instead create a throwaway user without entitlement for PREMIUM_REQUIRED — skip if test has promo.
-// Document: test user has promotional premium so PREMIUM_REQUIRED needs a fresh user.
 
 if (failed) process.exit(1)
 console.log('PDF_GATE_OK')

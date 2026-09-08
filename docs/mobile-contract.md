@@ -91,10 +91,10 @@ Returned by `books-list`, `books-search`, `home-feed` shelves/books, and `collec
 | `page_count` | number \| null | Real page count when known (admin, or learned from the reader) |
 | `length_bucket` | `short` \| `medium` \| `long` \| null | Computed; `null` when the book has no length signal |
 | `language` | `urdu` \| `english` \| `arabic` \| null | `null` = not recorded, and matches no language filter |
-| `price_cents` | number | |
-| `currency` | string | e.g. `PKR` |
+| `price_cents` | number | **Do not render.** Books are not sold individually — see below |
+| `currency` | string | e.g. `PKR`. Same: not a book price the reader can act on |
 | `format` | string \| null | |
-| `is_premium` | boolean | |
+| `is_premium` | boolean | Catalogue label + Discover filter. **Not** an access signal |
 | `published_at` | timestamptz \| null | |
 
 `book-detail` adds `description`, `rating_count`, `tags`, `is_published`, nested `author`, and the same `coverUrl`. It does **not** include `pdf_path`.
@@ -168,13 +168,38 @@ Email comes from Auth, not metadata. After admin promote, force re-login so JWT 
 **Gate premium UI and Read CTAs on `canAccessPremium`, not `isActive`.**  
 Admins have no subscription but `get-signed-pdf` still serves them.
 
+**The catalogue is subscription-only.** Every title requires an active
+membership. There is no free tier and no per-book purchase.
+
 Access for a PDF:
 
-1. caller is admin, or
-2. book is free (`is_premium = false`) and published, or
-3. book is premium and entitlement is active
+1. caller is admin (including unpublished drafts), or
+2. book is published and the caller's entitlement is active
 
 Otherwise `403 PREMIUM_REQUIRED`.
+
+`is_premium` is **not** consulted. It still labels a book in the catalogue and
+still works as a Discover filter, but it does not decide access — a book
+flagged `is_premium: false` is gated exactly like any other. Do not branch
+reader access on it.
+
+| Caller | Status | `error.code` |
+| --- | --- | --- |
+| Signed out / no token | `401` | `AUTH_REQUIRED` |
+| Signed in, no active subscription | `403` | `PREMIUM_REQUIRED` |
+| Signed in, active subscription | `200` | — (`signedUrl`) |
+| Admin, no subscription | `200` | — (drafts included) |
+
+### Book price fields
+
+`books.price_cents` / `currency` stay on the payload (admin tooling and
+reporting read them) but they are **kept at 0 and mean nothing to a reader** —
+under a subscription-only catalogue there is no per-book purchase to price.
+
+The app should drop the book price label outright rather than render it
+conditionally on a non-zero value. A conditional is a trapdoor: one admin
+typing a number into the price field would make a "buy this book" affordance
+appear next to a book nobody can buy.
 
 ### Plan prices vs store IAP
 

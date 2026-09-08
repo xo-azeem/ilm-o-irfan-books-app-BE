@@ -4,35 +4,51 @@
 
 ## Symptom
 
-A user with no subscription gets a signed URL for a book where `is_premium = true`, instead
-of `403 PREMIUM_REQUIRED`.
+A user with no subscription gets a signed URL for a book, instead of
+`403 PREMIUM_REQUIRED`.
 
 ## What cannot be the cause (any more)
 
-`get-signed-pdf` no longer reads `ALLOW_PDF_WITHOUT_ENTITLEMENT` or
-`app_settings.allow_pdf_without_entitlement`. Both were removed precisely because a global
-switch could open the paywall from a place nobody reviews. If someone tells you to "check
-the env flag", that is stale advice — the flag does nothing.
+**`is_premium` is not it.** The catalogue is subscription-only and `get-signed-pdf` does
+not read that column. An unflagged book is gated exactly like a flagged one, so "the title
+was never marked premium" — historically the most common answer here — can no longer
+produce this symptom. If it looks like the cause, you have found a genuine regression in
+the endpoint; go to step 3.
 
-Access is granted on exactly three conditions and no others:
+`get-signed-pdf` also no longer reads `ALLOW_PDF_WITHOUT_ENTITLEMENT` or
+`app_settings.allow_pdf_without_entitlement`. The env flag was removed from the code and
+the column has been dropped from the schema — both precisely because a global switch could
+open the paywall from a place nobody reviews. If someone tells you to "check the env flag",
+that is stale advice.
 
-1. the caller is an admin,
-2. the book is published and `is_premium = false`,
-3. the book is premium and the caller has an active entitlement.
+Access is granted on exactly two conditions and no others:
+
+1. the caller is an admin, or
+2. the book is published and the caller has an active entitlement.
 
 ## Triage, in order
 
-### 1. Is the book actually premium?
+### 1. Is the caller an admin?
 
 ```sql
-select id, title, is_premium, is_published from public.books where id = '<book-id>';
+select id, email, role from public.profiles where id = '<user-id>';
 ```
 
-The most common answer is that the title was never flagged premium. Fix the data:
+Admins are served every PDF, drafts included, with no subscription — that is deliberate
+and the app relies on it. An admin account handed to a tester or shared internally is now
+the most likely explanation for an unexpected 200. Check the JWT too:
+`app_metadata.app_role` grants admin independently of the `profiles` row.
+
+If the account should not be an admin:
 
 ```
-PATCH /functions/v1/admin-book-update  { "id": "<book-id>", "is_premium": true }
+POST /functions/v1/admin-set-user-role  { "userId": "<user-id>", "role": "user" }
 ```
+
+The JWT keeps the old `app_role` claim until the token is reissued, so **the user must sign
+out and back in** before the demotion takes effect in the claim path. The `profiles.role`
+fallback in `is_admin()` closes the window in the other direction (promotions) but not this
+one — a stale token still carries `app_role: admin` until it expires (1 hour by default).
 
 ### 2. Does the user hold an entitlement?
 
@@ -49,24 +65,7 @@ where user_id = '<user-id>';
 GET /functions/v1/admin-audit-log?entityId=<user-id>
 ```
 
-### 3. Is the user an admin?
-
-```sql
-select id, email, role from public.profiles where id = '<user-id>';
-```
-
-Admins read every PDF including drafts, by design. If the account should not be an admin:
-
-```
-POST /functions/v1/admin-set-user-role  { "userId": "<user-id>", "role": "user" }
-```
-
-The JWT keeps the old `app_role` claim until the token is reissued, so **the user must sign
-out and back in** before the demotion takes effect in the claim path. The `profiles.role`
-fallback in `is_admin()` closes the window in the other direction (promotions) but not this
-one — a stale token still carries `app_role: admin` until it expires (1 hour by default).
-
-### 4. Is a RevenueCat event granting more than it should?
+### 3. Is a RevenueCat event granting more than it should?
 
 ```sql
 select id, event_type, event_timestamp, created_at

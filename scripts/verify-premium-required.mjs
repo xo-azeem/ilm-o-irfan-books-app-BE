@@ -64,9 +64,14 @@ const booksRes = await fetch(`${base}/functions/v1/books-list?page=1&pageSize=50
   headers: { apikey: anon, Authorization: `Bearer ${anon}` },
 })
 const booksJson = await booksRes.json()
-const premium = (booksJson.data ?? []).find((b) => b.is_premium === true)
-if (!premium) {
-  console.error('no premium book')
+// Any published book will do. The catalogue is subscription-only, so the gate
+// no longer reads is_premium - picking a book by that flag would test the flag
+// rather than the gate. Preferring an is_premium=false one when it exists makes
+// this the stronger check: the book that used to be free must now be refused.
+const candidates = booksJson.data ?? []
+const target = candidates.find((b) => b.is_premium === false) ?? candidates[0]
+if (!target) {
+  console.error('no published book')
   process.exit(1)
 }
 
@@ -77,7 +82,7 @@ const pdf = await fetch(`${base}/functions/v1/get-signed-pdf`, {
     Authorization: `Bearer ${tok.access_token}`,
     'Content-Type': 'application/json',
   },
-  body: JSON.stringify({ bookId: premium.id }),
+  body: JSON.stringify({ bookId: target.id }),
 })
 const body = await pdf.json()
 console.log({ email, status: pdf.status, code: body?.error?.code })
