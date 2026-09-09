@@ -25,6 +25,10 @@ Full mobile contract: [`../mobile-contract.md`](../mobile-contract.md).
 | `revenuecat-webhook.play-store.initial-purchase.request.json` | Inbound RC body (`PLAY_STORE` / `INITIAL_PURCHASE`) |
 | `revenuecat-webhook.app-store.applied.response.json` | Webhook success (`store: app_store`) |
 | `revenuecat-webhook.play-store.applied.response.json` | Webhook success (`store: play_store`) |
+| `revenuecat-webhook.renewal.request.json` | Inbound RC body (`RENEWAL`) |
+| `revenuecat-webhook.cancellation.request.json` | Inbound RC body (`CANCELLATION`, paid-through) |
+| `revenuecat-webhook.expiration.request.json` | Inbound RC body (`EXPIRATION`) |
+| `revenuecat-webhook.billing-issue.request.json` | Inbound RC body (`BILLING_ISSUE`) |
 | `library-overview.response.json` | `GET /functions/v1/library-overview` |
 | `profile-read.response.json` | `GET /functions/v1/profile-read` |
 | `reading-progress.response.json` | `POST /functions/v1/reading-progress` |

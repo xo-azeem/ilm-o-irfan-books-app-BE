@@ -361,6 +361,37 @@ else
     -H "Authorization: $RC_AUTH" -d "$UNK_BODY")
   has "unknown product_id still applies via premium_monthly fallback" "$UNK_RES" '"applied":true'
   has "fallback still returns planId" "$UNK_RES" '"planId"'
+
+  # Lifecycle events after an active row exists (same user, increasing timestamps).
+  REN_EVENT=aaaaaaaa-e2e0-4000-8000-000000000004
+  CAN_EVENT=aaaaaaaa-e2e0-4000-8000-000000000005
+  EXP_EVENT=aaaaaaaa-e2e0-4000-8000-000000000006
+  BILL_EVENT=aaaaaaaa-e2e0-4000-8000-000000000007
+  psqlq "delete from public.revenuecat_events where id in ('$REN_EVENT','$CAN_EVENT','$EXP_EVENT','$BILL_EVENT');" >/dev/null
+
+  REN_BODY=$(printf '{"event":{"id":"%s","type":"RENEWAL","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"premium_monthly","store":"APP_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
+    "$REN_EVENT" "$UID" "$((NOW_MS + 3000))" "$((EXP_MS + 86400000))" "$((NOW_MS + 3000))")
+  has "RENEWAL applied" "$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" -H "Authorization: $RC_AUTH" -d "$REN_BODY")" '"applied":true'
+  is "RENEWAL leaves status active" \
+    "$(psqlq "select status from public.entitlements where user_id='$UID';" | tr -d ' ')" "active"
+
+  CAN_BODY=$(printf '{"event":{"id":"%s","type":"CANCELLATION","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"premium_monthly","store":"PLAY_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
+    "$CAN_EVENT" "$UID" "$((NOW_MS + 4000))" "$((NOW_MS + 86400000))" "$((NOW_MS + 4000))")
+  has "CANCELLATION applied" "$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" -H "Authorization: $RC_AUTH" -d "$CAN_BODY")" '"applied":true'
+  is "CANCELLATION paid-through is cancelled" \
+    "$(psqlq "select status from public.entitlements where user_id='$UID';" | tr -d ' ')" "cancelled"
+
+  BILL_BODY=$(printf '{"event":{"id":"%s","type":"BILLING_ISSUE","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"premium_monthly","store":"PLAY_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
+    "$BILL_EVENT" "$UID" "$((NOW_MS + 5000))" "$((NOW_MS + 86400000))" "$((NOW_MS + 5000))")
+  has "BILLING_ISSUE applied" "$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" -H "Authorization: $RC_AUTH" -d "$BILL_BODY")" '"applied":true'
+  is "BILLING_ISSUE status" \
+    "$(psqlq "select status from public.entitlements where user_id='$UID';" | tr -d ' ')" "billing_issue"
+
+  EXP_BODY=$(printf '{"event":{"id":"%s","type":"EXPIRATION","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"premium_monthly","store":"APP_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
+    "$EXP_EVENT" "$UID" "$((NOW_MS + 6000))" "$((NOW_MS - 1000))" "$((NOW_MS + 6000))")
+  has "EXPIRATION applied" "$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" -H "Authorization: $RC_AUTH" -d "$EXP_BODY")" '"applied":true'
+  is "EXPIRATION status" \
+    "$(psqlq "select status from public.entitlements where user_id='$UID';" | tr -d ' ')" "expired"
 fi
 
 echo
