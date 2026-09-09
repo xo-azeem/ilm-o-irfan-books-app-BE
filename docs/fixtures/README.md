@@ -21,6 +21,10 @@ Full mobile contract: [`../mobile-contract.md`](../mobile-contract.md).
 | `get-signed-pdf.premium-required.json` | `POST /functions/v1/get-signed-pdf` (403) |
 | `get-signed-pdf.not-in-storage.json` | `POST /functions/v1/get-signed-pdf` (404) |
 | `revenuecat-webhook.auth-failed.json` | `POST /functions/v1/revenuecat-webhook` (401) |
+| `revenuecat-webhook.app-store.initial-purchase.request.json` | Inbound RC body (`APP_STORE` / `INITIAL_PURCHASE`) |
+| `revenuecat-webhook.play-store.initial-purchase.request.json` | Inbound RC body (`PLAY_STORE` / `INITIAL_PURCHASE`) |
+| `revenuecat-webhook.app-store.applied.response.json` | Webhook success (`store: app_store`) |
+| `revenuecat-webhook.play-store.applied.response.json` | Webhook success (`store: play_store`) |
 | `library-overview.response.json` | `GET /functions/v1/library-overview` |
 | `profile-read.response.json` | `GET /functions/v1/profile-read` |
 | `reading-progress.response.json` | `POST /functions/v1/reading-progress` |

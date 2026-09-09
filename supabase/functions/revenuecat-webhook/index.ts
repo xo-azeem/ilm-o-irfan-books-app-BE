@@ -12,11 +12,13 @@ import {
   readJsonBody,
 } from '../_shared/http.ts'
 import {
+  FALLBACK_PLAN_CODE,
   grantsEntitlement,
   isUuid,
   mapStatus,
   mapStore,
   resolveEventTimestampMs,
+  resolvePlanLookup,
   type RcEvent,
 } from '../_shared/revenuecat.ts'
 
@@ -115,11 +117,31 @@ Deno.serve(async (req) => {
 
     const status = mapStatus(eventType, hasPremiumEntitlement, event.expiration_at_ms)
 
-    const { data: plan, error: planError } = await admin
-      .from('plans')
-      .select('id')
-      .eq('code', 'premium_monthly')
-      .maybeSingle()
+    // Prefer plans.revenuecat_product_id = event.product_id (App Store / Play SKU).
+    // Unknown or missing SKU → premium_monthly so a single-plan launch still applies.
+    const planLookup = resolvePlanLookup(event.product_id)
+    let plan: { id: string } | null = null
+    let planError: { message?: string; code?: string } | null = null
+
+    if (planLookup.by === 'revenuecat_product_id') {
+      const byProduct = await admin
+        .from('plans')
+        .select('id')
+        .eq('revenuecat_product_id', planLookup.value)
+        .maybeSingle()
+      planError = byProduct.error
+      plan = byProduct.data
+    }
+
+    if (!planError && !plan) {
+      const byCode = await admin
+        .from('plans')
+        .select('id')
+        .eq('code', FALLBACK_PLAN_CODE)
+        .maybeSingle()
+      planError = byCode.error
+      plan = byCode.data
+    }
 
     if (planError) {
       return failFromDbError(
@@ -173,6 +195,8 @@ Deno.serve(async (req) => {
       eventId: eventIdRaw,
       userId: appUserId,
       status: applyResult?.status ?? status,
+      store: mapStore(event.store),
+      planId: plan?.id ?? null,
       applied: true,
     })
   } catch (error) {

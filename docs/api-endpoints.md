@@ -97,6 +97,10 @@ The Edge Function endpoint base is `/functions/v1/...`.
 Requires `event.id` (UUID), `app_user_id` (Supabase Auth UUID), `type`, and `event_timestamp_ms`.
 Duplicates return `200` with `data.duplicate`; stale events return `200` with `data.stale`.
 
+Plan resolution: match `event.product_id` to `plans.revenuecat_product_id` when present; otherwise
+(and when the SKU is unknown) use plan code `premium_monthly`. Store mapping:
+`APP_STORE` / `MAC_APP_STORE` → `app_store`, `PLAY_STORE` → `play_store`. Applied responses include
+`store` and `planId` for ops debugging.
 ## Deprecated
 
 | Endpoint | Status | Use instead |

@@ -1,11 +1,13 @@
 import { assertEquals } from 'jsr:@std/assert@1'
 
 import {
+  FALLBACK_PLAN_CODE,
   grantsEntitlement,
   isUuid,
   mapStatus,
   mapStore,
   resolveEventTimestampMs,
+  resolvePlanLookup,
 } from '../supabase/functions/_shared/revenuecat.ts'
 
 const NOW = Date.parse('2026-09-05T00:00:00.000Z')
@@ -76,4 +78,18 @@ Deno.test('event ordering falls back to purchased_at_ms, then gives up', () => {
   assertEquals(resolveEventTimestampMs({}), null)
   assertEquals(resolveEventTimestampMs({ event_timestamp_ms: null }), null)
   assertEquals(resolveEventTimestampMs({ event_timestamp_ms: Number.NaN }), null)
+})
+
+Deno.test('plan lookup prefers store product_id, else premium_monthly', () => {
+  assertEquals(resolvePlanLookup('com.ilmoirfan.premium.monthly'), {
+    by: 'revenuecat_product_id',
+    value: 'com.ilmoirfan.premium.monthly',
+  })
+  assertEquals(resolvePlanLookup('  premium_monthly  '), {
+    by: 'revenuecat_product_id',
+    value: 'premium_monthly',
+  })
+  assertEquals(resolvePlanLookup(''), { by: 'code', value: FALLBACK_PLAN_CODE })
+  assertEquals(resolvePlanLookup(null), { by: 'code', value: FALLBACK_PLAN_CODE })
+  assertEquals(resolvePlanLookup(undefined), { by: 'code', value: FALLBACK_PLAN_CODE })
 })

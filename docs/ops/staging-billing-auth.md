@@ -7,24 +7,45 @@ API URL: `https://rwnmckrepvycydmtgvcq.supabase.co`
 
 1. Create a RevenueCat project (or use an existing sandbox project).
 2. Entitlement id must be **`premium`** (matches `REVENUECAT_ENTITLEMENT_ID`).
-3. Map App Store / Play products to plan `premium_monthly` (`revenuecat_product_id`).
-4. Webhook URL:
+3. Create one auto-renewing subscription in **App Store Connect** and **Google Play Console**.
+4. In RevenueCat, attach both store products to entitlement `premium` (default offering).
+5. Set `plans.revenuecat_product_id` for `premium_monthly` to that store/RC product id.
+   Seed currently uses the placeholder string `premium_monthly` — replace before live sandbox:
+
+```sql
+update public.plans
+set revenuecat_product_id = 'YOUR_STORE_OR_RC_PRODUCT_ID'
+where code = 'premium_monthly';
+```
+
+   The webhook prefers `event.product_id` → `plans.revenuecat_product_id`, then falls back to
+   `code = 'premium_monthly'` if the SKU row is missing.
+6. Webhook URL:
 
 ```text
 https://rwnmckrepvycydmtgvcq.supabase.co/functions/v1/revenuecat-webhook
 ```
 
-5. Authorization header must match the Edge secret `REVENUECAT_WEBHOOK_AUTH`.  
+7. Authorization header must match the Edge secret `REVENUECAT_WEBHOOK_AUTH`.  
    Staging may currently use `Bearer STAGING_PLACEHOLDER_NOT_LIVE` — replace before any real sandbox events:
 
 ```bash
 npx supabase secrets set REVENUECAT_WEBHOOK_AUTH="Bearer YOUR_REAL_SHARED_SECRET" --project-ref rwnmckrepvycydmtgvcq
 ```
 
-6. **`app_user_id` must be the Supabase Auth user UUID** (not email, not RC anonymous id).  
+8. **`app_user_id` must be the Supabase Auth user UUID** (not email, not RC anonymous id).  
    The webhook rejects non-UUID / unknown profiles with `400 USER_NOT_FOUND`.  
    In the RN app: `Purchases.logIn(supabaseUser.id)` after Auth sign-in.
-7. Sandbox matrix: initial purchase, renew, cancel, billing_issue, expire, product change → check `entitlements-status`.
+9. Sandbox matrix: initial purchase (APP_STORE + PLAY_STORE), renew, cancel, billing_issue, expire, product change → check `entitlements-status`.
+
+### Product id checklist
+
+- [ ] App Store product id created
+- [ ] Play product id created (may match or differ; map both in RC)
+- [ ] RC entitlement `premium` linked to both
+- [ ] `plans.revenuecat_product_id` updated on staging (and later prod)
+- [ ] Webhook auth no longer a placeholder
+- [ ] Sandbox INITIAL_PURCHASE → `entitlements.store` is `app_store` or `play_store`
 
 ### Manual comps (no RC)
 

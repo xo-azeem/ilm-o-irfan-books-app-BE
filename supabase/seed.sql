@@ -29,6 +29,10 @@ where id = 1
   and featured_collection_id is null;
 
 -- Premium plan (matches FE subscription copy)
+-- revenuecat_product_id is a PLACEHOLDER until App Store / Play SKUs exist.
+-- Replace with the real store product id (same string in RevenueCat +
+-- plans.revenuecat_product_id). Webhook matches event.product_id first, then
+-- falls back to code = premium_monthly.
 insert into public.plans (
   id, code, name, price_cents, currency, interval, features, revenuecat_product_id, is_active, sort_order
 ) values (

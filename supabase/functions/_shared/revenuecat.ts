@@ -108,3 +108,23 @@ export function resolveEventTimestampMs(event: RcEvent): number | null {
 
   return null
 }
+
+/** Default plan when the event has no product_id or the SKU is not in `plans`. */
+export const FALLBACK_PLAN_CODE = 'premium_monthly'
+
+export type PlanLookup =
+  | { by: 'revenuecat_product_id'; value: string }
+  | { by: 'code'; value: typeof FALLBACK_PLAN_CODE }
+
+/**
+ * Prefer matching `plans.revenuecat_product_id` to the store/RC product id.
+ * Fall back to the single v1 plan code when the event omits product_id.
+ * The webhook still falls back to `premium_monthly` if the product_id row is missing.
+ */
+export function resolvePlanLookup(productId: string | null | undefined): PlanLookup {
+  const trimmed = typeof productId === 'string' ? productId.trim() : ''
+  if (trimmed) {
+    return { by: 'revenuecat_product_id', value: trimmed }
+  }
+  return { by: 'code', value: FALLBACK_PLAN_CODE }
+}
