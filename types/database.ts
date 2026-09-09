@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -209,6 +214,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "book_categories_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "carousel_items"
+            referencedColumns: ["book_id"]
+          },
+          {
             foreignKeyName: "book_categories_category_id_fkey"
             columns: ["category_id"]
             isOneToOne: false
@@ -246,6 +258,8 @@ export type Database = {
           id: string
           is_premium: boolean
           is_published: boolean
+          language: string | null
+          page_count: number | null
           pdf_path: string | null
           price_cents: number
           published_at: string | null
@@ -253,6 +267,7 @@ export type Database = {
           rating_count: number
           read_time_minutes: number | null
           search_vector: unknown
+          search_vector_simple: unknown
           slug: string
           tag: string | null
           tags: string[]
@@ -273,6 +288,8 @@ export type Database = {
           id?: string
           is_premium?: boolean
           is_published?: boolean
+          language?: string | null
+          page_count?: number | null
           pdf_path?: string | null
           price_cents?: number
           published_at?: string | null
@@ -280,6 +297,7 @@ export type Database = {
           rating_count?: number
           read_time_minutes?: number | null
           search_vector?: unknown
+          search_vector_simple?: unknown
           slug: string
           tag?: string | null
           tags?: string[]
@@ -300,6 +318,8 @@ export type Database = {
           id?: string
           is_premium?: boolean
           is_published?: boolean
+          language?: string | null
+          page_count?: number | null
           pdf_path?: string | null
           price_cents?: number
           published_at?: string | null
@@ -307,6 +327,7 @@ export type Database = {
           rating_count?: number
           read_time_minutes?: number | null
           search_vector?: unknown
+          search_vector_simple?: unknown
           slug?: string
           tag?: string | null
           tags?: string[]
@@ -334,6 +355,93 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "book_list_items"
             referencedColumns: ["author_id"]
+          },
+          {
+            foreignKeyName: "books_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "carousel_items"
+            referencedColumns: ["author_id"]
+          },
+        ]
+      }
+      carousel_slides: {
+        Row: {
+          accent: string | null
+          badge: string | null
+          book_id: string
+          created_at: string
+          cta_label: string | null
+          ends_at: string | null
+          headline: string | null
+          id: string
+          image_path: string | null
+          is_active: boolean
+          sort_order: number
+          starts_at: string | null
+          subtitle: string | null
+          updated_at: string
+        }
+        Insert: {
+          accent?: string | null
+          badge?: string | null
+          book_id: string
+          created_at?: string
+          cta_label?: string | null
+          ends_at?: string | null
+          headline?: string | null
+          id?: string
+          image_path?: string | null
+          is_active?: boolean
+          sort_order?: number
+          starts_at?: string | null
+          subtitle?: string | null
+          updated_at?: string
+        }
+        Update: {
+          accent?: string | null
+          badge?: string | null
+          book_id?: string
+          created_at?: string
+          cta_label?: string | null
+          ends_at?: string | null
+          headline?: string | null
+          id?: string
+          image_path?: string | null
+          is_active?: boolean
+          sort_order?: number
+          starts_at?: string | null
+          subtitle?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carousel_slides_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: true
+            referencedRelation: "admin_book_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "carousel_slides_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: true
+            referencedRelation: "book_list_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "carousel_slides_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: true
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "carousel_slides_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: true
+            referencedRelation: "carousel_items"
+            referencedColumns: ["book_id"]
           },
         ]
       }
@@ -410,6 +518,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "books"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_books_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "carousel_items"
+            referencedColumns: ["book_id"]
           },
           {
             foreignKeyName: "collection_books_collection_id_fkey"
@@ -527,6 +642,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "downloads_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "carousel_items"
+            referencedColumns: ["book_id"]
+          },
+          {
             foreignKeyName: "downloads_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -546,6 +668,8 @@ export type Database = {
         Row: {
           created_at: string
           expires_at: string | null
+          last_revenuecat_event_at: string | null
+          last_revenuecat_event_id: string | null
           plan_id: string | null
           raw_event: Json | null
           revenuecat_app_user_id: string | null
@@ -559,6 +683,8 @@ export type Database = {
         Insert: {
           created_at?: string
           expires_at?: string | null
+          last_revenuecat_event_at?: string | null
+          last_revenuecat_event_id?: string | null
           plan_id?: string | null
           raw_event?: Json | null
           revenuecat_app_user_id?: string | null
@@ -572,6 +698,8 @@ export type Database = {
         Update: {
           created_at?: string
           expires_at?: string | null
+          last_revenuecat_event_at?: string | null
+          last_revenuecat_event_id?: string | null
           plan_id?: string | null
           raw_event?: Json | null
           revenuecat_app_user_id?: string | null
@@ -583,6 +711,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "entitlements_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "admin_plan_rows"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "entitlements_plan_id_fkey"
             columns: ["plan_id"]
@@ -668,6 +803,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "books"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "highlights_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "carousel_items"
+            referencedColumns: ["book_id"]
           },
           {
             foreignKeyName: "highlights_user_id_fkey"
@@ -844,6 +986,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "reading_progress_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "carousel_items"
+            referencedColumns: ["book_id"]
+          },
+          {
             foreignKeyName: "reading_progress_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -898,6 +1047,235 @@ export type Database = {
           },
         ]
       }
+      revenuecat_events: {
+        Row: {
+          event_timestamp: string
+          event_type: string
+          id: string
+          processed_at: string
+          raw_event: Json
+          user_id: string
+        }
+        Insert: {
+          event_timestamp: string
+          event_type: string
+          id: string
+          processed_at?: string
+          raw_event?: Json
+          user_id: string
+        }
+        Update: {
+          event_timestamp?: string
+          event_type?: string
+          id?: string
+          processed_at?: string
+          raw_event?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "revenuecat_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "admin_user_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenuecat_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trending_weekly: {
+        Row: {
+          book_id: string
+          created_at: string
+          sort_order: number
+          week_start: string
+        }
+        Insert: {
+          book_id: string
+          created_at?: string
+          sort_order?: number
+          week_start: string
+        }
+        Update: {
+          book_id?: string
+          created_at?: string
+          sort_order?: number
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trending_weekly_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "admin_book_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trending_weekly_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "book_list_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trending_weekly_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trending_weekly_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "carousel_items"
+            referencedColumns: ["book_id"]
+          },
+        ]
+      }
+      user_recommendations: {
+        Row: {
+          book_id: string
+          generated_at: string
+          rank: number
+          reason_label: string | null
+          reason_type: string
+          score: number
+          seed_book_id: string | null
+          user_id: string
+        }
+        Insert: {
+          book_id: string
+          generated_at?: string
+          rank: number
+          reason_label?: string | null
+          reason_type: string
+          score?: number
+          seed_book_id?: string | null
+          user_id: string
+        }
+        Update: {
+          book_id?: string
+          generated_at?: string
+          rank?: number
+          reason_label?: string | null
+          reason_type?: string
+          score?: number
+          seed_book_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_recommendations_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "admin_book_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_recommendations_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "book_list_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_recommendations_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_recommendations_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "carousel_items"
+            referencedColumns: ["book_id"]
+          },
+          {
+            foreignKeyName: "user_recommendations_seed_book_id_fkey"
+            columns: ["seed_book_id"]
+            isOneToOne: false
+            referencedRelation: "admin_book_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_recommendations_seed_book_id_fkey"
+            columns: ["seed_book_id"]
+            isOneToOne: false
+            referencedRelation: "book_list_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_recommendations_seed_book_id_fkey"
+            columns: ["seed_book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_recommendations_seed_book_id_fkey"
+            columns: ["seed_book_id"]
+            isOneToOne: false
+            referencedRelation: "carousel_items"
+            referencedColumns: ["book_id"]
+          },
+          {
+            foreignKeyName: "user_recommendations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "admin_user_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_recommendations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_taste_state: {
+        Row: {
+          recommendations_generated_at: string | null
+          signals_updated_at: string
+          user_id: string
+        }
+        Insert: {
+          recommendations_generated_at?: string | null
+          signals_updated_at?: string
+          user_id: string
+        }
+        Update: {
+          recommendations_generated_at?: string | null
+          signals_updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_taste_state_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "admin_user_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_taste_state_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wishlist: {
         Row: {
           book_id: string
@@ -935,6 +1313,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "books"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wishlist_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "carousel_items"
+            referencedColumns: ["book_id"]
           },
           {
             foreignKeyName: "wishlist_user_id_fkey"
@@ -1009,6 +1394,9 @@ export type Database = {
           id: string | null
           is_premium: boolean | null
           is_published: boolean | null
+          language: string | null
+          length_bucket: string | null
+          page_count: number | null
           pdf_path: string | null
           price_cents: number | null
           published_at: string | null
@@ -1044,6 +1432,69 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "book_list_items"
             referencedColumns: ["author_id"]
+          },
+          {
+            foreignKeyName: "books_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "carousel_items"
+            referencedColumns: ["author_id"]
+          },
+        ]
+      }
+      admin_carousel_rows: {
+        Row: {
+          accent: string | null
+          author_name: string | null
+          badge: string | null
+          book_cover_color: string | null
+          book_cover_path: string | null
+          book_id: string | null
+          book_slug: string | null
+          book_title: string | null
+          created_at: string | null
+          cta_label: string | null
+          ends_at: string | null
+          headline: string | null
+          id: string | null
+          image_path: string | null
+          is_active: boolean | null
+          is_live: boolean | null
+          is_premium: boolean | null
+          is_published: boolean | null
+          sort_order: number | null
+          starts_at: string | null
+          subtitle: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carousel_slides_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: true
+            referencedRelation: "admin_book_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "carousel_slides_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: true
+            referencedRelation: "book_list_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "carousel_slides_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: true
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "carousel_slides_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: true
+            referencedRelation: "carousel_items"
+            referencedColumns: ["book_id"]
           },
         ]
       }
@@ -1125,6 +1576,97 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_plan_rows: {
+        Row: {
+          code: string | null
+          created_at: string | null
+          currency: string | null
+          entitlement_count: number | null
+          features: Json | null
+          id: string | null
+          interval: string | null
+          is_active: boolean | null
+          name: string | null
+          price_cents: number | null
+          revenuecat_product_id: string | null
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string | null
+          currency?: string | null
+          entitlement_count?: never
+          features?: Json | null
+          id?: string | null
+          interval?: string | null
+          is_active?: boolean | null
+          name?: string | null
+          price_cents?: number | null
+          revenuecat_product_id?: string | null
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string | null
+          currency?: string | null
+          entitlement_count?: never
+          features?: Json | null
+          id?: string | null
+          interval?: string | null
+          is_active?: boolean | null
+          name?: string | null
+          price_cents?: number | null
+          revenuecat_product_id?: string | null
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      admin_trending_rows: {
+        Row: {
+          author_name: string | null
+          book_id: string | null
+          cover_path: string | null
+          is_premium: boolean | null
+          is_published: boolean | null
+          slug: string | null
+          sort_order: number | null
+          title: string | null
+          week_start: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trending_weekly_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "admin_book_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trending_weekly_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "book_list_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trending_weekly_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trending_weekly_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "carousel_items"
+            referencedColumns: ["book_id"]
+          },
+        ]
+      }
       admin_user_directory: {
         Row: {
           avatar_path: string | null
@@ -1161,11 +1703,46 @@ export type Database = {
           genre: string | null
           id: string | null
           is_premium: boolean | null
+          language: string | null
+          length_bucket: string | null
+          page_count: number | null
           price_cents: number | null
           published_at: string | null
           rating: number | null
           read_time_minutes: number | null
           slug: string | null
+          tag: string | null
+          title: string | null
+        }
+        Relationships: []
+      }
+      carousel_items: {
+        Row: {
+          accent: string | null
+          author_id: string | null
+          author_name: string | null
+          badge: string | null
+          book_id: string | null
+          cover_color: string | null
+          cover_color_dark: string | null
+          cover_path: string | null
+          cta_label: string | null
+          currency: string | null
+          ends_at: string | null
+          format: string | null
+          genre: string | null
+          headline: string | null
+          image_path: string | null
+          is_premium: boolean | null
+          price_cents: number | null
+          published_at: string | null
+          rating: number | null
+          read_time_minutes: number | null
+          slide_id: string | null
+          slug: string | null
+          sort_order: number | null
+          starts_at: string | null
+          subtitle: string | null
           tag: string | null
           title: string | null
         }
@@ -1208,11 +1785,69 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_carousel_delete: { Args: { p_ids: string[] }; Returns: number }
+      admin_carousel_reorder: { Args: { p_ids: string[] }; Returns: number }
+      admin_carousel_set: { Args: { p_book_ids: string[] }; Returns: number }
+      admin_carousel_upsert: {
+        Args: {
+          p_accent?: string
+          p_badge?: string
+          p_book_id?: string
+          p_clear_schedule?: boolean
+          p_cta_label?: string
+          p_ends_at?: string
+          p_headline?: string
+          p_id?: string
+          p_image_path?: string
+          p_is_active?: boolean
+          p_sort_order?: number
+          p_starts_at?: string
+          p_subtitle?: string
+        }
+        Returns: {
+          accent: string | null
+          badge: string | null
+          book_id: string
+          created_at: string
+          cta_label: string | null
+          ends_at: string | null
+          headline: string | null
+          id: string
+          image_path: string | null
+          is_active: boolean
+          sort_order: number
+          starts_at: string | null
+          subtitle: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "carousel_slides"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_dashboard_stats: { Args: never; Returns: Json }
       admin_delete_books: { Args: { p_ids: string[] }; Returns: Json }
+      admin_delete_category: {
+        Args: { p_force?: boolean; p_id: string }
+        Returns: Json
+      }
+      admin_delete_collection: {
+        Args: { p_force?: boolean; p_id: string }
+        Returns: Json
+      }
+      admin_delete_plan: {
+        Args: { p_force?: boolean; p_id: string }
+        Returns: Json
+      }
       admin_delete_storage_object: {
         Args: { p_bucket: string; p_name: string }
         Returns: undefined
+      }
+      admin_refresh_trending_week: {
+        Args: { p_pool?: number; p_week?: string }
+        Returns: Json
       }
       admin_reorder: {
         Args: { p_ids: string[]; p_table: string }
@@ -1244,7 +1879,122 @@ export type Database = {
         Returns: undefined
       }
       admin_storage_audit: { Args: never; Returns: Json }
+      admin_upsert_category: {
+        Args: {
+          p_accent?: string
+          p_accent_dark?: string
+          p_icon_key?: string
+          p_id?: string
+          p_label?: string
+          p_slug?: string
+          p_sort_order?: number
+        }
+        Returns: {
+          accent: string | null
+          accent_dark: string | null
+          created_at: string
+          icon_key: string
+          id: string
+          label: string
+          slug: string
+          sort_order: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "categories"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_upsert_collection: {
+        Args: {
+          p_accent?: string
+          p_id?: string
+          p_is_published?: boolean
+          p_kind?: string
+          p_slug?: string
+          p_sort_order?: number
+          p_subtitle?: string
+          p_title?: string
+        }
+        Returns: {
+          accent: string | null
+          created_at: string
+          id: string
+          is_published: boolean
+          kind: string
+          slug: string
+          sort_order: number
+          subtitle: string | null
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "collections"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_upsert_plan: {
+        Args: {
+          p_code?: string
+          p_currency?: string
+          p_features?: Json
+          p_id?: string
+          p_interval?: string
+          p_is_active?: boolean
+          p_name?: string
+          p_price_cents?: number
+          p_revenuecat_product_id?: string
+          p_sort_order?: number
+        }
+        Returns: {
+          code: string
+          created_at: string
+          currency: string
+          features: Json
+          id: string
+          interval: string
+          is_active: boolean
+          name: string
+          price_cents: number
+          revenuecat_product_id: string | null
+          sort_order: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "plans"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_user_detail: { Args: { p_user_id: string }; Returns: Json }
+      apply_revenuecat_entitlement: {
+        Args: {
+          p_event_at: string
+          p_event_id: string
+          p_expires_at: string
+          p_plan_id: string
+          p_raw_event: Json
+          p_revenuecat_entitlement_id: string
+          p_starts_at: string
+          p_status: string
+          p_store: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      book_effective_pages: {
+        Args: { p_page_count: number; p_read_time_minutes: number }
+        Returns: number
+      }
+      book_length_bucket: {
+        Args: { p_page_count: number; p_read_time_minutes: number }
+        Returns: string
+      }
+      book_publish_blocker: { Args: { p_book_id: string }; Returns: string }
       books_search_document: {
         Args: {
           p_author_name: string
@@ -1266,7 +2016,101 @@ export type Database = {
         }
         Returns: unknown
       }
+      books_search_vector_simple: {
+        Args: {
+          description: string
+          genre: string
+          tag: string
+          tags: string[]
+          title: string
+        }
+        Returns: unknown
+      }
+      catalog_books: {
+        Args: {
+          p_category?: string
+          p_languages?: string[]
+          p_lengths?: string[]
+          p_limit?: number
+          p_min_rating?: number
+          p_offset?: number
+          p_premium?: boolean
+          p_query?: string
+          p_sort?: string
+        }
+        Returns: {
+          author_id: string
+          author_name: string
+          cover_color: string
+          cover_color_dark: string
+          cover_path: string
+          currency: string
+          format: string
+          genre: string
+          id: string
+          is_premium: boolean
+          language: string
+          length_bucket: string
+          page_count: number
+          price_cents: number
+          published_at: string
+          rating: number
+          read_time_minutes: number
+          slug: string
+          tag: string
+          title: string
+          total_count: number
+        }[]
+      }
+      current_trending_week: { Args: never; Returns: string }
+      ensure_trending_week: {
+        Args: { p_pool?: number; p_week?: string }
+        Returns: number
+      }
       is_admin: { Args: never; Returns: boolean }
+      length_bucket: {
+        Args: { b: Database["public"]["Tables"]["books"]["Row"] }
+        Returns: string
+      }
+      random_published_books: {
+        Args: { p_limit?: number }
+        Returns: {
+          author_id: string | null
+          author_name: string | null
+          cover_color: string | null
+          cover_color_dark: string | null
+          cover_path: string | null
+          currency: string | null
+          format: string | null
+          genre: string | null
+          id: string | null
+          is_premium: boolean | null
+          language: string | null
+          length_bucket: string | null
+          page_count: number | null
+          price_cents: number | null
+          published_at: string | null
+          rating: number | null
+          read_time_minutes: number | null
+          slug: string | null
+          tag: string | null
+          title: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "book_list_items"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      rebuild_user_recommendations: {
+        Args: { p_limit?: number; p_user_id: string }
+        Returns: number
+      }
+      recommendations_for_me: {
+        Args: { p_limit?: number; p_per_section?: number; p_sections?: number }
+        Returns: Json
+      }
       search_books: {
         Args: { p_limit?: number; p_offset?: number; p_query: string }
         Returns: {
@@ -1293,11 +2137,78 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       slugify: { Args: { input: string }; Returns: string }
+      storage_object_exists: {
+        Args: { p_bucket: string; p_path: string }
+        Returns: boolean
+      }
+      storage_object_key: {
+        Args: { p_bucket: string; p_path: string }
+        Returns: string
+      }
       unaccent: { Args: { "": string }; Returns: string }
+      upsert_reading_progress: {
+        Args: {
+          p_book_id: string
+          p_chapter_label?: string
+          p_current_page?: number
+          p_progress?: number
+          p_total_pages?: number
+        }
+        Returns: {
+          book_id: string
+          chapter_label: string | null
+          created_at: string
+          current_page: number
+          id: string
+          last_read_at: string
+          progress: number
+          total_pages: number | null
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "reading_progress"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       user_has_active_premium: {
         Args: { p_user_id?: string }
         Returns: boolean
       }
+      weekly_trending_books: {
+        Args: { p_limit?: number }
+        Returns: {
+          author_id: string | null
+          author_name: string | null
+          cover_color: string | null
+          cover_color_dark: string | null
+          cover_path: string | null
+          currency: string | null
+          format: string | null
+          genre: string | null
+          id: string | null
+          is_premium: boolean | null
+          language: string | null
+          length_bucket: string | null
+          page_count: number | null
+          price_cents: number | null
+          published_at: string | null
+          rating: number | null
+          read_time_minutes: number | null
+          slug: string | null
+          tag: string | null
+          title: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "book_list_items"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      weekly_trending_meta: { Args: never; Returns: Json }
     }
     Enums: {
       [_ in never]: never
@@ -1321,6 +2232,7 @@ export type Database = {
           public: boolean | null
           type: Database["storage"]["Enums"]["buckettype"]
           updated_at: string | null
+          versioning_status: string
         }
         Insert: {
           allowed_mime_types?: string[] | null
@@ -1334,6 +2246,7 @@ export type Database = {
           public?: boolean | null
           type?: Database["storage"]["Enums"]["buckettype"]
           updated_at?: string | null
+          versioning_status?: string
         }
         Update: {
           allowed_mime_types?: string[] | null
@@ -1347,6 +2260,7 @@ export type Database = {
           public?: boolean | null
           type?: Database["storage"]["Enums"]["buckettype"]
           updated_at?: string | null
+          versioning_status?: string
         }
         Relationships: []
       }
@@ -1401,101 +2315,6 @@ export type Database = {
         }
         Relationships: []
       }
-      iceberg_namespaces: {
-        Row: {
-          bucket_name: string
-          catalog_id: string
-          created_at: string
-          id: string
-          metadata: Json
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          bucket_name: string
-          catalog_id: string
-          created_at?: string
-          id?: string
-          metadata?: Json
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          bucket_name?: string
-          catalog_id?: string
-          created_at?: string
-          id?: string
-          metadata?: Json
-          name?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "iceberg_namespaces_catalog_id_fkey"
-            columns: ["catalog_id"]
-            isOneToOne: false
-            referencedRelation: "buckets_analytics"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      iceberg_tables: {
-        Row: {
-          bucket_name: string
-          catalog_id: string
-          created_at: string
-          id: string
-          location: string
-          name: string
-          namespace_id: string
-          remote_table_id: string | null
-          shard_id: string | null
-          shard_key: string | null
-          updated_at: string
-        }
-        Insert: {
-          bucket_name: string
-          catalog_id: string
-          created_at?: string
-          id?: string
-          location: string
-          name: string
-          namespace_id: string
-          remote_table_id?: string | null
-          shard_id?: string | null
-          shard_key?: string | null
-          updated_at?: string
-        }
-        Update: {
-          bucket_name?: string
-          catalog_id?: string
-          created_at?: string
-          id?: string
-          location?: string
-          name?: string
-          namespace_id?: string
-          remote_table_id?: string | null
-          shard_id?: string | null
-          shard_key?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "iceberg_tables_catalog_id_fkey"
-            columns: ["catalog_id"]
-            isOneToOne: false
-            referencedRelation: "buckets_analytics"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "iceberg_tables_namespace_id_fkey"
-            columns: ["namespace_id"]
-            isOneToOne: false
-            referencedRelation: "iceberg_namespaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       migrations: {
         Row: {
           executed_at: string | null
@@ -1519,9 +2338,12 @@ export type Database = {
       }
       objects: {
         Row: {
+          archived_at: string | null
           bucket_id: string | null
           created_at: string | null
           id: string
+          is_delete_marker: boolean
+          is_versioned: boolean
           last_accessed_at: string | null
           metadata: Json | null
           name: string | null
@@ -1533,9 +2355,12 @@ export type Database = {
           version: string | null
         }
         Insert: {
+          archived_at?: string | null
           bucket_id?: string | null
           created_at?: string | null
           id?: string
+          is_delete_marker?: boolean
+          is_versioned?: boolean
           last_accessed_at?: string | null
           metadata?: Json | null
           name?: string | null
@@ -1547,9 +2372,12 @@ export type Database = {
           version?: string | null
         }
         Update: {
+          archived_at?: string | null
           bucket_id?: string | null
           created_at?: string | null
           id?: string
+          is_delete_marker?: boolean
+          is_versioned?: boolean
           last_accessed_at?: string | null
           metadata?: Json | null
           name?: string | null
@@ -1861,12 +2689,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1890,11 +2718,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1915,11 +2743,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1940,11 +2768,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1957,11 +2785,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1983,4 +2811,3 @@ export const Constants = {
     },
   },
 } as const
-

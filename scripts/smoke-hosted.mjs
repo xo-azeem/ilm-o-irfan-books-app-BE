@@ -145,7 +145,11 @@ console.log(`== smoke against ${base} ==`)
 
 const publicGets = [
   ['home-feed', ''],
+  ['carousel-list', ''],
+  ['trending-weekly', '?limit=5'],
   ['books-list', '?page=1&pageSize=5'],
+  ['books-list', '?page=1&pageSize=5&language=urdu'],
+  ['books-list', '?page=1&pageSize=5&sort=rating'],
   ['plans-list', ''],
   ['categories-list', ''],
   ['collections-list', ''],
@@ -153,15 +157,41 @@ const publicGets = [
 ]
 
 for (const [name, path] of publicGets) {
+  const label = path ? `${name}${path}` : name
   const result = await invoke(name, { path })
-  expectDataEnvelope(name, result)
+  expectDataEnvelope(label, result)
+}
+
+{
+  const result = await invoke('home-feed')
+  if (result?.res?.status === 200 && result.json?.data && 'carousel' in result.json.data) {
+    ok('home-feed includes carousel')
+  } else if (result) {
+    no('home-feed includes carousel', 'missing carousel key')
+  }
 }
 
 if (userJwt) {
   console.log('== authenticated checks ==')
-  for (const name of ['entitlements-status', 'profile-read']) {
+  for (const name of ['entitlements-status', 'profile-read', 'recommendations']) {
     const result = await invoke(name, { auth: userJwt })
     expectDataEnvelope(name, result)
+  }
+
+  {
+    const result = await invoke('entitlements-status', { auth: userJwt })
+    const data = result?.json?.data
+    if (
+      data &&
+      typeof data.canAccessPremium === 'boolean' &&
+      typeof data.reason === 'string' &&
+      typeof data.serverTime === 'string' &&
+      data.realtime?.channel
+    ) {
+      ok('entitlements-status lifecycle fields')
+    } else if (result) {
+      no('entitlements-status lifecycle fields', JSON.stringify(data)?.slice(0, 200))
+    }
   }
 } else {
   console.log('== authenticated checks skipped (set SUPABASE_USER_JWT to enable) ==')

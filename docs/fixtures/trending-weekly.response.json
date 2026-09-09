@@ -1,0 +1,22 @@
+{
+  "data": {
+    "weekStart": "2026-09-08T00:00:00.000Z",
+    "expiresAt": "2026-09-15T00:00:00.000Z",
+    "books": [
+      {
+        "id": "aaaaaaaa-0000-0000-0000-000000000001",
+        "slug": "ihya",
+        "title": "Ihya Ulum al-Din",
+        "author_name": "Imam Al Ghazali",
+        "cover_path": "covers/ihya.webp",
+        "coverUrl": "https://<ref>.supabase.co/storage/v1/object/public/covers/ihya.webp",
+        "cover_color": "#2F5D50",
+        "cover_color_dark": "#1A332C",
+        "rating": 4.9,
+        "genre": "Spirituality",
+        "is_premium": true,
+        "read_time_minutes": 360
+      }
+    ]
+  }
+}

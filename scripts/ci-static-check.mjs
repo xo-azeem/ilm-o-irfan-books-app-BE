@@ -104,6 +104,50 @@ if (!existsSync(FIXTURES_DIR)) {
       no(`${file} invalid JSON`, error.message)
     }
   }
+
+  // Contract keys the FE already branches on — keep fixtures frozen to the live shape.
+  function requireKeys(file, pathKeys) {
+    try {
+      const parsed = JSON.parse(readFileSync(join(FIXTURES_DIR, file), 'utf8'))
+      const data = parsed?.data
+      if (!data || typeof data !== 'object') {
+        no(`${file} missing data object for key check`)
+        return
+      }
+      for (const key of pathKeys) {
+        const parts = key.split('.')
+        let cur = data
+        for (const part of parts) {
+          if (cur == null || typeof cur !== 'object' || !(part in cur)) {
+            no(`${file} missing required key ${key}`)
+            return
+          }
+          cur = cur[part]
+        }
+      }
+      ok(`${file} required keys`)
+    } catch (error) {
+      no(`${file} key check failed`, error.message)
+    }
+  }
+
+  requireKeys('entitlements-status.response.json', [
+    'canAccessPremium',
+    'reason',
+    'serverTime',
+    'realtime.channel',
+    'realtime.event',
+  ])
+  requireKeys('get-signed-pdf.response.json', [
+    'signedUrl',
+    'expiresIn',
+    'access.serverTime',
+    'access.reason',
+  ])
+  requireKeys('home-feed.response.json', ['carousel', 'shelves', 'supportEmail'])
+  requireKeys('carousel-list.response.json', ['slides'])
+  requireKeys('trending-weekly.response.json', ['weekStart', 'expiresAt', 'books'])
+  requireKeys('recommendations.response.json', ['sections', 'books', 'isPersonalized'])
 }
 
 console.log('== migrations present ==')

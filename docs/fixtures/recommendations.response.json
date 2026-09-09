@@ -1,0 +1,38 @@
+{
+  "data": {
+    "generatedAt": "2026-09-09T12:00:00.000Z",
+    "isPersonalized": true,
+    "sections": [
+      {
+        "seedBook": {
+          "id": "aaaaaaaa-0000-0000-0000-000000000001",
+          "slug": "ihya",
+          "title": "Ihya Ulum al-Din",
+          "cover_path": "covers/ihya.webp",
+          "coverUrl": "https://<ref>.supabase.co/storage/v1/object/public/covers/ihya.webp",
+          "author_name": "Imam Al Ghazali"
+        },
+        "books": [
+          {
+            "id": "aaaaaaaa-0000-0000-0000-000000000002",
+            "slug": "masnavi",
+            "title": "The Masnavi",
+            "cover_path": "covers/masnavi.webp",
+            "coverUrl": "https://<ref>.supabase.co/storage/v1/object/public/covers/masnavi.webp",
+            "author_name": "Jalaluddin Rumi"
+          }
+        ]
+      }
+    ],
+    "books": [
+      {
+        "id": "aaaaaaaa-0000-0000-0000-000000000002",
+        "slug": "masnavi",
+        "title": "The Masnavi",
+        "cover_path": "covers/masnavi.webp",
+        "coverUrl": "https://<ref>.supabase.co/storage/v1/object/public/covers/masnavi.webp",
+        "author_name": "Jalaluddin Rumi"
+      }
+    ]
+  }
+}

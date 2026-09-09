@@ -10,11 +10,14 @@ Full mobile contract: [`../mobile-contract.md`](../mobile-contract.md).
 
 | File | Endpoint |
 | --- | --- |
-| `home-feed.response.json` | `GET /functions/v1/home-feed` |
+| `home-feed.response.json` | `GET /functions/v1/home-feed` (includes `carousel` + shelves) |
+| `carousel-list.response.json` | `GET /functions/v1/carousel-list` |
+| `trending-weekly.response.json` | `GET /functions/v1/trending-weekly` |
+| `recommendations.response.json` | `GET /functions/v1/recommendations` (user) |
 | `book-detail.response.json` | `GET /functions/v1/book-detail` |
 | `collection-books.response.json` | `GET /functions/v1/collection-books` |
-| `entitlements-status.response.json` | `GET /functions/v1/entitlements-status` |
-| `get-signed-pdf.response.json` | `POST /functions/v1/get-signed-pdf` (success) |
+| `entitlements-status.response.json` | `GET /functions/v1/entitlements-status` (lifecycle + realtime) |
+| `get-signed-pdf.response.json` | `POST /functions/v1/get-signed-pdf` (success + `access`) |
 | `get-signed-pdf.premium-required.json` | `POST /functions/v1/get-signed-pdf` (403) |
 | `get-signed-pdf.not-in-storage.json` | `POST /functions/v1/get-signed-pdf` (404) |
 | `revenuecat-webhook.auth-failed.json` | `POST /functions/v1/revenuecat-webhook` (401) |
