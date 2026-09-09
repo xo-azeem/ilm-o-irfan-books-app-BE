@@ -51,7 +51,8 @@ Sample webhook bodies:
 `docs/fixtures/revenuecat-webhook.app-store.initial-purchase.request.json`,  
 `docs/fixtures/revenuecat-webhook.play-store.initial-purchase.request.json`.
 
-Ops checklist: [`staging-billing-auth.md`](./staging-billing-auth.md).
+Ops checklist: [`staging-billing-auth.md`](./staging-billing-auth.md).  
+**Full A→Z walkthrough (avoid common mistakes):** [`revenuecat-setup-a-to-z.md`](./revenuecat-setup-a-to-z.md).
 
 ## After backend deploy
 
