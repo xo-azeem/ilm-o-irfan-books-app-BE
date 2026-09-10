@@ -310,6 +310,91 @@ case "$WH_CODE" in
 esac
 
 echo
+echo "== revenuecat webhook apply (APP_STORE + PLAY_STORE) =="
+# Success paths need the same Authorization value the local functions serve process
+# was started with. Export REVENUECAT_WEBHOOK_AUTH before `supabase functions serve`.
+RC_AUTH="${REVENUECAT_WEBHOOK_AUTH:-}"
+UID=$(psqlq "select id from public.profiles where email='$EMAIL';" | tr -d ' ')
+NOW_MS=$(($(date +%s) * 1000))
+EXP_MS=$((NOW_MS + 30 * 24 * 60 * 60 * 1000))
+if [ -z "$RC_AUTH" ] || [ -z "$UID" ]; then
+  ok "webhook apply skipped (set REVENUECAT_WEBHOOK_AUTH to enable; need e2e user)"
+else
+  # Ensure seed plan product id is present for product_id lookup.
+  psqlq "update public.plans set revenuecat_product_id='premium_monthly' where code='premium_monthly';" >/dev/null
+  psqlq "delete from public.entitlements where user_id='$UID';" >/dev/null
+
+  APP_EVENT=aaaaaaaa-e2e0-4000-8000-000000000001
+  PLAY_EVENT=aaaaaaaa-e2e0-4000-8000-000000000002
+  psqlq "delete from public.revenuecat_events where id in ('$APP_EVENT','$PLAY_EVENT');" >/dev/null
+
+  APP_BODY=$(printf '{"event":{"id":"%s","type":"INITIAL_PURCHASE","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"premium_monthly","store":"APP_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
+    "$APP_EVENT" "$UID" "$NOW_MS" "$EXP_MS" "$NOW_MS")
+  APP_RES=$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" \
+    -H "Authorization: $RC_AUTH" -d "$APP_BODY")
+  has "APP_STORE initial purchase applied" "$APP_RES" '"applied":true'
+  has "APP_STORE maps store" "$APP_RES" '"store":"app_store"'
+  is "APP_STORE entitlement active" \
+    "$(psqlq "select status from public.entitlements where user_id='$UID';" | tr -d ' ')" "active"
+  is "APP_STORE store column" \
+    "$(psqlq "select store from public.entitlements where user_id='$UID';" | tr -d ' ')" "app_store"
+
+  DUP=$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" \
+    -H "Authorization: $RC_AUTH" -d "$APP_BODY")
+  has "APP_STORE duplicate is idempotent" "$DUP" '"duplicate":true'
+
+  PLAY_BODY=$(printf '{"event":{"id":"%s","type":"INITIAL_PURCHASE","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"premium_monthly","store":"PLAY_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
+    "$PLAY_EVENT" "$UID" "$((NOW_MS + 1000))" "$EXP_MS" "$((NOW_MS + 1000))")
+  PLAY_RES=$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" \
+    -H "Authorization: $RC_AUTH" -d "$PLAY_BODY")
+  has "PLAY_STORE initial purchase applied" "$PLAY_RES" '"applied":true'
+  has "PLAY_STORE maps store" "$PLAY_RES" '"store":"play_store"'
+  is "PLAY_STORE store column" \
+    "$(psqlq "select store from public.entitlements where user_id='$UID';" | tr -d ' ')" "play_store"
+
+  # Unknown SKU still falls back to premium_monthly so a mistyped product id does not drop access.
+  UNK_EVENT=aaaaaaaa-e2e0-4000-8000-000000000003
+  psqlq "delete from public.revenuecat_events where id='$UNK_EVENT';" >/dev/null
+  UNK_BODY=$(printf '{"event":{"id":"%s","type":"INITIAL_PURCHASE","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"unknown.sku.not.in.plans","store":"APP_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
+    "$UNK_EVENT" "$UID" "$((NOW_MS + 2000))" "$EXP_MS" "$((NOW_MS + 2000))")
+  UNK_RES=$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" \
+    -H "Authorization: $RC_AUTH" -d "$UNK_BODY")
+  has "unknown product_id still applies via premium_monthly fallback" "$UNK_RES" '"applied":true'
+  has "fallback still returns planId" "$UNK_RES" '"planId"'
+
+  # Lifecycle events after an active row exists (same user, increasing timestamps).
+  REN_EVENT=aaaaaaaa-e2e0-4000-8000-000000000004
+  CAN_EVENT=aaaaaaaa-e2e0-4000-8000-000000000005
+  EXP_EVENT=aaaaaaaa-e2e0-4000-8000-000000000006
+  BILL_EVENT=aaaaaaaa-e2e0-4000-8000-000000000007
+  psqlq "delete from public.revenuecat_events where id in ('$REN_EVENT','$CAN_EVENT','$EXP_EVENT','$BILL_EVENT');" >/dev/null
+
+  REN_BODY=$(printf '{"event":{"id":"%s","type":"RENEWAL","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"premium_monthly","store":"APP_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
+    "$REN_EVENT" "$UID" "$((NOW_MS + 3000))" "$((EXP_MS + 86400000))" "$((NOW_MS + 3000))")
+  has "RENEWAL applied" "$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" -H "Authorization: $RC_AUTH" -d "$REN_BODY")" '"applied":true'
+  is "RENEWAL leaves status active" \
+    "$(psqlq "select status from public.entitlements where user_id='$UID';" | tr -d ' ')" "active"
+
+  CAN_BODY=$(printf '{"event":{"id":"%s","type":"CANCELLATION","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"premium_monthly","store":"PLAY_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
+    "$CAN_EVENT" "$UID" "$((NOW_MS + 4000))" "$((NOW_MS + 86400000))" "$((NOW_MS + 4000))")
+  has "CANCELLATION applied" "$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" -H "Authorization: $RC_AUTH" -d "$CAN_BODY")" '"applied":true'
+  is "CANCELLATION paid-through is cancelled" \
+    "$(psqlq "select status from public.entitlements where user_id='$UID';" | tr -d ' ')" "cancelled"
+
+  BILL_BODY=$(printf '{"event":{"id":"%s","type":"BILLING_ISSUE","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"premium_monthly","store":"PLAY_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
+    "$BILL_EVENT" "$UID" "$((NOW_MS + 5000))" "$((NOW_MS + 86400000))" "$((NOW_MS + 5000))")
+  has "BILLING_ISSUE applied" "$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" -H "Authorization: $RC_AUTH" -d "$BILL_BODY")" '"applied":true'
+  is "BILLING_ISSUE status" \
+    "$(psqlq "select status from public.entitlements where user_id='$UID';" | tr -d ' ')" "billing_issue"
+
+  EXP_BODY=$(printf '{"event":{"id":"%s","type":"EXPIRATION","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"premium_monthly","store":"APP_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
+    "$EXP_EVENT" "$UID" "$((NOW_MS + 6000))" "$((NOW_MS - 1000))" "$((NOW_MS + 6000))")
+  has "EXPIRATION applied" "$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" -H "Authorization: $RC_AUTH" -d "$EXP_BODY")" '"applied":true'
+  is "EXPIRATION status" \
+    "$(psqlq "select status from public.entitlements where user_id='$UID';" | tr -d ' ')" "expired"
+fi
+
+echo
 echo "== admin gate =="
 for e in admin-books admin-users admin-analytics admin-settings; do
   is "$e forbidden for user" "$(code "$B/$e" "${A[@]}")" 403

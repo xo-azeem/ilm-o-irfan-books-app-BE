@@ -95,6 +95,17 @@ if (!existsSync(FIXTURES_DIR)) {
       const parsed = JSON.parse(readFileSync(join(FIXTURES_DIR, file), 'utf8'))
       if (!parsed || typeof parsed !== 'object') {
         no(`${file} must be a JSON object`)
+      } else if (file.endsWith('.request.json')) {
+        // RevenueCat (and similar) inbound webhook samples — body has `event`, not data/error.
+        if (!parsed.event || typeof parsed.event !== 'object') {
+          no(`${file} must have an event object`)
+        } else if (typeof parsed.event.type !== 'string' || !parsed.event.type) {
+          no(`${file} event.type required`)
+        } else if (typeof parsed.event.store !== 'string' || !parsed.event.store) {
+          no(`${file} event.store required`)
+        } else {
+          ok(file)
+        }
       } else if (!('data' in parsed) && !('error' in parsed)) {
         no(`${file} must have data or error envelope`)
       } else {
@@ -148,6 +159,22 @@ if (!existsSync(FIXTURES_DIR)) {
   requireKeys('carousel-list.response.json', ['slides'])
   requireKeys('trending-weekly.response.json', ['weekStart', 'expiresAt', 'books'])
   requireKeys('recommendations.response.json', ['sections', 'books', 'isPersonalized'])
+  requireKeys('revenuecat-webhook.app-store.applied.response.json', [
+    'eventId',
+    'userId',
+    'status',
+    'store',
+    'planId',
+    'applied',
+  ])
+  requireKeys('revenuecat-webhook.play-store.applied.response.json', [
+    'eventId',
+    'userId',
+    'status',
+    'store',
+    'planId',
+    'applied',
+  ])
 }
 
 console.log('== migrations present ==')

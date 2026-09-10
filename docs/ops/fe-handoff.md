@@ -33,6 +33,27 @@ Google OAuth is Dashboard + deep links later — not required for the first host
 Contract details: [`docs/mobile-contract.md`](../mobile-contract.md).  
 Frozen envelopes: [`docs/fixtures/`](../fixtures/).
 
+## Billing contract (Apple / Google via RevenueCat)
+
+In-app subscription checkout is FE + RevenueCat. The backend only accepts the webhook and exposes status.
+
+| Rule | Detail |
+| --- | --- |
+| `app_user_id` | Must be the **Supabase Auth user UUID** (`Purchases.logIn(user.id)`). Email / `$RCAnonymousID` → `400 USER_NOT_FOUND` / invalid event |
+| Entitlement id | `premium` (`REVENUECAT_ENTITLEMENT_ID`) |
+| Plan | `premium_monthly`; webhook matches `event.product_id` → `plans.revenuecat_product_id`, else falls back to that plan code |
+| Stores | `APP_STORE` / `MAC_APP_STORE` → `app_store`; `PLAY_STORE` → `play_store` |
+| After purchase | Refresh **`entitlements-status`** (and Realtime `entitlement_changed`). Never write `entitlements` from the client |
+| Prices | Show RC/package localized price on Subscribe; DB `plans.price_cents` is catalog copy only |
+| Secrets | Public RC SDK keys → FE env. `REVENUECAT_WEBHOOK_AUTH` → Edge secret + RC dashboard only |
+
+Sample webhook bodies:  
+`docs/fixtures/revenuecat-webhook.app-store.initial-purchase.request.json`,  
+`docs/fixtures/revenuecat-webhook.play-store.initial-purchase.request.json`.
+
+Ops checklist: [`staging-billing-auth.md`](./staging-billing-auth.md).  
+**Full A→Z walkthrough (avoid common mistakes):** [`revenuecat-setup-a-to-z.md`](./revenuecat-setup-a-to-z.md).
+
 ## After backend deploy
 
 1. Operator runs `npm run deploy:hosted` + `npm run smoke:hosted` ([deploy-checklist.md](./deploy-checklist.md)).
