@@ -159,8 +159,11 @@ true, and there is no third case:
 
 1. `profiles.role = 'admin'` (or JWT `app_metadata.app_role = 'admin'`) — admins read any
    PDF, published or draft, with no subscription.
-2. The book is published and the caller has an active entitlement
-   (`status = 'active'` and `expires_at` null or in the future).
+2. The book is published and `public.entitlement_has_access(status, expires_at)` is true
+   for the caller (same rule as `canAccessPremium` / `my_access_state()`).
+
+Do **not** gate on `status = 'active'` alone — trial, cancelled (paid through), grace, and
+billing_issue can still grant access until `expires_at`.
 
 `books.is_premium` is **not** consulted. It used to carve out a "published and free"
 branch, which meant one unset flag — a bulk-action misclick, an importer default, a seed

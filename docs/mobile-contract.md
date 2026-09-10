@@ -34,6 +34,9 @@ Every Edge Function returns one of:
 | Screen | Method | Route | Auth |
 | --- | --- | --- | --- |
 | Home | GET | `/functions/v1/home-feed` | Public |
+| Home carousel (standalone) | GET | `/functions/v1/carousel-list` | Public |
+| Weekly trending | GET | `/functions/v1/trending-weekly` | Public |
+| Recommendations | GET | `/functions/v1/recommendations` | User |
 | Search (browse) | GET | `/functions/v1/books-list?page=&pageSize=` | Public |
 | Search (category) | GET | `/functions/v1/books-list?category=<uuid-or-slug>` | Public |
 | Search (query) | GET | `/functions/v1/books-search?q=` | Public |

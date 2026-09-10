@@ -81,7 +81,13 @@ P=(-H "Authorization: Bearer $ANON")
 echo
 echo "== public catalog =="
 is "home-feed 200"        "$(code "$B/home-feed" "${P[@]}")" 200
+has "home-feed carousel"  "$(curl -s "$B/home-feed" "${P[@]}")" '"carousel"'
+is "carousel-list 200"    "$(code "$B/carousel-list" "${P[@]}")" 200
+is "trending-weekly 200"  "$(code "$B/trending-weekly?limit=5" "${P[@]}")" 200
+has "trending weekStart"  "$(curl -s "$B/trending-weekly?limit=5" "${P[@]}")" '"weekStart"'
 is "books-list 200"       "$(code "$B/books-list" "${P[@]}")" 200
+is "books-list language filter 200" "$(code "$B/books-list?language=english&page=1&pageSize=5" "${P[@]}")" 200
+is "books-list sort rating 200" "$(code "$B/books-list?sort=rating&page=1&pageSize=5" "${P[@]}")" 200
 is "book-detail 200"      "$(code "$B/book-detail?id=$BOOK" "${P[@]}")" 200
 is "categories-list 200"  "$(code "$B/categories-list" "${P[@]}")" 200
 is "collections-list 200" "$(code "$B/collections-list" "${P[@]}")" 200
@@ -122,6 +128,7 @@ echo "== auth gate (no token) =="
 for e in profile-read reading-progress wishlist-list downloads-list highlights-list library-overview entitlements-status admin-books get-signed-pdf; do
   is "$e 401" "$(code -X POST "$B/$e" -H 'Content-Type: application/json' -d '{}')" 401
 done
+is "recommendations 401" "$(code "$B/recommendations" "${P[@]}")" 401
 
 echo
 echo "== profile partial update (data-loss regression) =="
@@ -264,6 +271,11 @@ has "reason"             "$ES" '"reason":"active"'
 has "serverTime for clock-skew correction" "$ES" '"serverTime"'
 has "the channel to subscribe to" "$ES" '"channel":"entitlement:'
 has "marked private"     "$ES" '"private":true'
+
+echo
+echo "== recommendations =="
+is "recommendations 200" "$(code "$B/recommendations?limit=10" "${A[@]}")" 200
+has "recommendations envelope" "$(curl -s "$B/recommendations?limit=10" "${A[@]}")" '"isPersonalized"'
 
 # A signed URL must not outlive the subscription. 40 seconds left, 300s default.
 # Asserted as a range, not an exact number: the value depends on how long the

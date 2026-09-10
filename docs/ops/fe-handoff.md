@@ -15,18 +15,27 @@ Google OAuth is Dashboard + deep links later — not required for the first host
 
 ## Edge Functions the app calls
 
-**Public:** `home-feed`, `books-list`, `books-search`, `book-detail`, `categories-list`, `collections-list`, `collection-books`, `plans-list`
+**Public:**  
+`home-feed`, `carousel-list`, `trending-weekly`, `books-list`, `books-search`, `book-detail`, `categories-list`, `collections-list`, `collection-books`, `plans-list`
 
 **Authenticated** (`Authorization: Bearer <user JWT>` + `apikey: <anon>`):  
-`get-signed-pdf`, `reading-progress`, `library-overview`, `wishlist-list`, `wishlist-toggle`, `downloads-list`, `downloads-create`, `highlights-list`, `highlights-upsert`, `highlights-delete`, `profile-read`, `profile-update`, `avatar-upload-url`, `entitlements-status`
+`get-signed-pdf`, `reading-progress`, `library-overview`, `wishlist-list`, `wishlist-toggle`, `downloads-list`, `downloads-create`, `highlights-list`, `highlights-upsert`, `highlights-delete`, `profile-read`, `profile-update`, `avatar-upload-url`, `entitlements-status`, `recommendations`
 
 **Not called by the app:** `revenuecat-webhook`, all `admin-*`, deprecated `signed-pdf` (410).
 
-Contract details: [`docs/mobile-contract.md`](../mobile-contract.md).
+### Premium / reader rules (do not drift)
+
+- Gate UI and Read on **`canAccessPremium`** from `entitlements-status` (not `isActive`, not `books.is_premium`).
+- Access rule is `entitlement_has_access(status, expires_at)` — trial / cancelled / grace / billing_issue can still read while paid through.
+- `get-signed-pdf` returns `access.{expiresAt,secondsRemaining,serverTime,reason}` to re-anchor the countdown.
+- Catalogue is **subscription-only** — every published title needs membership (or admin).
+
+Contract details: [`docs/mobile-contract.md`](../mobile-contract.md).  
+Frozen envelopes: [`docs/fixtures/`](../fixtures/).
 
 ## After backend deploy
 
 1. Operator runs `npm run deploy:hosted` + `npm run smoke:hosted` ([deploy-checklist.md](./deploy-checklist.md)).
 2. Copy URL + anon key into the FE env (never commit secrets).
 3. Wire Supabase Auth + Edge Function client on the FE side.
-4. Premium path needs RevenueCat SDK + live webhook; until then gate UI on `entitlements-status` and treat purchases as unavailable.
+4. Premium path needs RevenueCat SDK + live webhook; until then gate UI on `entitlements-status` and treat purchases as unavailable (promo/admin comps for staging).

@@ -1,0 +1,21 @@
+{
+  "data": {
+    "slides": [
+      {
+        "slide_id": "66666666-6666-6666-6666-666666666001",
+        "sort_order": 0,
+        "book_id": "aaaaaaaa-0000-0000-0000-000000000001",
+        "headline": "Start with Ihya",
+        "subtitle": "A classic of the spiritual sciences",
+        "cta_label": "Read now",
+        "badge": "Featured",
+        "image_path": "covers/ihya.webp",
+        "imageUrl": "https://<ref>.supabase.co/storage/v1/object/public/covers/ihya.webp",
+        "cover_path": "covers/ihya.webp",
+        "coverUrl": "https://<ref>.supabase.co/storage/v1/object/public/covers/ihya.webp",
+        "title": "Ihya Ulum al-Din",
+        "author_name": "Imam Al Ghazali"
+      }
+    ]
+  }
+}

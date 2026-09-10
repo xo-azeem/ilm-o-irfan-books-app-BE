@@ -21,7 +21,7 @@ linked Supabase project, a RevenueCat project, the book files, and Docker. See
 
 ### 1. Correct PDF authorization
 
-**Status:** Fixed in `get-signed-pdf` — entitlement is required only when `books.is_premium = true`. Free published books are available to any signed-in user. Admin + global bypass behavior unchanged. E2E paywall section covers free vs premium.
+**Status:** Fixed — catalogue is subscription-only. `get-signed-pdf` grants access only when the caller is an admin **or** `entitlement_has_access(status, expires_at)` is true for a published book. `books.is_premium` is not consulted for the gate; the global bypass flag was removed. E2E covers lifecycle statuses (trial / cancelled / grace / expired).
 
 **Owner:** `supabase/functions/get-signed-pdf/index.ts`
 

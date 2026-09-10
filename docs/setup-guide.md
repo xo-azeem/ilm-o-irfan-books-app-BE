@@ -7,7 +7,7 @@ This repo is the **Supabase** backend for Ilm o Irfan. PostgreSQL is the databas
 | Path | Purpose |
 | --- | --- |
 | `supabase/migrations/` | Production schema, RLS, storage buckets, admin CMS, search |
-| `supabase/functions/` | Full app/admin API (**58** Edge Functions): catalog, library, PDF, webhook, admin |
+| `supabase/functions/` | Full app/admin API (**67** Edge Functions): catalog, library, carousel, trending, recommendations, PDF, webhook, admin |
 | `supabase/seed.sql` | Baseline categories, subscription plan, local-only test users |
 | `sql/pgadmin/` | Same schema/seed for running in pgAdmin Query Tool |
 | `.env.example` | Keys / connection placeholders (paywall bypass defaults **off**) |
@@ -336,14 +336,15 @@ Upload cover and PDF files in Dashboard → Storage using the paths stored on ea
 PDFs are only served via **`get-signed-pdf`**. A signed-in user can open a book on exactly these conditions:
 
 - they are an **admin** (`profiles.role` / JWT `app_metadata.app_role`)
-- the book is **free** (`is_premium = false`) and published
-- the book is **premium** and they have an **active entitlement** (`status = 'active'` and unexpired)
+- the book is **published** and `entitlement_has_access(status, expires_at)` is true
+  (same as `canAccessPremium` — not `status = 'active'` alone)
 
 Anyone else gets `403 PREMIUM_REQUIRED`. Admins may also preview unpublished drafts.
 
 There is no override — no environment flag and no product switch — so nothing
-needs turning off before a release. To let someone read a premium book without
-paying, give them an entitlement.
+needs turning off before a release. To let someone read without paying, give them
+an entitlement (promo / admin-set). The catalogue is subscription-only; `is_premium`
+is a label/filter only.
 
 ### Promote the first admin
 

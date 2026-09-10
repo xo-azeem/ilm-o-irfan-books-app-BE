@@ -103,7 +103,7 @@ You are choosing **Supabase, which uses PostgreSQL** — not “Postgres or Supa
 | Continue reading / save progress | App → PostgreSQL `reading_progress` (+ optional MMKV mirror) |
 | Wishlist | App → PostgreSQL `wishlist` |
 | Buy Premium | App → **RevenueCat** → Store billing → RevenueCat webhook → **Edge Function** → PostgreSQL `entitlements` |
-| Download / open PDF | App → **Edge Function** (auth + entitlement, or admin / free-PDF flag) → **Storage** signed URL → download to **device FS** → `react-native-pdf` |
+| Download / open PDF | App → **Edge Function** (auth + entitlement, or admin) → **Storage** signed URL → download to **device FS** → `react-native-pdf` |
 | Show subscription status | App → PostgreSQL `entitlements` (+ RevenueCat SDK for paywall UI) |
 | Theme / offline prefs | **MMKV** only |
 
@@ -621,9 +621,10 @@ At this stage, optimize PDF size and ensure clients don’t re-download existing
 - [x] PostgreSQL schema (catalog, users, library, plans, entitlements)  
 - [~] Supabase Auth (email ready; Google requires Dashboard + OAuth client setup)  
 - [x] Supabase Storage (`covers`, `pdfs`, `avatars`)  
-- [x] Edge Functions — **58** on current branch: catalog, library, signed PDF, RevenueCat webhook, and a
-  complete admin CMS (books, authors, categories, collections, plans, users, entitlements,
-  storage, audit log). Inventory: `supabase/functions/_shared/endpoint-manifest.ts`  
+- [x] Edge Functions — **67** on current branch: catalog, library, carousel, trending,
+  recommendations, signed PDF, RevenueCat webhook, and a complete admin CMS (books, authors,
+  categories, collections, plans, users, entitlements, carousel, storage, audit log).
+  Inventory: `supabase/functions/_shared/endpoint-manifest.ts`  
 - [x] RLS on all user tables  
 - [x] CI: contract checks, secret scan, typecheck, lint, unit tests  
 - [x] Runbooks (`docs/runbooks/`) and env matrix (`docs/ops/env-matrix.md`)  

@@ -28,7 +28,7 @@ That runs: **link → db push → optional seed → functions deploy → secrets
 CI equivalent (manual only): Actions → **Deploy hosted (staging)** — needs repo secrets listed in [`env-matrix.md`](./env-matrix.md).
 
 - [ ] `npm run deploy:hosted` exited 0
-- [ ] `npx supabase functions list` shows all **58** functions
+- [ ] `npx supabase functions list` shows all **67** functions
 
 Manual A–D below is the same work if you prefer step-by-step.
 
