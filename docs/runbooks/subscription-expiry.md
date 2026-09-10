@@ -99,14 +99,19 @@ select cron.schedule(
 );
 ```
 
-Recent runs and failures:
+Recent runs and failures. `cron.job_run_details` keys on `jobid`, **not** `jobname` — it
+has no such column, so join `cron.job`:
 
 ```sql
-select start_time, status, return_message
-from cron.job_run_details
-where jobname = 'expire-lapsed-entitlements'
-order by start_time desc limit 20;
+select d.start_time, d.status, d.return_message
+from cron.job_run_details d
+join cron.job j on j.jobid = d.jobid
+where j.jobname = 'expire-lapsed-entitlements'
+order by d.start_time desc limit 20;
 ```
+
+`return_message` reads `1 row` when it locked one subscription, `0 rows` when there was
+nothing to do — which is the normal steady state.
 
 Run it by hand — safe, idempotent, returns the number of rows it locked:
 
@@ -116,24 +121,61 @@ select public.expire_lapsed_entitlements();
 
 ## Is the live channel working?
 
+Delivery is **Postgres Changes on `public.access_events`**, not Realtime Broadcast. See
+"Why not Broadcast" below before trying to fix it the other way.
+
 ```sql
--- Should exist, or every private broadcast is undeliverable to every client.
+-- The table must be published, or nothing is delivered to anyone.
+select schemaname, tablename from pg_publication_tables
+where pubname = 'supabase_realtime' and tablename = 'access_events';
+
+-- And readable, or the subscription is authorised away to nothing.
 select policyname from pg_policies
-where schemaname = 'realtime' and tablename = 'messages';
+where schemaname = 'public' and tablename = 'access_events';
 ```
 
-Expect `entitlement_topic_select_own`. `realtime.messages` ships with RLS **on and no
-policies**, so if this policy is ever dropped, the symptom is silent: broadcasts are
-written, nobody receives them, and readers only lock on their own timer.
-
-Watch a broadcast land:
+Expect one publication row and `access_events_select_own`. Watch events land:
 
 ```sql
-select topic, event, payload->>'canAccessPremium', inserted_at
-from realtime.messages order by inserted_at desc limit 10;
+select user_id, can_access_premium, reason, created_at
+from public.access_events order by id desc limit 10;
 ```
 
-`realtime.messages` is a rolling buffer — absence of old rows is normal.
+If entitlements are changing but no rows appear here, the trigger is the problem:
+
+```sql
+select tgname from pg_trigger
+where tgrelid = 'public.entitlements'::regclass and not tgisinternal;
+```
+
+Expect `entitlements_broadcast_write` and `entitlements_broadcast_update`.
+
+### Why not Broadcast
+
+The original design used `realtime.send()` to a private per-reader topic. It is the
+better-scaling shape and the call is still in the trigger, but it is **undeliverable on
+the hosted project** and fails silently:
+
+- `realtime.messages` is RANGE partitioned on `inserted_at`.
+- The hosted project has **zero partitions**.
+- `realtime.send()` wraps its INSERT in `exception when others then raise warning`.
+
+So the insert fails with `WarnSendingBroadcastMessage: no partition of relation
+"messages" found for row`, the entitlement write still commits, and the device is never
+told. Nothing surfaces as an error.
+
+We cannot create the partitions: the `postgres` role is not a superuser, not a member of
+`supabase_realtime_admin`, and holds no `CREATE` on the `realtime` schema. That belongs to
+Supabase's Realtime service.
+
+If partitions ever appear on this project, the broadcast starts working on its own with no
+migration. Check with:
+
+```sql
+select c.relname from pg_class c
+join pg_inherits i on i.inhrelid = c.oid
+where i.inhparent = 'realtime.messages'::regclass;
+```
 
 ## Containment
 

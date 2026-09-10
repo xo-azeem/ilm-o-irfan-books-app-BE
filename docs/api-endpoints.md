@@ -225,10 +225,28 @@ be recalled, so one issued ten seconds before expiry must not stay valid for fiv
 
 ### The live channel
 
-Private Realtime topic `entitlement:<user_id>`, event `entitlement_changed`, payload
-identical to the `entitlements-status` body minus `entitlement`. RLS on
-`realtime.messages` pins a reader to their own topic and grants no INSERT, so a device can
-neither eavesdrop nor forge itself an unlock.
+**Postgres Changes** on `public.access_events`, INSERT only, filtered
+`user_id=eq.<user_id>`. Each row carries the same computed answer as the
+`entitlements-status` body (in snake_case): `can_access_premium`, `is_active`, `is_admin`,
+`status`, `expires_at`, `reason`, `seconds_remaining`, `server_time`.
+
+RLS scopes the table to the reader's own rows, `anon` has no grant at all, and no
+INSERT/UPDATE/DELETE policy exists — so a device can neither eavesdrop nor forge itself an
+unlock. The table deliberately carries no billing internals: `entitlements.raw_event` is
+the entire RevenueCat payload, and Postgres Changes ships whole rows to the device.
+
+Clients should read the subscription shape from `entitlements-status.realtime` rather than
+hardcoding it.
+
+> **Why not Realtime Broadcast.** The original design used `realtime.send()` to a private
+> per-reader topic, which scales better. It is undeliverable on the hosted project:
+> `realtime.messages` is partitioned by day, the project has **no partitions**, and
+> `realtime.send()` downgrades the resulting insert failure to a warning — so every
+> message vanished silently while the entitlement write still committed. Creating
+> partitions requires privileges on the `realtime` schema that the `postgres` role does not
+> have. The broadcast call remains in the trigger and resumes working by itself if
+> partitions ever appear. See
+> [runbooks/subscription-expiry.md](./runbooks/subscription-expiry.md#why-not-broadcast).
 
 `entitlements-status` reports:
 
@@ -244,8 +262,9 @@ neither eavesdrop nor forge itself an unlock.
     "secondsRemaining": null,   // null when expiresAt is null; never negative
     "reason": "admin",          // why, so the paywall can say something useful
     "serverTime": "2026-09-09T12:00:00Z",   // client clock-skew correction
-    "realtime": { "channel": "entitlement:<user_id>",
-                  "event": "entitlement_changed", "private": true } } }
+    "realtime": { "mode": "postgres_changes", "channel": "access:<user_id>",
+                  "schema": "public", "table": "access_events", "event": "INSERT",
+                  "filter": "user_id=eq.<user_id>" } } }
 ```
 
 Gating on `isActive` alone would show an admin a locked button on a file the backend would

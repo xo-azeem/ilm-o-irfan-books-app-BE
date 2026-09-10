@@ -10,7 +10,14 @@
 
 import { requireMethod, requireUser } from '../_shared/auth.ts'
 import { failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
-import { entitlementChannel, ENTITLEMENT_EVENT, type AccessState } from '../_shared/entitlement.ts'
+import {
+  ACCESS_EVENTS_EVENT,
+  ACCESS_EVENTS_SCHEMA,
+  ACCESS_EVENTS_TABLE,
+  accessChannel,
+  accessFilter,
+  type AccessState,
+} from '../_shared/entitlement.ts'
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)
@@ -91,12 +98,21 @@ Deno.serve(async (req) => {
       // whose clock is dragged backwards earns itself free reading time.
       serverTime: state.serverTime,
 
-      // Named here so the client does not hardcode the topic convention. If
-      // the channel is ever renamed, apps already in the field follow.
+      // Named here so the client does not hardcode the subscription. If the
+      // delivery mechanism is ever changed again, apps already in the field
+      // follow without a release.
+      //
+      // Postgres Changes rather than Broadcast: realtime.messages has no
+      // partitions on the hosted project, so realtime.send() drops every
+      // message with a warning and the device is never told. See
+      // _shared/entitlement.ts.
       realtime: {
-        channel: entitlementChannel(ctx.user.id),
-        event: ENTITLEMENT_EVENT,
-        private: true,
+        mode: 'postgres_changes',
+        channel: accessChannel(ctx.user.id),
+        schema: ACCESS_EVENTS_SCHEMA,
+        table: ACCESS_EVENTS_TABLE,
+        event: ACCESS_EVENTS_EVENT,
+        filter: accessFilter(ctx.user.id),
       },
     })
   } catch (error) {

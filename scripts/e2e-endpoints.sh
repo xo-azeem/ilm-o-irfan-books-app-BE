@@ -224,37 +224,42 @@ has "...and entitlements-status agrees" \
   "$(curl -s "$B/entitlements-status" "${A[@]}")" '"canAccessPremium":false'
 
 echo
-echo "== subscription lifecycle: the sweep and the broadcast =="
-psqlq "delete from realtime.messages;" >/dev/null
+echo "== subscription lifecycle: the sweep and the live channel =="
+# Delivery is Postgres Changes on public.access_events, not Realtime Broadcast:
+# realtime.messages is partitioned by day, the hosted project has no partitions,
+# and realtime.send() downgrades that failure to a warning - so every broadcast
+# is silently dropped. access_events is a table we own and can prove.
+EV="select count(*) from public.access_events where user_id=(select id from public.profiles where email='$EMAIL');"
+NEWEST="select row_to_json(t)::text from (select can_access_premium, reason, status from public.access_events where user_id=(select id from public.profiles where email='$EMAIL') order by id desc limit 1) t;"
+psqlq "delete from public.access_events;" >/dev/null
 is "sweep flips exactly the lapsed row" "$(psqlq "select public.expire_lapsed_entitlements();" | tr -d ' ')" "1"
 is "status is now expired" \
   "$(psqlq "select status from public.entitlements where user_id=(select id from public.profiles where email='$EMAIL');" | tr -d ' ')" "expired"
 is "sweep is idempotent" "$(psqlq "select public.expire_lapsed_entitlements();" | tr -d ' ')" "0"
-is "one broadcast, on the reader's own private topic" \
-  "$(psqlq "select count(*) from realtime.messages where topic='entitlement:'||(select id from public.profiles where email='$EMAIL') and private and extension='broadcast';" | tr -d ' ')" "1"
-has "broadcast carries the lock, not a row diff" \
-  "$(psqlq "select payload::text from realtime.messages limit 1;")" '"canAccessPremium": false'
-has "broadcast names the reason" \
-  "$(psqlq "select payload::text from realtime.messages limit 1;")" '"reason": "expired"'
-# A device must not be able to talk itself back in.
-case "$(psqlq "select payload::text from realtime.messages limit 1;")" in
-  *raw_event*|*store*) no "broadcast does not leak billing internals" "absent" "present";;
-  *) ok "broadcast does not leak billing internals";;
-esac
+is "exactly one event, for this reader only" "$(psqlq "$EV" | tr -d ' ')" "1"
+has "event carries the lock" "$(psqlq "$NEWEST")" '"can_access_premium":false'
+has "event names the reason"  "$(psqlq "$NEWEST")" '"reason":"expired"'
+is "access_events is published for Realtime" \
+  "$(psqlq "select count(*) from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='access_events';" | tr -d ' ')" "1"
+# The whole reason for a separate table: entitlements.raw_event is the entire
+# RevenueCat payload, and Postgres Changes ships whole rows to the device.
+is "channel table carries no billing internals" \
+  "$(psqlq "select count(*) from information_schema.columns where table_schema='public' and table_name='access_events' and column_name in ('raw_event','store','revenuecat_app_user_id','plan_id');" | tr -d ' ')" "0"
 
 # Renewal after the sweep already locked them: the row must move again, and
 # the sweep must not have poisoned the webhook ordering guard.
-psqlq "delete from realtime.messages;" >/dev/null
+psqlq "delete from public.access_events;" >/dev/null
 ent 'active' "now()+interval '30 days'"
-is "renewal broadcasts an unlock" \
-  "$(psqlq "select count(*) from realtime.messages;" | tr -d ' ')" "1"
-has "unlock says access is back" \
-  "$(psqlq "select payload::text from realtime.messages limit 1;")" '"canAccessPremium": true'
+is "renewal emits an unlock" "$(psqlq "$EV" | tr -d ' ')" "1"
+has "unlock says access is back" "$(psqlq "$NEWEST")" '"can_access_premium":true'
 has "renewal restores the gate" "$(gate)" 'signedUrl'
 # Noise must not wake every device the reader owns.
-psqlq "delete from realtime.messages;" >/dev/null
+psqlq "delete from public.access_events;" >/dev/null
 psqlq "update public.entitlements set raw_event='{\"noise\":true}'::jsonb where user_id=(select id from public.profiles where email='$EMAIL');" >/dev/null
-is "an irrelevant write broadcasts nothing" "$(psqlq "select count(*) from realtime.messages;" | tr -d ' ')" "0"
+is "an irrelevant write emits nothing" "$(psqlq "$EV" | tr -d ' ')" "0"
+# Retention: the table is append-only, so something must trim it.
+is "prune job is scheduled" \
+  "$(psqlq "select count(*) from cron.job where jobname='prune-access-events';" | tr -d ' ')" "1"
 # A lifetime / promotional comp has no end date and must never be swept.
 ent 'active' 'null'
 is "lifetime comp is never swept" "$(psqlq "select public.expire_lapsed_entitlements();" | tr -d ' ')" "0"
@@ -269,8 +274,9 @@ has "expiresAt"          "$ES" '"expiresAt"'
 has "secondsRemaining"   "$ES" '"secondsRemaining"'
 has "reason"             "$ES" '"reason":"active"'
 has "serverTime for clock-skew correction" "$ES" '"serverTime"'
-has "the channel to subscribe to" "$ES" '"channel":"entitlement:'
-has "marked private"     "$ES" '"private":true'
+has "tells the app how to subscribe" "$ES" '"mode":"postgres_changes"'
+has "names the channel table"       "$ES" '"table":"access_events"'
+has "scoped to this reader"         "$ES" '"filter":"user_id=eq.'
 
 echo
 echo "== recommendations =="

@@ -182,8 +182,9 @@ Email comes from Auth, not metadata. After admin promote, force re-login so JWT 
     "reason": "active",
     "serverTime": "2026-09-09T12:00:00Z",  // for clock-skew correction
 
-    "realtime": { "channel": "entitlement:<user_id>",
-                  "event": "entitlement_changed", "private": true } } }
+    "realtime": { "mode": "postgres_changes", "channel": "access:<user_id>",
+                  "schema": "public", "table": "access_events", "event": "INSERT",
+                  "filter": "user_id=eq.<user_id>" } } }
 ```
 
 `reason` tells the paywall what to say. `active` · `trial` · `cancelled_paid_through` ·
@@ -235,18 +236,39 @@ next request happens to go out. Three layers make that true, and the app owns on
 mechanism, turning off wifi one second before expiry would buy unlimited reading — and
 that is the one thing this whole feature exists to prevent.
 
-Subscribe to the **private** channel named in `entitlements-status.realtime.channel`. Its
-payload is the same shape as the `entitlements-status` body (minus `entitlement`), so one
-reducer handles both:
+Subscribe using the `realtime` block from `entitlements-status` — **Postgres Changes on
+`public.access_events`**, filtered to this reader:
 
-```jsonc
-{ "userId": "...", "status": "expired", "expiresAt": "...", "isActive": false,
-  "isAdmin": false, "canAccessPremium": false, "reason": "expired",
-  "serverTime": "...", "secondsRemaining": 0 }
+```ts
+const rt = state.realtime   // { mode, channel, schema, table, event, filter }
+
+supabase
+  .channel(rt.channel)
+  .on('postgres_changes',
+      { event: rt.event, schema: rt.schema, table: rt.table, filter: rt.filter },
+      ({ new: row }) => applyAccessState(row))
+  .subscribe()
 ```
 
-The channel is read-only and scoped to one reader by RLS. A device cannot broadcast itself
-an unlock, and cannot join another reader's topic. It carries no billing internals.
+Each row is the computed answer, in snake_case:
+
+```jsonc
+{ "user_id": "...", "can_access_premium": false, "is_active": false,
+  "is_admin": false, "status": "expired", "expires_at": null,
+  "reason": "expired", "seconds_remaining": 0, "server_time": "...",
+  "created_at": "..." }
+```
+
+Same fields as the `entitlements-status` body, so one reducer handles both — just note
+this side is snake_case while `entitlements-status` is camelCase.
+
+The table is **read-only and RLS-scoped to one reader**: another reader's rows are
+invisible, `anon` is refused outright, and a device cannot insert itself an unlock. It
+carries no billing internals — no `raw_event`, no `store`, no plan ids.
+
+Take the whole subscription shape from the `realtime` block rather than hardcoding it. The
+delivery mechanism has already changed once and the block exists so apps in the field
+follow without a release.
 
 Rules that matter:
 

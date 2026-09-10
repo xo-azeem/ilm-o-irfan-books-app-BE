@@ -31,9 +31,35 @@ export type AccessState = {
   secondsRemaining: number | null
 }
 
-// One private Realtime topic per reader. The RLS policy on realtime.messages
-// pins a reader to exactly this string, so both ends must build it the same
-// way - hence one function rather than two template literals.
+// How a reader is told their access changed.
+//
+// This is Postgres Changes on public.access_events, not Realtime Broadcast.
+// Broadcast is the better-scaling design and the code for it is still in the
+// trigger, but it is undeliverable on the hosted project: realtime.messages is
+// partitioned by day, that project has no partitions, and realtime.send()
+// downgrades the resulting failure to a warning - so every broadcast vanishes
+// silently. Creating partitions needs privileges on the `realtime` schema that
+// the postgres role does not have.
+//
+// access_events is a table we own, carries the same computed payload, and is
+// filtered to one reader by RLS.
+export const ACCESS_EVENTS_TABLE = 'access_events'
+export const ACCESS_EVENTS_SCHEMA = 'public'
+export const ACCESS_EVENTS_EVENT = 'INSERT'
+
+// The channel name is the client's own label for the subscription; only the
+// filter decides what arrives. Naming it per reader keeps two subscriptions in
+// one app from colliding.
+export function accessChannel(userId: string): string {
+  return `access:${userId}`
+}
+
+export function accessFilter(userId: string): string {
+  return `user_id=eq.${userId}`
+}
+
+// Dormant. Kept so the contract does not have to change again on the day
+// Supabase provisions partitions for this project.
 export function entitlementChannel(userId: string): string {
   return `entitlement:${userId}`
 }
