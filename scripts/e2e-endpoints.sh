@@ -94,6 +94,15 @@ is "collections-list 200" "$(code "$B/collections-list" "${P[@]}")" 200
 is "collection-books needs id" "$(code "$B/collection-books" "${P[@]}")" 400
 is "collection-books by slug" "$(code "$B/collection-books?slug=home-hero" "${P[@]}")" 200
 has "books-list coverUrl" "$(curl -s "$B/books-list" "${P[@]}")" '"coverUrl"'
+
+# json() defaults every response to `private, no-store`. That is right for user
+# data and wrong for the catalogue: it tells the CDN and the phone's own HTTP
+# cache to discard Home on every launch. A public endpoint that forgets
+# publicCache() is silently uncacheable, so each one is pinned here.
+hdr() { curl -s -D - -o /dev/null "$B/$1" "${P[@]}" | grep -i '^cache-control' | tr -d '\r'; }
+for e in home-feed "books-list?pageSize=2" "books-search?q=ma" "book-detail?id=$BOOK" categories-list collections-list "collection-books?slug=home-hero" plans-list carousel-list trending-weekly; do
+  has "public cache: ${e%%\?*}" "$(hdr "$e")" 'public, max-age='
+done
 has "book-detail no pdf_path" "$(curl -s "$B/book-detail?id=$BOOK" "${P[@]}")" '"coverUrl"'
 case "$(curl -s "$B/book-detail?id=$BOOK" "${P[@]}")" in *pdf_path*) no "pdf_path not leaked" "absent" "present";; *) ok "pdf_path not leaked";; esac
 is "plans-list 200"       "$(code "$B/plans-list" "${P[@]}")" 200
@@ -545,6 +554,15 @@ is  "unsupported type 400" "$(code -X POST "$B/avatar-upload-url" "${A[@]}" -d '
 
 echo
 echo "== RLS regression =="
+# 20260911150000 tried to hide raw_event with a column-level REVOKE while the
+# table-level SELECT stayed - which is a no-op in Postgres. Column grants are
+# the real fence; this proves the column is actually gone from the wire.
+is "raw_event not readable over PostgREST" \
+  "$(code "http://127.0.0.1:54321/rest/v1/entitlements?select=raw_event" "${A[@]}")" 403
+is "revenuecat ids not readable over PostgREST" \
+  "$(code "http://127.0.0.1:54321/rest/v1/entitlements?select=revenuecat_app_user_id,last_revenuecat_event_id" "${A[@]}")" 403
+has "safe entitlement columns still readable" \
+  "$(curl -s "http://127.0.0.1:54321/rest/v1/entitlements?select=status,expires_at,store" "${A[@]}")" '"status"'
 # Each of these is a rule the app depends on. A failure here is a data breach,
 # not a bug.
 is "anon cannot read unpublished books" \

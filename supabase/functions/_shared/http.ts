@@ -55,11 +55,19 @@ export function ok(
 
 // Cache-Control for a response the whole audience shares.
 //
-// Only for genuinely public, non-personalised payloads: the carousel and the
-// weekly trending draw, which are the same bytes for every caller until an
-// admin edits them or the week rolls over. `stale-while-revalidate` is what
-// keeps a Monday-morning cache expiry from turning into a thundering herd on
-// the database.
+// Only for genuinely public, non-personalised payloads - the catalogue, the
+// carousel, the weekly draw - which are the same bytes for every caller until
+// an admin edits them. Never for anything read with a user JWT.
+//
+// This matters more than it looks: json() defaults every response to
+// `private, no-store`, which is right for user data but tells the CDN and the
+// phone's own HTTP cache to throw the catalogue away on every screen. A public
+// endpoint that forgets this helper is silently uncacheable.
+//
+// `stale-while-revalidate` is what keeps a cache expiry from turning into a
+// thundering herd on the database.
+export const CATALOGUE_CACHE_SECONDS = 60
+export const REFERENCE_CACHE_SECONDS = 300
 export function publicCache(maxAgeSeconds: number): Record<string, string> {
   const swr = Math.max(60, Math.floor(maxAgeSeconds / 2))
   return {
@@ -80,8 +88,11 @@ export function fail(
 // Paginated list response. The envelope already carries `data`, so it is
 // serialised as-is rather than nested under another `data` key.
 // Extra keys (e.g. collection meta on collection-books) are allowed.
-export function list(envelope: { data: unknown[] } & Record<string, unknown>): Response {
-  return json(envelope)
+export function list(
+  envelope: { data: unknown[] } & Record<string, unknown>,
+  extraHeaders: Record<string, string> = {},
+): Response {
+  return json(envelope, 200, extraHeaders)
 }
 
 // Preflight. Returns null when the request is not an OPTIONS probe.

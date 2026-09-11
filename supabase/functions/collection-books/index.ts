@@ -1,6 +1,14 @@
 import { anonClient, requireMethod } from '../_shared/auth.ts'
 import { withCoverUrl, type WithCoverUrl } from '../_shared/covers.ts'
-import { fail, failFromDbError, handleError, handleOptions, list } from '../_shared/http.ts'
+import {
+  CATALOGUE_CACHE_SECONDS,
+  fail,
+  failFromDbError,
+  handleError,
+  handleOptions,
+  list,
+  publicCache,
+} from '../_shared/http.ts'
 import { isRangeNotSatisfiable, paginate, rangeFromRequest } from '../_shared/pagination.ts'
 import { asUuid } from '../_shared/payload.ts'
 
@@ -81,7 +89,7 @@ Deno.serve(async (req) => {
         return list({
           ...paginate([], count ?? null, page, pageSize),
           collection: collectionMeta,
-        })
+        }, publicCache(CATALOGUE_CACHE_SECONDS))
       }
 
       return failFromDbError(
@@ -98,7 +106,7 @@ Deno.serve(async (req) => {
       return list({
         ...paginate([], count ?? 0, page, pageSize),
         collection: collectionMeta,
-      })
+      }, publicCache(CATALOGUE_CACHE_SECONDS))
     }
 
     const { data: books, error: booksError } = await supabase
@@ -130,7 +138,7 @@ Deno.serve(async (req) => {
     return list({
       ...paginate(ordered, totalCount, page, pageSize),
       collection: collectionMeta,
-    })
+    }, publicCache(CATALOGUE_CACHE_SECONDS))
   } catch (error) {
     return handleError('collection-books', error)
   }

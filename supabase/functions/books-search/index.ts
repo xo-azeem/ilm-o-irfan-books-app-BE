@@ -1,7 +1,7 @@
 import { anonClient, requireMethod } from '../_shared/auth.ts'
 import { catalogArgsFromRequest, splitCatalogRows } from '../_shared/catalog-filters.ts'
 import { withCoverUrls } from '../_shared/covers.ts'
-import { handleError, handleOptions, list } from '../_shared/http.ts'
+import { handleError, handleOptions, list, publicCache, CATALOGUE_CACHE_SECONDS } from '../_shared/http.ts'
 import { paginate, rangeFromRequest } from '../_shared/pagination.ts'
 import { failFromRpcError } from '../_shared/rpc.ts'
 
@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
     // to books-list the moment the field is cleared, and returning the whole
     // catalogue here would change that contract underneath it.
     if (!query) {
-      return list(paginate([], 0, page, pageSize))
+      return list(paginate([], 0, page, pageSize), publicCache(CATALOGUE_CACHE_SECONDS))
     }
 
     // Same function as books-list, so `category`, `premium`, `minRating`,
@@ -38,7 +38,10 @@ Deno.serve(async (req) => {
 
     const { items, totalCount } = splitCatalogRows(data ?? [])
 
-    return list(paginate(withCoverUrls(items), totalCount, page, pageSize))
+    return list(
+      paginate(withCoverUrls(items), totalCount, page, pageSize),
+      publicCache(CATALOGUE_CACHE_SECONDS),
+    )
   } catch (error) {
     return handleError('books-search', error)
   }

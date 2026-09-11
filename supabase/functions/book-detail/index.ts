@@ -1,6 +1,6 @@
 import { anonClient, requireMethod } from '../_shared/auth.ts'
 import { withCoverUrl } from '../_shared/covers.ts'
-import { fail, failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
+import { fail, failFromDbError, handleError, handleOptions, ok, publicCache, CATALOGUE_CACHE_SECONDS } from '../_shared/http.ts'
 import { asUuid } from '../_shared/payload.ts'
 
 Deno.serve(async (req) => {
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
       return fail('NOT_FOUND', 'Book not found', 404)
     }
 
-    return ok(withCoverUrl(book as Record<string, unknown>))
+    return ok(withCoverUrl(book as Record<string, unknown>), 200, publicCache(CATALOGUE_CACHE_SECONDS))
   } catch (error) {
     return handleError('book-detail', error)
   }

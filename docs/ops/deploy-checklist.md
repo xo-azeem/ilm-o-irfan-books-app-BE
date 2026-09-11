@@ -167,6 +167,43 @@ select code, is_active from public.plans;
 
 ---
 
+## H2. Keep-warm pinger (per project, once)
+
+Edge Functions cold-start at ~1.5s after a few minutes idle. A pg_cron job
+(`warm-edge-functions`, every 3 min) fires async `pg_net` GETs at the launch-path
+functions so readers get the ~0.3s warm path. It is a **no-op until the project's URL and
+anon key are in `private.runtime_config`** — the migration deliberately does not hardcode
+them, so every new project needs this once:
+
+```sql
+insert into private.runtime_config (key, value) values
+  ('supabase_url', 'https://<ref>.supabase.co'),
+  ('anon_key',     '<anon key>')
+on conflict (key) do update set value = excluded.value, updated_at = timezone('utc', now());
+
+select private.warm_edge_functions();   -- fires 11 pings now; expect 11
+```
+
+The anon key is public (it ships in the app); the URL is what differs per environment.
+
+Verify it is landing (statuses `200`, `401`, `404`, `405` are all "the isolate booted"):
+
+```sql
+select count(*), string_agg(distinct status_code::text, ',')
+from net._http_response where created > now() - interval '5 minutes';
+```
+
+Cost: ~5,300 invocations/day (~160k/month against a 500k free tier). Off switch:
+
+```sql
+select cron.unschedule('warm-edge-functions');
+```
+
+- [ ] `runtime_config` seeded on this project
+- [ ] `select private.warm_edge_functions()` returned 11
+
+---
+
 ## I. Private ops note (offline / password manager)
 
 - Staging + production project refs

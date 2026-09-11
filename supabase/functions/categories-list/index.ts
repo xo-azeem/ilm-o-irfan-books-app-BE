@@ -1,5 +1,5 @@
 import { anonClient, requireMethod } from '../_shared/auth.ts'
-import { failFromDbError, handleError, handleOptions, list } from '../_shared/http.ts'
+import { failFromDbError, handleError, handleOptions, list, publicCache, REFERENCE_CACHE_SECONDS } from '../_shared/http.ts'
 import { isRangeNotSatisfiable, paginate, rangeFromRequest } from '../_shared/pagination.ts'
 
 Deno.serve(async (req) => {
@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
       // The last call of a "load more" loop asks for a page that starts past
       // the end. That is an empty page, not a failure.
       if (isRangeNotSatisfiable(error)) {
-        return list(paginate([], count ?? null, page, pageSize))
+        return list(paginate([], count ?? null, page, pageSize), publicCache(REFERENCE_CACHE_SECONDS))
       }
 
       return failFromDbError(
@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    return list(paginate(data ?? [], count ?? null, page, pageSize))
+    return list(paginate(data ?? [], count ?? null, page, pageSize), publicCache(REFERENCE_CACHE_SECONDS))
   } catch (error) {
     return handleError('categories-list', error)
   }

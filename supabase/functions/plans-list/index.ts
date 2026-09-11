@@ -1,5 +1,5 @@
 import { anonClient, requireMethod } from '../_shared/auth.ts'
-import { failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
+import { failFromDbError, handleError, handleOptions, ok, publicCache, REFERENCE_CACHE_SECONDS } from '../_shared/http.ts'
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)
@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
       return failFromDbError('plans-list', 'PLANS_READ_FAILED', 'Unable to load plans', error)
     }
 
-    return ok(data ?? [])
+    return ok(data ?? [], 200, publicCache(REFERENCE_CACHE_SECONDS))
   } catch (error) {
     return handleError('plans-list', error)
   }

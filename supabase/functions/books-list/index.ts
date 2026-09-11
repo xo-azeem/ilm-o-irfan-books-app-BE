@@ -1,7 +1,7 @@
 import { anonClient, requireMethod } from '../_shared/auth.ts'
 import { catalogArgsFromRequest, splitCatalogRows } from '../_shared/catalog-filters.ts'
 import { withCoverUrls } from '../_shared/covers.ts'
-import { handleError, handleOptions, list } from '../_shared/http.ts'
+import { handleError, handleOptions, list, publicCache, CATALOGUE_CACHE_SECONDS } from '../_shared/http.ts'
 import { paginate, rangeFromRequest } from '../_shared/pagination.ts'
 import { failFromRpcError } from '../_shared/rpc.ts'
 
@@ -39,7 +39,10 @@ Deno.serve(async (req) => {
     // the last call of every load-more loop. The RPC returns no rows rather
     // than the PGRST103 that a PostgREST .range() would, so there is nothing
     // to special-case here.
-    return list(paginate(withCoverUrls(items), totalCount, page, pageSize))
+    return list(
+      paginate(withCoverUrls(items), totalCount, page, pageSize),
+      publicCache(CATALOGUE_CACHE_SECONDS),
+    )
   } catch (error) {
     return handleError('books-list', error)
   }

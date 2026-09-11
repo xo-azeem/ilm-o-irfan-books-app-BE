@@ -91,8 +91,9 @@ Deno.serve(async (req) => {
       )
     }
 
-    // The JWT claim still stands on its own so a real admin is not locked out
-    // by a profiles read that went wrong.
+    // profiles.role is the only admin authority. The JWT app_role claim is
+    // deliberately not consulted: a demoted admin keeps a stale claim until
+    // their token refreshes, and that window was long enough to read drafts.
     const isAdmin = state.isAdmin
 
     const book = bookRes.data
