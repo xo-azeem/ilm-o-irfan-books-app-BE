@@ -188,19 +188,27 @@ try {
   unlinkSync(secretsFile)
 }
 
-const unset = runQuiet([
+const unsetDangerous = runQuiet([
   'supabase',
   'secrets',
   'unset',
+  'DATABASE_URL',
+  'PGDATABASE',
+  'PGHOST',
+  'PGPASSWORD',
+  'PGPORT',
+  'PGUSER',
   'ALLOW_PDF_WITHOUT_ENTITLEMENT',
   '--project-ref',
   ref,
 ])
-if (unset.status === 0) {
-  console.log('\n== unset ALLOW_PDF_WITHOUT_ENTITLEMENT (if it existed) ==')
+if (unsetDangerous.status === 0) {
+  console.log(
+    '\n== unset local-tooling / dead secrets from Edge (DATABASE_URL, PG*, ALLOW_PDF) ==',
+  )
 } else {
   console.log(
-    '\n== ALLOW_PDF_WITHOUT_ENTITLEMENT unset skipped (absent or not supported) ==',
+    '\n== Edge secret cleanup skipped (absent or not supported) ==',
   )
 }
 

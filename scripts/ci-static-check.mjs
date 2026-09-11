@@ -207,13 +207,32 @@ if (sortedTimestamps.join() !== migTimestamps.join()) {
 console.log('== HTTP contract ==')
 
 // Exempt: signed-pdf answers 410 to everything on purpose.
+// revenuecat-webhook is server-to-server only (no CORS / handleOptions).
 const METHOD_EXEMPT = new Set(['signed-pdf'])
+const NO_CORS_WEBHOOKS = new Set(['revenuecat-webhook'])
 
 for (const name of dirs) {
   const source = readFileSync(join(FUNCTIONS_DIR, name, 'index.ts'), 'utf8')
 
   if (METHOD_EXEMPT.has(name)) {
     ok(`${name} exempt from method enforcement (documented)`)
+    continue
+  }
+
+  if (NO_CORS_WEBHOOKS.has(name)) {
+    if (!/req\.method\s*!==\s*'POST'/.test(source) && !/requireMethod\(req,\s*\['POST'\]/.test(source)) {
+      no(`${name} does not enforce POST`)
+      continue
+    }
+    if (source.includes('handleOptions(req)')) {
+      no(`${name} should not answer browser CORS preflight`)
+      continue
+    }
+    if (!new RegExp(`(handleError|failUnexpected)\\('${name}'`).test(source)) {
+      no(`${name} has no catch-all error handler`)
+      continue
+    }
+    ok(`${name} enforces POST without CORS (server webhook)`)
     continue
   }
 
@@ -247,10 +266,14 @@ for (const entry of manifestEntries) {
   if (METHOD_EXEMPT.has(entry.name)) continue
 
   const source = readFileSync(join(FUNCTIONS_DIR, entry.name, 'index.ts'), 'utf8')
-  const allowed = [...source.matchAll(/requireMethod\(req,\s*\[([^\]]+)\]/g)]
+  let allowed = [...source.matchAll(/requireMethod\(req,\s*\[([^\]]+)\]/g)]
     .flatMap((m) => m[1].split(','))
     .map((s) => s.trim().replace(/'/g, ''))
     .filter(Boolean)
+
+  if (allowed.length === 0 && NO_CORS_WEBHOOKS.has(entry.name) && /req\.method\s*!==\s*'POST'/.test(source)) {
+    allowed = ['POST']
+  }
 
   if (!allowed.includes(entry.method)) {
     no(
@@ -258,6 +281,50 @@ for (const entry of manifestEntries) {
     )
   } else {
     ok(`${entry.name} ${entry.method}`)
+  }
+}
+
+console.log('== deploy secret allowlist + no PDF bypass ==')
+{
+  const deploySrc = readFileSync(join(ROOT, 'scripts', 'deploy-hosted.mjs'), 'utf8')
+  const allowed = ['REVENUECAT_WEBHOOK_AUTH', 'REVENUECAT_ENTITLEMENT_ID', 'SIGNED_PDF_EXPIRES_IN']
+  for (const key of allowed) {
+    if (!deploySrc.includes(key)) {
+      no(`deploy-hosted.mjs must set ${key}`)
+    } else {
+      ok(`deploy sets ${key}`)
+    }
+  }
+  if (/secrets\s+set[\s\S]*--env-file\s+['"]?\.env['"]?/.test(deploySrc)) {
+    no('deploy-hosted must not secrets-set the whole .env file')
+  } else {
+    ok('deploy does not push full .env as Edge secrets')
+  }
+  if (!deploySrc.includes('DATABASE_URL') || !deploySrc.includes('secrets') || !deploySrc.includes('unset')) {
+    // Prefer explicit unset of dangerous keys after deploy.
+  }
+  if (deploySrc.includes("'DATABASE_URL'") || deploySrc.includes('"DATABASE_URL"') || deploySrc.includes('DATABASE_URL,')) {
+    ok('deploy cleans DATABASE_URL from Edge secrets')
+  } else if (deploySrc.includes('DATABASE_URL')) {
+    ok('deploy references DATABASE_URL cleanup')
+  } else {
+    no('deploy-hosted should unset DATABASE_URL if it was ever pushed')
+  }
+
+  let allowPdfReads = 0
+  for (const file of walk(join(ROOT, 'supabase', 'functions'))) {
+    if (!file.endsWith('.ts')) continue
+    const src = readFileSync(file, 'utf8')
+    if (/ALLOW_PDF_WITHOUT_ENTITLEMENT|allow_pdf_without_entitlement/.test(src) && !src.includes('deliberately absent') && !src.includes('both gone')) {
+      // comments about removal are ok; live reads of Deno.env.get('ALLOW_PDF...') are not
+      if (/Deno\.env\.get\(\s*['"]ALLOW_PDF_WITHOUT_ENTITLEMENT['"]\s*\)/.test(src)) {
+        allowPdfReads += 1
+        no(`${relative(ROOT, file)} still reads ALLOW_PDF_WITHOUT_ENTITLEMENT`)
+      }
+    }
+  }
+  if (allowPdfReads === 0) {
+    ok('no Edge Function reads ALLOW_PDF_WITHOUT_ENTITLEMENT')
   }
 }
 

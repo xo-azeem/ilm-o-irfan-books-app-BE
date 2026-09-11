@@ -29,10 +29,16 @@ export function json(
   payload: unknown,
   status = 200,
   extraHeaders: Record<string, string> = {},
+  options: { cors?: boolean } = {},
 ): Response {
+  const useCors = options.cors !== false
   return new Response(JSON.stringify(payload), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json', ...extraHeaders },
+    headers: {
+      ...(useCors ? corsHeaders : {}),
+      'Content-Type': 'application/json',
+      ...extraHeaders,
+    },
   })
 }
 
@@ -40,8 +46,9 @@ export function ok(
   data: unknown,
   status = 200,
   extraHeaders: Record<string, string> = {},
+  options: { cors?: boolean } = {},
 ): Response {
-  return json({ data }, status, extraHeaders)
+  return json({ data }, status, extraHeaders, options)
 }
 
 // Cache-Control for a response the whole audience shares.
@@ -59,8 +66,13 @@ export function publicCache(maxAgeSeconds: number): Record<string, string> {
   }
 }
 
-export function fail(code: string, message: string, status: number): Response {
-  return json({ error: { code, message } }, status)
+export function fail(
+  code: string,
+  message: string,
+  status: number,
+  options: { cors?: boolean } = {},
+): Response {
+  return json({ error: { code, message } }, status, {}, options)
 }
 
 // Paginated list response. The envelope already carries `data`, so it is
@@ -86,16 +98,21 @@ export function failFromDbError(
   message: string,
   error: { message?: string; code?: string } | null,
   status = 500,
+  options: { cors?: boolean } = {},
 ): Response {
   console.error(`[${scope}]`, error?.code ?? '', error?.message ?? error)
-  return fail(code, message, status)
+  return fail(code, message, status, options)
 }
 
 // Single catch-all so an unexpected throw never leaks a stack or a raw driver
 // message to the app.
-export function failUnexpected(scope: string, error: unknown): Response {
+export function failUnexpected(
+  scope: string,
+  error: unknown,
+  options: { cors?: boolean } = {},
+): Response {
   console.error(`[${scope}] unexpected`, error)
-  return fail('UNEXPECTED_ERROR', 'Something went wrong. Please try again.', 500)
+  return fail('UNEXPECTED_ERROR', 'Something went wrong. Please try again.', 500, options)
 }
 
 // Thrown by validators so a handler can turn bad input into a 400 rather than
@@ -113,16 +130,42 @@ export class BadRequestError extends Error {
 // The tail of every handler. Bad input is the caller's fault (400); anything
 // else is ours (500, logged, nothing leaked). Written once so a handler cannot
 // forget the BadRequestError branch and turn a typo into a 500.
-export function handleError(scope: string, error: unknown): Response {
+export function handleError(
+  scope: string,
+  error: unknown,
+  options: { cors?: boolean } = {},
+): Response {
   if (error instanceof BadRequestError) {
-    return fail(error.code, error.message, 400)
+    return fail(error.code, error.message, 400, options)
   }
 
-  return failUnexpected(scope, error)
+  return failUnexpected(scope, error, options)
 }
 
-export async function readJsonBody(req: Request): Promise<Record<string, unknown>> {
-  const body = await req.json().catch(() => null)
+export async function readJsonBody(
+  req: Request,
+  options: { maxBytes?: number } = {},
+): Promise<Record<string, unknown>> {
+  const maxBytes = options.maxBytes ?? 256 * 1024
+  const contentLength = req.headers.get('content-length')
+  if (contentLength) {
+    const declared = Number(contentLength)
+    if (Number.isFinite(declared) && declared > maxBytes) {
+      throw new BadRequestError('Request body too large', 'PAYLOAD_TOO_LARGE')
+    }
+  }
+
+  const text = await req.text()
+  if (new TextEncoder().encode(text).byteLength > maxBytes) {
+    throw new BadRequestError('Request body too large', 'PAYLOAD_TOO_LARGE')
+  }
+
+  let body: unknown = null
+  try {
+    body = text ? JSON.parse(text) : null
+  } catch {
+    body = null
+  }
 
   if (body === null || typeof body !== 'object' || Array.isArray(body)) {
     return {}

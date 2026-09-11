@@ -99,6 +99,17 @@ Deno.test('readJsonBody returns an empty object rather than throwing on junk', a
   assertEquals(await readJsonBody(post('null')), {})
 })
 
+Deno.test('readJsonBody rejects oversized payloads', async () => {
+  const huge = 'x'.repeat(300 * 1024)
+  let threw = false
+  try {
+    await readJsonBody(post(huge), { maxBytes: 256 * 1024 })
+  } catch (error) {
+    threw = error instanceof BadRequestError && error.code === 'PAYLOAD_TOO_LARGE'
+  }
+  assertEquals(threw, true)
+})
+
 Deno.test('publicCache sets a shared cache directive with a revalidation window', () => {
   const headers = publicCache(900)
 

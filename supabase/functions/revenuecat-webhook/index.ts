@@ -1,13 +1,15 @@
 // Edge Function: revenuecat-webhook
 // Shared secret → validate event → idempotent ledger → order-safe entitlement upsert.
 // Clients never write entitlements.
+//
+// No CORS: RevenueCat is a server caller, not a browser.
 
-import { requireMethod, serviceClient } from '../_shared/auth.ts'
+import { serviceClient } from '../_shared/auth.ts'
+import { timingSafeEqualString } from '../_shared/crypto.ts'
 import {
   fail,
   failFromDbError,
   handleError,
-  handleOptions,
   ok,
   readJsonBody,
 } from '../_shared/http.ts'
@@ -22,32 +24,38 @@ import {
   type RcEvent,
 } from '../_shared/revenuecat.ts'
 
+const NO_CORS = { cors: false } as const
+const WEBHOOK_MAX_BYTES = 256 * 1024
+
 Deno.serve(async (req) => {
-  const preflight = handleOptions(req)
-  if (preflight) return preflight
+  // Reject browser preflight — this endpoint is not for browsers.
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 405 })
+  }
 
   try {
-    const notAllowed = requireMethod(req, ['POST'])
-    if (notAllowed) return notAllowed
+    if (req.method !== 'POST') {
+      return fail('METHOD_NOT_ALLOWED', 'Allowed: POST', 405, NO_CORS)
+    }
 
     const expectedAuth = Deno.env.get('REVENUECAT_WEBHOOK_AUTH')
     const entitlementId = Deno.env.get('REVENUECAT_ENTITLEMENT_ID') ?? 'premium'
 
     if (!expectedAuth) {
-      return fail('WEBHOOK_CONFIG_ERROR', 'Webhook authorization is not configured', 500)
+      return fail('WEBHOOK_CONFIG_ERROR', 'Webhook authorization is not configured', 500, NO_CORS)
     }
 
     const auth = req.headers.get('Authorization')
-    if (auth !== expectedAuth) {
-      return fail('WEBHOOK_AUTH_FAILED', 'Invalid webhook authorization', 401)
+    if (!timingSafeEqualString(auth, expectedAuth)) {
+      return fail('WEBHOOK_AUTH_FAILED', 'Invalid webhook authorization', 401, NO_CORS)
     }
 
-    const payload = await readJsonBody(req)
+    const payload = await readJsonBody(req, { maxBytes: WEBHOOK_MAX_BYTES })
     const event = (payload.event ?? payload) as RcEvent
 
     const eventIdRaw = typeof event.id === 'string' ? event.id.trim() : ''
     if (!eventIdRaw || !isUuid(eventIdRaw)) {
-      return fail('INVALID_WEBHOOK_EVENT', 'Missing or invalid event id', 400)
+      return fail('INVALID_WEBHOOK_EVENT', 'Missing or invalid event id', 400, NO_CORS)
     }
 
     const appUserId = typeof event.app_user_id === 'string' ? event.app_user_id.trim() : ''
@@ -56,18 +64,19 @@ Deno.serve(async (req) => {
         'INVALID_WEBHOOK_EVENT',
         'Missing or invalid app_user_id (must be Supabase Auth UUID)',
         400,
+        NO_CORS,
       )
     }
 
     const eventType = (event.type ?? '').toUpperCase()
     if (!eventType) {
-      return fail('INVALID_WEBHOOK_EVENT', 'Missing event type', 400)
+      return fail('INVALID_WEBHOOK_EVENT', 'Missing event type', 400, NO_CORS)
     }
 
     const eventTimestampMs = resolveEventTimestampMs(event)
 
     if (eventTimestampMs == null) {
-      return fail('INVALID_WEBHOOK_EVENT', 'Missing event_timestamp_ms', 400)
+      return fail('INVALID_WEBHOOK_EVENT', 'Missing event_timestamp_ms', 400, NO_CORS)
     }
 
     const eventTimestamp = new Date(eventTimestampMs).toISOString()
@@ -85,14 +94,19 @@ Deno.serve(async (req) => {
         'USER_LOOKUP_FAILED',
         'Unable to verify user',
         profileError,
+        500,
+        NO_CORS,
       )
     }
 
     if (!profile) {
-      return fail('USER_NOT_FOUND', 'No profile for app_user_id', 400)
+      return fail('USER_NOT_FOUND', 'No profile for app_user_id', 400, NO_CORS)
     }
 
-    // Idempotency ledger — unique event id. Duplicate → 200 without re-applying.
+    // Idempotency ledger — unique event id.
+    // If apply failed after a prior insert, RC retries hit 23505; we re-drive
+    // apply when entitlements.last_revenuecat_event_id is not yet this event.
+    let isDuplicateLedger = false
     const { error: insertEventError } = await admin.from('revenuecat_events').insert({
       id: eventIdRaw,
       user_id: appUserId,
@@ -103,22 +117,43 @@ Deno.serve(async (req) => {
 
     if (insertEventError) {
       if (insertEventError.code === '23505') {
-        return ok({ duplicate: true, eventId: eventIdRaw, userId: appUserId })
+        isDuplicateLedger = true
+        const { data: existing, error: existingError } = await admin
+          .from('entitlements')
+          .select('last_revenuecat_event_id')
+          .eq('user_id', appUserId)
+          .maybeSingle()
+
+        if (existingError) {
+          return failFromDbError(
+            'revenuecat-webhook',
+            'ENTITLEMENT_WRITE_FAILED',
+            'Unable to verify prior entitlement apply',
+            existingError,
+            500,
+            NO_CORS,
+          )
+        }
+
+        if (existing?.last_revenuecat_event_id === eventIdRaw) {
+          return ok({ duplicate: true, eventId: eventIdRaw, userId: appUserId }, 200, {}, NO_CORS)
+        }
+        // Fall through and re-apply — ledger row exists but entitlement never committed.
+      } else {
+        return failFromDbError(
+          'revenuecat-webhook',
+          'EVENT_LEDGER_WRITE_FAILED',
+          'Unable to record webhook event',
+          insertEventError,
+          500,
+          NO_CORS,
+        )
       }
-      return failFromDbError(
-        'revenuecat-webhook',
-        'EVENT_LEDGER_WRITE_FAILED',
-        'Unable to record webhook event',
-        insertEventError,
-      )
     }
 
     const hasPremiumEntitlement = grantsEntitlement(event, entitlementId)
-
     const status = mapStatus(eventType, hasPremiumEntitlement, event.expiration_at_ms)
 
-    // Prefer plans.revenuecat_product_id = event.product_id (App Store / Play SKU).
-    // Unknown or missing SKU → premium_monthly so a single-plan launch still applies.
     const planLookup = resolvePlanLookup(event.product_id)
     let plan: { id: string } | null = null
     let planError: { message?: string; code?: string } | null = null
@@ -149,6 +184,8 @@ Deno.serve(async (req) => {
         'PLAN_LOOKUP_FAILED',
         'Unable to load plan',
         planError,
+        500,
+        NO_CORS,
       )
     }
 
@@ -177,29 +214,43 @@ Deno.serve(async (req) => {
         'ENTITLEMENT_WRITE_FAILED',
         'Unable to update entitlement',
         applyError,
+        500,
+        NO_CORS,
       )
     }
 
     const applied = applyResult?.applied === true
     if (!applied) {
-      return ok({
-        stale: true,
-        ignored: true,
-        eventId: eventIdRaw,
-        userId: appUserId,
-        reason: applyResult?.reason ?? 'stale',
-      })
+      return ok(
+        {
+          stale: true,
+          ignored: true,
+          eventId: eventIdRaw,
+          userId: appUserId,
+          reason: applyResult?.reason ?? 'stale',
+          replayed: isDuplicateLedger,
+        },
+        200,
+        {},
+        NO_CORS,
+      )
     }
 
-    return ok({
-      eventId: eventIdRaw,
-      userId: appUserId,
-      status: applyResult?.status ?? status,
-      store: mapStore(event.store),
-      planId: plan?.id ?? null,
-      applied: true,
-    })
+    return ok(
+      {
+        eventId: eventIdRaw,
+        userId: appUserId,
+        status: applyResult?.status ?? status,
+        store: mapStore(event.store),
+        planId: plan?.id ?? null,
+        applied: true,
+        replayed: isDuplicateLedger,
+      },
+      200,
+      {},
+      NO_CORS,
+    )
   } catch (error) {
-    return handleError('revenuecat-webhook', error)
+    return handleError('revenuecat-webhook', error, NO_CORS)
   }
 })
