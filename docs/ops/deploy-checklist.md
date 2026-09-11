@@ -186,6 +186,13 @@ select private.warm_edge_functions();   -- fires 11 pings now; expect 11
 
 The anon key is public (it ships in the app); the URL is what differs per environment.
 
+**The pinger only warms the region it runs in** — Edge Functions are per-region isolates,
+and `pg_net` requests originate from the database host (`ap-southeast-1` on this project).
+A phone in Pakistan is routed to `ap-south-1` by default and sees no benefit. The app
+must send `x-region: ap-southeast-1` on every Edge Function call (see
+[mobile-contract.md](../mobile-contract.md)); measured cost ~30ms warm, gain ~1s cold.
+If the project is ever migrated to another region, that header value moves with it.
+
 Verify it is landing (statuses `200`, `401`, `404`, `405` are all "the isolate booted"):
 
 ```sql

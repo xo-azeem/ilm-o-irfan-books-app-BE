@@ -27,6 +27,29 @@ Every Edge Function returns one of:
 
 `plans-list` is the list exception: plain `{ "data": [ … ] }` (no page meta).
 
+### Send `x-region: ap-southeast-1` on every Edge Function call
+
+Edge Functions run as per-region isolates and cold-start at ~1.3–1.8s after a few
+minutes idle. The backend keeps the launch-path functions warm with a scheduled pinger —
+but that pinger runs from the database in Singapore (`ap-southeast-1`) and can only warm
+Singapore. A phone in Pakistan is routed to Mumbai (`ap-south-1`) by default, where
+nothing is warm.
+
+Pinning every request to `ap-southeast-1` costs ~30ms on a warm call (measured: 320ms vs
+350ms for `home-feed`) and removes the cold start entirely. Set it as a default header on
+the Edge Function client, not per call:
+
+```ts
+const fn = (path: string, init: RequestInit = {}) =>
+  fetch(`${SUPABASE_URL}/functions/v1/${path}`, {
+    ...init,
+    headers: { ...init.headers, 'x-region': 'ap-southeast-1', apikey: ANON_KEY },
+  })
+```
+
+This is also where the database lives, so a Singapore isolate reaches it locally instead
+of crossing from Mumbai on every query.
+
 ---
 
 ## Screen → route map
