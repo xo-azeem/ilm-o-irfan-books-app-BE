@@ -141,9 +141,10 @@ Deno.test('ok carries cache headers alongside the CORS ones', async () => {
   assertEquals(await response.json(), { data: { slides: [] } })
 })
 
-Deno.test('a response with no extra headers is unchanged', async () => {
+Deno.test('authenticated responses default to private no-store', async () => {
   const response = ok({ id: 1 })
 
-  assertEquals(response.headers.get('Cache-Control'), null)
+  assertEquals(response.headers.get('Cache-Control'), 'private, no-store')
+  assertEquals(response.headers.get('X-Content-Type-Options'), 'nosniff')
   assertEquals(await response.json(), { data: { id: 1 } })
 })

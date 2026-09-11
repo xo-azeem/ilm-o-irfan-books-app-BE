@@ -37,6 +37,8 @@ export function json(
     headers: {
       ...(useCors ? corsHeaders : {}),
       'Content-Type': 'application/json',
+      'X-Content-Type-Options': 'nosniff',
+      'Cache-Control': 'private, no-store',
       ...extraHeaders,
     },
   })

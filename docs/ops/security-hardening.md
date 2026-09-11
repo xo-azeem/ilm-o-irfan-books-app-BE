@@ -1,5 +1,14 @@
 # Security hardening notes (staging)
 
+## Screen capture (mobile app)
+
+| Platform | Behavior |
+| --- | --- |
+| **Android** | `FLAG_SECURE` on the main activity — blocks screenshots, recents thumbnails, and most screen recordings |
+| **iOS** | Full still-screenshot blocking is **not** available from Apple; the app blacks out the UI while `UIScreen.isCaptured` (AirPlay / screen recording) |
+
+Rebuild the native app after pulling FE changes.
+
 ## Edge Function secrets allowlist
 
 Only these should be set as **custom** Edge secrets (via `npm run deploy:hosted`):
