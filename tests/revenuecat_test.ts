@@ -65,11 +65,38 @@ Deno.test('store names are mapped onto the values the column accepts', () => {
   assertEquals(mapStore(null), 'unknown')
 })
 
-Deno.test('an account-wide event with no entitlement_ids counts as premium', () => {
-  assertEquals(grantsEntitlement({}, 'premium'), true)
-  assertEquals(grantsEntitlement({ entitlement_ids: [] }, 'premium'), true)
+Deno.test('an account-wide lifecycle event with no entitlement_ids counts as premium', () => {
+  assertEquals(
+    grantsEntitlement({ type: 'EXPIRATION', entitlement_ids: [] }, 'premium'),
+    true,
+  )
+  assertEquals(
+    grantsEntitlement({ type: 'CANCELLATION' }, 'premium'),
+    true,
+  )
   assertEquals(grantsEntitlement({ entitlement_ids: ['premium'] }, 'premium'), true)
   assertEquals(grantsEntitlement({ entitlement_ids: ['audio_only'] }, 'premium'), false)
+})
+
+Deno.test('purchase events without entitlement_ids need a product_id to grant', () => {
+  assertEquals(
+    grantsEntitlement({ type: 'INITIAL_PURCHASE', entitlement_ids: [] }, 'premium'),
+    false,
+  )
+  assertEquals(
+    grantsEntitlement(
+      { type: 'INITIAL_PURCHASE', entitlement_ids: [], product_id: 'premium_monthly' },
+      'premium',
+    ),
+    true,
+  )
+  assertEquals(
+    grantsEntitlement(
+      { type: 'RENEWAL', entitlement_ids: ['premium'], product_id: 'x' },
+      'premium',
+    ),
+    true,
+  )
 })
 
 Deno.test('event ordering falls back to purchased_at_ms, then gives up', () => {

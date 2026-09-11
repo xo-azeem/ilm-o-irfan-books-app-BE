@@ -37,7 +37,19 @@ Deno.serve(async (req) => {
       ctx.supabase.rpc('my_access_state'),
       ctx.supabase
         .from('entitlements')
-        .select('*, plan:plans(*)')
+        .select(
+          [
+            'user_id',
+            'plan_id',
+            'status',
+            'starts_at',
+            'expires_at',
+            'store',
+            'created_at',
+            'updated_at',
+            'plan:plans(id, code, name, price_cents, currency, interval, features, is_active)',
+          ].join(','),
+        )
         .eq('user_id', ctx.user.id)
         .maybeSingle(),
     ])

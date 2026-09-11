@@ -99,6 +99,17 @@ Deno.test('readJsonBody returns an empty object rather than throwing on junk', a
   assertEquals(await readJsonBody(post('null')), {})
 })
 
+Deno.test('readJsonBody rejects oversized payloads', async () => {
+  const huge = 'x'.repeat(300 * 1024)
+  let threw = false
+  try {
+    await readJsonBody(post(huge), { maxBytes: 256 * 1024 })
+  } catch (error) {
+    threw = error instanceof BadRequestError && error.code === 'PAYLOAD_TOO_LARGE'
+  }
+  assertEquals(threw, true)
+})
+
 Deno.test('publicCache sets a shared cache directive with a revalidation window', () => {
   const headers = publicCache(900)
 
@@ -130,9 +141,10 @@ Deno.test('ok carries cache headers alongside the CORS ones', async () => {
   assertEquals(await response.json(), { data: { slides: [] } })
 })
 
-Deno.test('a response with no extra headers is unchanged', async () => {
+Deno.test('authenticated responses default to private no-store', async () => {
   const response = ok({ id: 1 })
 
-  assertEquals(response.headers.get('Cache-Control'), null)
+  assertEquals(response.headers.get('Cache-Control'), 'private, no-store')
+  assertEquals(response.headers.get('X-Content-Type-Options'), 'nosniff')
   assertEquals(await response.json(), { data: { id: 1 } })
 })

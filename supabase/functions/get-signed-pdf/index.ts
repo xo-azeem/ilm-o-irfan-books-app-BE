@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
 
     // The JWT claim still stands on its own so a real admin is not locked out
     // by a profiles read that went wrong.
-    const isAdmin = ctx.user.app_metadata?.app_role === 'admin' || state.isAdmin
+    const isAdmin = state.isAdmin
 
     const book = bookRes.data
 

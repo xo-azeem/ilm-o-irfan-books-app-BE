@@ -82,9 +82,8 @@ export async function requireUser(req: Request): Promise<AuthedContext | Respons
   return { user: data.user, supabase, authHeader }
 }
 
-// The JWT claim is checked first because it needs no round trip. profiles.role
-// is only consulted when the claim says no, which covers an admin whose token
-// predates their promotion. This mirrors public.is_admin() in SQL.
+// Always verify profiles.role. JWT app_metadata.app_role alone is not enough:
+// a demoted admin can keep a stale claim until the next token refresh.
 export async function requireAdmin(req: Request): Promise<AdminContext | Response> {
   const ctx = await requireUser(req)
 
@@ -93,10 +92,6 @@ export async function requireAdmin(req: Request): Promise<AdminContext | Respons
   }
 
   const admin = serviceClient({ id: ctx.user.id, email: ctx.user.email })
-
-  if (ctx.user.app_metadata?.app_role === 'admin') {
-    return { ...ctx, admin }
-  }
 
   const { data: profile, error } = await admin
     .from('profiles')

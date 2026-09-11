@@ -84,14 +84,33 @@ export function mapStatus(
   return 'expired'
 }
 
-// An event with no entitlement_ids at all is a whole-account event (a refund,
-// a transfer); treat it as touching the premium entitlement.
+// An event that names entitlement_ids must include `premium` to grant.
+// Missing/empty ids on purchase/renewal require a product_id (RC sometimes
+// omits the list). Pure account-lifecycle types without ids still grant so
+// expiry/cancel/billing still apply.
+const ACCOUNT_LEVEL_WITHOUT_IDS = new Set([
+  'EXPIRATION',
+  'CANCELLATION',
+  'BILLING_ISSUE',
+  'TRANSFER',
+  'SUBSCRIBER_ALIAS',
+  'SUBSCRIPTION_PAUSED',
+  'UNCANCELLATION',
+])
+
 export function grantsEntitlement(event: RcEvent, entitlementId: string): boolean {
-  return (
-    !event.entitlement_ids ||
-    event.entitlement_ids.length === 0 ||
-    event.entitlement_ids.includes(entitlementId)
-  )
+  const ids = event.entitlement_ids
+  if (ids && ids.length > 0) {
+    return ids.includes(entitlementId)
+  }
+
+  const type = (event.type ?? '').toUpperCase()
+  if (ACCOUNT_LEVEL_WITHOUT_IDS.has(type)) {
+    return true
+  }
+
+  // Purchase-like events with no entitlement list: only grant if a product id is present.
+  return Boolean(typeof event.product_id === 'string' && event.product_id.trim())
 }
 
 // event_timestamp_ms is what orders two events against each other. Sandbox
