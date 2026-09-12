@@ -195,6 +195,10 @@ verify_jwt = true
 [functions.highlights-delete]
 verify_jwt = true
 
+# The reader's bookmark button: create-or-delete on (book, page) in one call.
+[functions.highlights-toggle]
+verify_jwt = true
+
 [functions.admin-book-create]
 verify_jwt = true
 

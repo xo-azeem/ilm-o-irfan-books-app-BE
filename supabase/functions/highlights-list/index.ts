@@ -15,7 +15,11 @@ Deno.serve(async (req) => {
     if (ctx instanceof Response) return ctx
 
     const url = new URL(req.url)
-    const { page, pageSize, from, to } = rangeFromRequest(req, { defaultPageSize: 50 })
+    // One book's bookmarks in one call: pageSize goes to 200 here.
+    const { page, pageSize, from, to } = rangeFromRequest(req, {
+      defaultPageSize: 100,
+      maxPageSize: 200,
+    })
 
     let query = ctx.supabase
       .from('highlights')
@@ -28,8 +32,11 @@ Deno.serve(async (req) => {
       query = query.eq('book_id', asUuid('book_id')(bookIdParam))
     }
 
+    // Page order, so the list reads like the book. Highlights with no page
+    // (free text, not pinned) come after every pinned one.
     const { data, count, error } = await query
-      .order('created_at', { ascending: false })
+      .order('page_number', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: true })
       .order('id', { ascending: true })
       .range(from, to)
 

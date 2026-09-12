@@ -94,18 +94,22 @@ export const endpointManifest: EndpointDefinition[] = [
   },
   {
     name: 'reading-progress',
-    route: '/functions/v1/reading-progress',
+    route: '/functions/v1/reading-progress?book_id=<uuid>',
     method: 'GET',
     access: 'authenticated',
-    description: 'Returns read progress for the current user.',
+    description:
+      'With book_id: the caller\x27s position in that book as one row, or { data: null }. Without: every position the caller has, newest first, paginated (pageSize up to 200).',
+    notes:
+      'Compact rows, no book embed. Call the list once at launch to hydrate the local cache; call the single form when opening a book.',
   },
   {
     name: 'reading-progress',
     route: '/functions/v1/reading-progress',
     method: 'POST',
     access: 'authenticated',
-    description: 'Upserts read progress for one book (partial merge).',
-    notes: 'Send progress (0–1) or progress_percent (0–100), never both.',
+    description: 'Upserts read progress for one book (partial merge, last-write-wins).',
+    notes:
+      'Send progress (0–1) or progress_percent (0–100), never both. Optional client_updated_at (ISO-8601): the write is skipped when the stored last_read_at is newer. Response is the stored row plus applied:true|false. current_page one past total_pages is clamped.',
   },
   {
     name: 'wishlist-list',
@@ -137,17 +141,30 @@ export const endpointManifest: EndpointDefinition[] = [
   },
   {
     name: 'highlights-list',
-    route: '/functions/v1/highlights-list',
+    route: '/functions/v1/highlights-list?book_id=<uuid>',
     method: 'GET',
     access: 'authenticated',
-    description: 'Returns highlights and notes for the user.',
+    description: 'Returns the caller\x27s highlights and bookmarks, in page order.',
+    notes:
+      'Sorted page_number ASC, created_at ASC; unpinned (null page) rows last. pageSize up to 200.',
   },
   {
     name: 'highlights-upsert',
     route: '/functions/v1/highlights-upsert',
     method: 'POST',
     access: 'authenticated',
-    description: 'Adds or updates a highlight record.',
+    description: 'Saves a bookmark on (book_id, page_number), or edits a highlight by id.',
+    notes:
+      'True upsert on (user, book, page): a repeat lands on the same row. Response is the row plus created:true|false (201 when created).',
+  },
+  {
+    name: 'highlights-toggle',
+    route: '/functions/v1/highlights-toggle',
+    method: 'POST',
+    access: 'authenticated',
+    description: 'Adds the bookmark on (book_id, page_number) if absent, removes it if present.',
+    notes:
+      'One round trip for the reader\x27s bookmark button. Responds { bookmarked, highlight }.',
   },
   {
     name: 'library-overview',
@@ -308,7 +325,8 @@ export const endpointManifest: EndpointDefinition[] = [
     route: '/functions/v1/highlights-delete',
     method: 'POST',
     access: 'authenticated',
-    description: 'Deletes one of the current user highlights.',
+    description: 'Deletes one of the current user highlights by id or by (book_id, page_number).',
+    notes: 'Deleting a row that is already gone is { deleted: false } with 200, never a 404.',
   },
   {
     name: 'admin-collections',

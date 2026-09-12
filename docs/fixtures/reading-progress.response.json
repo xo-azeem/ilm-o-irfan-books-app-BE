@@ -1,14 +1,15 @@
 {
   "data": {
-    "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
-    "user_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-    "book_id": "aaaaaaaa-0000-0000-0000-000000000001",
-    "current_page": 42,
+    "id": "4db0fe53-18dd-4d7a-a453-911e3925eac1",
+    "applied": true,
+    "book_id": "ffc921f5-01ba-41a1-81eb-a15958f03932",
+    "user_id": "6d34a654-0bf4-48fb-a1c8-baa38e149d84",
+    "progress": 0.135,
+    "created_at": "2026-09-12T12:45:20.624272+00:00",
+    "updated_at": "2026-09-12T12:45:20.624272+00:00",
     "total_pages": 310,
-    "progress": 0.1355,
-    "chapter_label": "Chapter 3 — The Marvels of the Heart",
-    "last_read_at": "2026-09-05T09:12:44.000Z",
-    "created_at": "2026-08-20T18:03:11.000Z",
-    "updated_at": "2026-09-05T09:12:44.000Z"
+    "current_page": 42,
+    "last_read_at": "2026-09-12T12:44:48.823+00:00",
+    "chapter_label": "Chapter 3"
   }
 }

@@ -80,11 +80,11 @@ unauthenticated, so it cannot know what this reader downloaded. That state comes
 | Collections strip | GET | `/functions/v1/collections-list` | Public |
 | Book detail | GET | `/functions/v1/book-detail?id=<uuid>` | Public |
 | Reader open / download | POST | `/functions/v1/get-signed-pdf` body `{ "bookId" }` | User |
-| Progress sync | GET/POST | `/functions/v1/reading-progress` | User |
+| Progress sync | GET/POST | `/functions/v1/reading-progress` (`?book_id=` for one row; list for launch hydrate) | User |
 | Library | GET | `/functions/v1/library-overview` | User |
 | Wishlist | GET/POST | `wishlist-list` / `wishlist-toggle` | User |
 | Downloads | GET/POST | `downloads-list` / `downloads-create` | User |
-| Highlights | GET/POST | `highlights-list` / `highlights-upsert` / `highlights-delete` | User |
+| Highlights / bookmarks | GET/POST | `highlights-list` / `highlights-upsert` / `highlights-toggle` / `highlights-delete` | User |
 | Profile | GET/PUT | `profile-read` / `profile-update` | User |
 | Avatar | POST | `avatar-upload-url` then upload then `profile-update` | User |
 | Subscription status | GET | `entitlements-status` | User |
@@ -183,6 +183,13 @@ Email comes from Auth, not metadata. After admin promote, force re-login so JWT 
 - `progress` is a fraction **0.0–1.0**.
 - Or send `progress_percent` **0–100**. Never both.
 - `POST /reading-progress` merges: omitted fields stay unchanged; `chapter_label: ""` clears.
+- Send `client_updated_at` (ISO-8601) with every progress write. If the stored `last_read_at`
+  is newer the write is skipped and the response says `applied: false` — the row returned is
+  the one to cache. Without it the write always lands (legacy behaviour).
+- `current_page` one past `total_pages` is clamped to the last page; two or more past is a 400.
+- `GET /reading-progress?book_id=<uuid>` is `{ data: null }` (200) for a book never opened.
+- Bookmarks: one row per `(book_id, page_number)`. `highlights-toggle { book_id, page_number }`
+  → `{ bookmarked, highlight }`. `highlights-delete` on a missing row is `{ deleted: false }` (200).
 - Finished shelf: `progress >= 0.99`.
 
 ---

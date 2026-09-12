@@ -2389,33 +2389,31 @@ export type Database = {
         Args: { p_bucket: string; p_path: string }
         Returns: string
       }
+      toggle_highlight: {
+        Args: { p_book_id: string; p_page_number: number }
+        Returns: Json
+      }
       unaccent: { Args: { "": string }; Returns: string }
+      upsert_highlight: {
+        Args: {
+          p_book_id: string
+          p_color?: string
+          p_note?: string
+          p_page_number: number
+          p_text_excerpt?: string
+        }
+        Returns: Json
+      }
       upsert_reading_progress: {
         Args: {
           p_book_id: string
           p_chapter_label?: string
+          p_client_updated_at?: string
           p_current_page?: number
           p_progress?: number
           p_total_pages?: number
         }
-        Returns: {
-          book_id: string
-          chapter_label: string | null
-          created_at: string
-          current_page: number
-          id: string
-          last_read_at: string
-          progress: number
-          total_pages: number | null
-          updated_at: string
-          user_id: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "reading_progress"
-          isOneToOne: true
-          isSetofReturn: false
-        }
+        Returns: Json
       }
       user_access_state: { Args: { p_user_id: string }; Returns: Json }
       user_has_active_premium: {

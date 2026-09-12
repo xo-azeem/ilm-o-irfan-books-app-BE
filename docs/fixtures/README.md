@@ -31,7 +31,11 @@ Full mobile contract: [`../mobile-contract.md`](../mobile-contract.md).
 | `revenuecat-webhook.billing-issue.request.json` | Inbound RC body (`BILLING_ISSUE`) |
 | `library-overview.response.json` | `GET /functions/v1/library-overview` |
 | `profile-read.response.json` | `GET /functions/v1/profile-read` |
-| `reading-progress.response.json` | `POST /functions/v1/reading-progress` |
+| `reading-progress.response.json` | `POST /functions/v1/reading-progress` (stored row + `applied`) |
+| `reading-progress.single.response.json` | `GET /functions/v1/reading-progress?book_id=<uuid>` (`{ data: null }` when never opened) |
+| `highlights-upsert.response.json` | `POST /functions/v1/highlights-upsert` (row + `created`) |
+| `highlights-toggle.response.json` | `POST /functions/v1/highlights-toggle` |
+| `highlights-delete.missing.response.json` | `POST /functions/v1/highlights-delete` on a row already gone (200, not 404) |
 | `avatar-upload-url.response.json` | `POST /functions/v1/avatar-upload-url` |
 | `admin-audit-log.response.json` | `GET /functions/v1/admin-audit-log` (list envelope) |
 | `books-list.page-out-of-range.json` | any list endpoint paged past the offset ceiling |
@@ -43,6 +47,12 @@ Full mobile contract: [`../mobile-contract.md`](../mobile-contract.md).
 - `progress` is 0–1. Send `progress_percent` if you have 0–100; never both.
 - A `POST /reading-progress` merges — omitting `chapter_label` keeps the stored one, and
   `""` clears it. Omitting `current_page` does not reset it to page 1.
+- Send `client_updated_at` (ISO-8601, the moment the reader was at that page) with every
+  progress write. A queued write older than the stored `last_read_at` is skipped and the
+  response carries `applied: false` plus the row that won — cache that row.
+- Bookmarks are one row per `(book_id, page_number)`: `highlights-upsert` never duplicates,
+  `highlights-toggle` is the bookmark button, and `highlights-delete` accepts `{ book_id,
+  page_number }` as well as `{ id }`.
 - Avatars: `avatar-upload-url` → upload → `profile-update { avatar_path }`. Render from the
   signed `avatarUrl` in `profile-read`, which expires after an hour.
 - List endpoints stop at 10,000 rows of offset and answer `PAGE_OUT_OF_RANGE` past that.

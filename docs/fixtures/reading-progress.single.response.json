@@ -1,0 +1,14 @@
+{
+  "data": {
+    "id": "4db0fe53-18dd-4d7a-a453-911e3925eac1",
+    "user_id": "6d34a654-0bf4-48fb-a1c8-baa38e149d84",
+    "book_id": "ffc921f5-01ba-41a1-81eb-a15958f03932",
+    "current_page": 100,
+    "total_pages": 310,
+    "progress": 0.3226,
+    "chapter_label": "Chapter 3",
+    "last_read_at": "2026-09-12T12:45:22.2221+00:00",
+    "created_at": "2026-09-12T12:45:20.624272+00:00",
+    "updated_at": "2026-09-12T12:45:22.2221+00:00"
+  }
+}

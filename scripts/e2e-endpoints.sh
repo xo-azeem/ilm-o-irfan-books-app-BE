@@ -158,6 +158,11 @@ is  "out of range 400"      "$(code -X POST "$B/reading-progress" "${A[@]}" -d "
 is  "both scales 400"       "$(code -X POST "$B/reading-progress" "${A[@]}" -d "{\"book_id\":\"$BOOK\",\"progress\":0.5,\"progress_percent\":50}")" 400
 is  "bad uuid 400"          "$(code -X POST "$B/reading-progress" "${A[@]}" -d '{"book_id":"nope"}')" 400
 is  "missing book 404"      "$(code -X POST "$B/reading-progress" "${A[@]}" -d '{"book_id":"99999999-9999-9999-9999-999999999999"}')" 404
+has "newer client stamp applies"  "$(curl -s -X POST "$B/reading-progress" "${A[@]}" -d "{\"book_id\":\"$BOOK\",\"current_page\":9,\"total_pages\":50,\"client_updated_at\":\"2099-01-01T00:00:00Z\"}")" '"applied":true'
+has "older client stamp skipped"  "$(curl -s -X POST "$B/reading-progress" "${A[@]}" -d "{\"book_id\":\"$BOOK\",\"current_page\":8,\"client_updated_at\":\"2000-01-01T00:00:00Z\"}")" '"applied":false'
+has "one past the end clamps"     "$(curl -s -X POST "$B/reading-progress" "${A[@]}" -d "{\"book_id\":\"$BOOK\",\"current_page\":51,\"total_pages\":50}")" '"current_page":50'
+has "single row by book_id"       "$(curl -s "$B/reading-progress?book_id=$BOOK" "${A[@]}")" '"current_page":50'
+has "unknown book is data:null"   "$(curl -s "$B/reading-progress?book_id=99999999-9999-9999-9999-999999999999" "${A[@]}")" '"data":null'
 
 echo
 echo "== wishlist =="
@@ -177,6 +182,13 @@ R=$(curl -s -X POST "$B/highlights-upsert" "${A[@]}" -d "{\"id\":\"$HID\",\"note
 has "note updated"     "$R" '"note":"my note"'
 has "excerpt survived" "$R" '"text_excerpt":"excerpt text"'
 has "color survived"   "$R" '"color":"amber"'
+R=$(curl -s -X POST "$B/highlights-upsert" "${A[@]}" -d "{\"book_id\":\"$BOOK\",\"page_number\":12,\"note\":\"again\"}")
+has "same page upserts, not duplicates" "$R" "\"id\":\"$HID\""
+has "created:false on repeat"           "$R" '"created":false'
+has "toggle on"  "$(curl -s -X POST "$B/highlights-toggle" "${A[@]}" -d "{\"book_id\":\"$BOOK\",\"page_number\":77}")" '"bookmarked":true'
+has "toggle off" "$(curl -s -X POST "$B/highlights-toggle" "${A[@]}" -d "{\"book_id\":\"$BOOK\",\"page_number\":77}")" '"bookmarked":false'
+has "delete by key"           "$(curl -s -X POST "$B/highlights-delete" "${A[@]}" -d "{\"book_id\":\"$BOOK\",\"page_number\":12}")" '"deleted":true'
+has "delete missing is false" "$(curl -s -X POST "$B/highlights-delete" "${A[@]}" -d "{\"book_id\":\"$BOOK\",\"page_number\":12}")" '"deleted":false'
 
 echo
 echo "== paywall =="

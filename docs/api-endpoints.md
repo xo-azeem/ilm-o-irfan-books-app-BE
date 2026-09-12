@@ -29,14 +29,15 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | --- | --- | --- | --- |
 | `/functions/v1/profile-read` | GET | User | Own profile + `streak` (`current_streak`, `longest_streak`, `last_read_date`) |
 | `/functions/v1/profile-update` | PUT/PATCH | User | Partial contact fields including `date_of_birth` (YYYY-MM-DD); email/role not writable |
-| `/functions/v1/reading-progress` | GET/POST | User | Fetch and save progress |
+| `/functions/v1/reading-progress` | GET/POST | User | Reading position: one row (`?book_id=`), the full list, or a last-write-wins upsert — see [Reading position](#reading-position-and-bookmarks) |
 | `/functions/v1/wishlist-list` | GET | User | List saved books |
 | `/functions/v1/wishlist-toggle` | POST | User | Save or remove favorite books |
 | `/functions/v1/downloads-list` | GET | User | Download metadata and history |
 | `/functions/v1/downloads-create` | POST | User | Record a completed download |
-| `/functions/v1/highlights-list` | GET | User | User notes / highlights |
-| `/functions/v1/highlights-upsert` | POST | User | Upsert note data |
-| `/functions/v1/highlights-delete` | POST | User | Delete one highlight by id |
+| `/functions/v1/highlights-list` | GET | User | Highlights / bookmarks in page order (`?book_id=`, `pageSize` ≤ 200) |
+| `/functions/v1/highlights-upsert` | POST | User | Upsert on `(book_id, page_number)` → row + `created`; edit by `id` |
+| `/functions/v1/highlights-toggle` | POST | User | Bookmark button: create or delete on `(book_id, page_number)` in one call |
+| `/functions/v1/highlights-delete` | POST | User | Delete by `{ id }` or `{ book_id, page_number }`; missing → `deleted: false` |
 | `/functions/v1/library-overview` | GET | User | Combined shelves: wishlist, in-progress, finished (`progress >= 0.99`), downloads, highlights |
 | `/functions/v1/entitlements-status` | GET | User | Current premium state |
 | `/functions/v1/get-signed-pdf` | POST | User | Signed PDF URL for premium or allowed access |
@@ -527,6 +528,62 @@ rather than failing the batch. Upload the PDF first, then publish.
   the offset is capped at 10,000 rows (`PAGE_OUT_OF_RANGE`); every list sorts on a stable
   key with `id` as the tiebreaker. `books-search` clamps its own limit and offset inside
   `search_books()` as well, so a direct RPC call cannot ask for more.
+
+## Reading position and bookmarks
+
+The reader writes its page in bursts (debounced while flipping, once on close) and queues
+those writes while offline. Both tables are owner-only under RLS, so the app's direct
+PostgREST fallback keeps working; the Edge Functions add the conflict rule and the
+one-call bookmark toggle.
+
+### `reading-progress`
+
+| Call | Returns |
+| --- | --- |
+| `GET ?book_id=<uuid>` | `{ data: row }`, or `{ data: null }` (200) when the book was never opened. One keyed lookup, no embed. |
+| `GET` (no `book_id`) | Every row for the caller, `last_read_at DESC`, paginated, `pageSize` up to 200 (default 100). Call once at launch to hydrate the local cache. |
+| `POST` | Upsert on `(user_id, book_id)`; response is **the stored row after the call** plus `applied`. |
+
+Row: `{ id, user_id, book_id, current_page, total_pages, progress, chapter_label, last_read_at, created_at, updated_at }`.
+
+```json
+{ "book_id": "uuid", "current_page": 42, "total_pages": 310, "progress": 0.135,
+  "chapter_label": "optional", "client_updated_at": "2026-09-12T10:22:31.000Z" }
+```
+
+- **Conflict rule.** `client_updated_at` is optional. When present, the write lands only if
+  the stored `last_read_at <= client_updated_at` (equal applies, so replaying the same queue
+  entry is idempotent), and `last_read_at` is set to `client_updated_at`. When the stored row
+  is newer nothing is written and the response is that row with `applied: false`. When
+  absent, the write always lands and `last_read_at = now()` (pre-queue behaviour).
+- Any ISO-8601 with an offset or `Z` is accepted and normalised to UTC; more than 24 h in the
+  future is a 400. Compare and store in UTC.
+- `current_page` exactly one past `total_pages` is clamped to `total_pages` (the PDF view can
+  report that for a frame). Two or more past is `INVALID_REQUEST`. The check runs on the
+  merged row, so `current_page` sent alone is checked against the stored `total_pages`.
+- The merge and the conflict check are one `INSERT … ON CONFLICT … WHERE` inside
+  `upsert_reading_progress()`, so two devices syncing at once cannot both win.
+- Errors: `AUTH_REQUIRED` 401, `INVALID_REQUEST` 400, `NOT_FOUND` 404 (unknown book),
+  `READING_PROGRESS_WRITE_FAILED` / `READING_PROGRESS_READ_FAILED` 500.
+
+### Bookmarks (`highlights`)
+
+A bookmark is a highlight with a `page_number`; the unique index
+`highlights_user_book_page_key (user_id, book_id, page_number)` makes it one row per page
+(NULL pages — free-text highlights — never collide).
+
+| Call | Body | Returns |
+| --- | --- | --- |
+| `POST highlights-upsert` | `{ book_id, page_number, note?, color?, text_excerpt? }` | row + `created: true` (201) or `false` (200). Omitted fields keep their value; `""` clears. |
+| `POST highlights-upsert` | `{ id, …fields }` | edits that row; moving it onto a page that already has one is `CONFLICT` 409 |
+| `POST highlights-toggle` | `{ book_id, page_number }` | `{ bookmarked: boolean, highlight: row \| null }` |
+| `POST highlights-delete` | `{ id }` **or** `{ book_id, page_number }` | `{ id, deleted: true }`, or `{ id, deleted: false }` (200) when already gone |
+| `GET highlights-list?book_id=` | — | `page_number ASC, created_at ASC`, NULL pages last, `pageSize` up to 200 |
+
+`library-overview.highlights.items[]` carries `page_number`, `note`, `created_at` and the
+book card, so the Library can jump straight to the page; `readingProgress` / `finished`
+items carry `current_page`, `total_pages`, `progress`, `last_read_at` sorted
+`last_read_at DESC`.
 
 ## Rules for implementation
 

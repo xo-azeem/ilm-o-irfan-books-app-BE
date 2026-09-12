@@ -1,6 +1,5 @@
 import { requireMethod, requireUser } from '../_shared/auth.ts'
 import {
-  BadRequestError,
   fail,
   failFromDbError,
   handleError,
@@ -10,8 +9,25 @@ import {
   readJsonBody,
 } from '../_shared/http.ts'
 import { isRangeNotSatisfiable, paginate, rangeFromRequest } from '../_shared/pagination.ts'
-import { asInteger, asOptionalInteger, asOptionalText, requireUuidField } from '../_shared/payload.ts'
-import { hasAny, resolveProgress } from '../_shared/progress.ts'
+import {
+  asInteger,
+  asOptionalInteger,
+  asOptionalText,
+  asUuid,
+  requireUuidField,
+} from '../_shared/payload.ts'
+import {
+  clampCurrentPage,
+  hasAny,
+  resolveClientUpdatedAt,
+  resolveProgress,
+} from '../_shared/progress.ts'
+
+// The compact row the app caches per book. No book embed on purpose: the
+// launch-time hydrate pulls every row the user has, and the catalogue is
+// already cached on the device under its own key.
+const ROW_COLUMNS =
+  'id, user_id, book_id, current_page, total_pages, progress, chapter_label, last_read_at, created_at, updated_at'
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)
@@ -25,11 +41,44 @@ Deno.serve(async (req) => {
     if (ctx instanceof Response) return ctx
 
     if (req.method === 'GET') {
-      const { page, pageSize, from, to } = rangeFromRequest(req, { defaultPageSize: 50 })
+      const url = new URL(req.url)
+      const bookIdParam = url.searchParams.get('book_id') ?? url.searchParams.get('bookId')
+
+      // Opening a book: one keyed lookup. A book the user has never opened is
+      // { data: null }, not a 404 - "no position yet" is a normal answer here.
+      if (bookIdParam) {
+        const bookId = asUuid('book_id')(bookIdParam)
+
+        const { data, error } = await ctx.supabase
+          .from('reading_progress')
+          .select(ROW_COLUMNS)
+          .eq('user_id', ctx.user.id)
+          .eq('book_id', bookId)
+          .maybeSingle()
+
+        if (error) {
+          return failFromDbError(
+            'reading-progress',
+            'READING_PROGRESS_READ_FAILED',
+            'Unable to read reading progress',
+            error,
+          )
+        }
+
+        return ok(data ?? null)
+      }
+
+      // App launch: every position the user has, newest first, so each book
+      // can open at its page without a round trip. pageSize goes to 200 so a
+      // normal library is one call.
+      const { page, pageSize, from, to } = rangeFromRequest(req, {
+        defaultPageSize: 100,
+        maxPageSize: 200,
+      })
 
       const { data, count, error } = await ctx.supabase
         .from('reading_progress')
-        .select('*', { count: 'exact' })
+        .select(ROW_COLUMNS, { count: 'exact' })
         .eq('user_id', ctx.user.id)
         .order('last_read_at', { ascending: false })
         .order('book_id', { ascending: true })
@@ -60,7 +109,7 @@ Deno.serve(async (req) => {
     // background task that knows the page but not the chapter, so anything the
     // caller did not send is passed as null and left alone by the RPC rather
     // than defaulted back to page 1 / no chapter.
-    const currentPage = hasAny(payload, ['current_page', 'currentPage'])
+    let currentPage = hasAny(payload, ['current_page', 'currentPage'])
       ? asInteger('current_page', { min: 1 })(payload.current_page ?? payload.currentPage)
       : null
 
@@ -68,8 +117,8 @@ Deno.serve(async (req) => {
       ? asOptionalInteger('total_pages', { min: 1 })(payload.total_pages ?? payload.totalPages)
       : null
 
-    if (currentPage !== null && totalPages !== null && currentPage > totalPages) {
-      throw new BadRequestError('current_page cannot be greater than total_pages')
+    if (currentPage !== null) {
+      currentPage = clampCurrentPage(currentPage, totalPages)
     }
 
     // '' is the documented way to clear the chapter; null means "unchanged".
@@ -78,6 +127,7 @@ Deno.serve(async (req) => {
       : null
 
     const progress = resolveProgress(payload)
+    const clientUpdatedAt = resolveClientUpdatedAt(payload)
 
     const { data, error } = await ctx.supabase
       .rpc('upsert_reading_progress', {
@@ -86,6 +136,7 @@ Deno.serve(async (req) => {
         p_total_pages: totalPages,
         p_progress: progress ?? null,
         p_chapter_label: chapterLabel,
+        p_client_updated_at: clientUpdatedAt,
       })
 
     if (error) {
@@ -95,7 +146,7 @@ Deno.serve(async (req) => {
       }
 
       // 22023 is raised by the RPC when the merged row would put current_page
-      // past total_pages - the caller's input, so a 400 rather than a 500.
+      // more than one past total_pages - the caller's input, so a 400.
       if (error.code === '22023') {
         return fail('INVALID_REQUEST', 'current_page cannot be greater than total_pages', 400)
       }
@@ -108,6 +159,9 @@ Deno.serve(async (req) => {
       )
     }
 
+    // The RPC answers with the row that is stored after the call plus
+    // `applied`. applied:false means a newer position was already there and
+    // this write was skipped; the row is what the client should cache.
     return ok(data)
   } catch (error) {
     return handleError('reading-progress', error)

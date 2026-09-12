@@ -1,13 +1,6 @@
 import { requireMethod, requireUser } from '../_shared/auth.ts'
-import {
-  fail,
-  failFromDbError,
-  handleError,
-  handleOptions,
-  ok,
-  readJsonBody,
-} from '../_shared/http.ts'
-import { requireUuidField } from '../_shared/payload.ts'
+import { failFromDbError, handleError, handleOptions, ok, readJsonBody } from '../_shared/http.ts'
+import { asInteger, asOptionalUuid, requireUuidField } from '../_shared/payload.ts'
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)
@@ -21,15 +14,27 @@ Deno.serve(async (req) => {
     if (ctx instanceof Response) return ctx
 
     const payload = await readJsonBody(req)
-    const id = requireUuidField(payload, ['id', 'highlightId', 'highlight_id'], 'id')
 
-    const { data, error } = await ctx.supabase
+    // Either the row id, or the (book, page) key a bookmark is known by in the
+    // reader - the app does not have to look the id up first.
+    const id = asOptionalUuid('id')(payload.id ?? payload.highlightId ?? payload.highlight_id)
+
+    let query = ctx.supabase
       .from('highlights')
       .delete()
-      .eq('id', id)
       .eq('user_id', ctx.user.id)
-      .select('id')
-      .maybeSingle()
+
+    if (id) {
+      query = query.eq('id', id)
+    } else {
+      const bookId = requireUuidField(payload, ['book_id', 'bookId'], 'book_id')
+      const pageNumber = asInteger('page_number', { min: 1 })(
+        payload.page_number ?? payload.pageNumber,
+      )
+      query = query.eq('book_id', bookId).eq('page_number', pageNumber)
+    }
+
+    const { data, error } = await query.select('id').maybeSingle()
 
     if (error) {
       return failFromDbError(
@@ -40,8 +45,10 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Deleting what is already gone is the outcome the caller wanted, and an
+    // offline queue replaying a delete twice must not see an error for it.
     if (!data) {
-      return fail('NOT_FOUND', 'Highlight not found', 404)
+      return ok({ id: id ?? null, deleted: false })
     }
 
     return ok({ id: data.id, deleted: true })
