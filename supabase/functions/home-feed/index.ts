@@ -1,14 +1,25 @@
 import { anonClient, requireMethod } from '../_shared/auth.ts'
+import {
+  CAROUSEL_FALLBACK_SLIDES,
+  CAROUSEL_MAX_SLIDES,
+  carouselSource,
+} from '../_shared/carousel.ts'
 import { withCarouselUrls, withCoverUrls } from '../_shared/covers.ts'
-import { failFromDbError, handleError, handleOptions, ok, publicCache, CATALOGUE_CACHE_SECONDS } from '../_shared/http.ts'
+import {
+  CATALOGUE_CACHE_SECONDS,
+  failFromDbError,
+  handleError,
+  handleOptions,
+  ok,
+  publicCache,
+} from '../_shared/http.ts'
 
 type BookCard = Record<string, unknown> & { id: string }
 
 // The app slices Trending to 10. Asking for 12 leaves headroom so a catalogue
-// that briefly dips below 12 titles still fills the rail.
+// that briefly dips below 12 titles still fills the rail. The carousel fallback
+// draw sorts these twelve to the back of its pool, so keep the two in step.
 const TRENDING_LIMIT = 12
-
-const CAROUSEL_LIMIT = 20
 
 // hero and newArrivals stay curated collections, as they have been. Only
 // `trending` moved to the weekly draw, because trending was the one rail
@@ -59,12 +70,11 @@ Deno.serve(async (req) => {
       // The carousel ships inside home-feed as well as on its own endpoint. It
       // is the first thing on the screen, and a second round trip to fill it is
       // a second chance for Home to render half-empty on a slow connection.
-      supabase
-        .from('carousel_items')
-        .select('*')
-        .order('sort_order', { ascending: true, nullsFirst: true })
-        .order('slide_id', { ascending: true })
-        .limit(CAROUSEL_LIMIT),
+      // Admin slides when there are any, else this week's fallback draw.
+      supabase.rpc('home_carousel', {
+        p_limit: CAROUSEL_MAX_SLIDES,
+        p_fallback_limit: CAROUSEL_FALLBACK_SLIDES,
+      }),
       supabase.rpc('collection_shelf', { p_slug: 'home-hero', p_limit: 8 }),
       supabase.rpc('collection_shelf', { p_slug: 'new-arrivals', p_limit: 12 }),
       supabase.rpc('weekly_trending_books', { p_limit: TRENDING_LIMIT }),
@@ -111,6 +121,8 @@ Deno.serve(async (req) => {
 
     const newest = (booksRes.data ?? []) as BookCard[]
 
+    const carousel = (carouselRes.data ?? []) as Record<string, unknown>[]
+
     // A failed draw is not worth failing the whole screen over: it degrades to
     // the newest-books list the response already carries.
     let trending: BookCard[]
@@ -145,9 +157,11 @@ Deno.serve(async (req) => {
         categories: categoriesRes.data ?? [],
         featuredCollectionId: settingsRes.data?.featured_collection_id ?? null,
         supportEmail: settingsRes.data?.support_email ?? null,
-        // Admin-managed. Empty means the admin has not put anything there, not
-        // that the app should invent a carousel of its own.
-        carousel: withCarouselUrls((carouselRes.data ?? []) as Record<string, unknown>[]),
+        // Admin-managed, with a weekly random fallback when the admin has set
+        // nothing. Empty only when the catalogue itself is empty (or the read
+        // failed); the app never invents a carousel of its own.
+        carousel: withCarouselUrls(carousel),
+        carouselSource: carouselSource(carousel),
         shelves: {
           hero: withCoverUrls(hero),
           trending: withCoverUrls(trending),

@@ -246,7 +246,8 @@ verify_jwt = true
 [functions.avatar-upload-url]
 verify_jwt = true
 
-# Home carousel — admin-curated, read by everyone.
+# Home carousel — admin-curated, read by everyone. Falls back to a weekly
+# random draw of five books while the admin has nothing live.
 [functions.carousel-list]
 verify_jwt = false
 
@@ -274,4 +275,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.admin-refresh-trending]
+verify_jwt = true
+
+[functions.admin-refresh-carousel]
 verify_jwt = true

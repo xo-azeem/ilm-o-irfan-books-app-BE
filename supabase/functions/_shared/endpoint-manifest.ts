@@ -444,8 +444,10 @@ export const endpointManifest: EndpointDefinition[] = [
     route: '/functions/v1/carousel-list',
     method: 'GET',
     access: 'public',
-    description: 'Returns the admin-curated home carousel, in the admin order.',
-    notes: 'Also embedded in home-feed as `carousel`; call this only to refresh it alone.',
+    description:
+      'Returns the admin-curated home carousel in the admin order, or five books drawn at random for the week when the admin has nothing live.',
+    notes:
+      'Also embedded in home-feed as `carousel`; call this only to refresh it alone. `source` is `admin` or `fallback`; fallback slides have a null `slide_id`.',
   },
   {
     name: 'trending-weekly',
@@ -504,5 +506,13 @@ export const endpointManifest: EndpointDefinition[] = [
     method: 'POST',
     access: 'admin',
     description: 'Redraws this week trending picks without waiting for Monday.',
+  },
+  {
+    name: 'admin-refresh-carousel',
+    route: '/functions/v1/admin-refresh-carousel',
+    method: 'POST',
+    access: 'admin',
+    description: 'Redraws this week carousel fallback picks without waiting for Monday.',
+    notes: 'Only affects what the app shows while no admin slide is live.',
   },
 ]

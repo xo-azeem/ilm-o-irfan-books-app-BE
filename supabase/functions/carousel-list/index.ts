@@ -1,11 +1,11 @@
 import { anonClient, requireMethod } from '../_shared/auth.ts'
+import {
+  CAROUSEL_FALLBACK_SLIDES,
+  CAROUSEL_MAX_SLIDES,
+  carouselSource,
+} from '../_shared/carousel.ts'
 import { withCarouselUrls } from '../_shared/covers.ts'
 import { failFromDbError, handleError, handleOptions, ok, publicCache } from '../_shared/http.ts'
-
-// The carousel is small by design — a rail nobody swipes to the end of is a
-// rail nobody sees the end of — and an admin who adds a 40th slide should not
-// be able to make Home load 40 covers.
-const MAX_SLIDES = 20
 
 // Editorial changes should reach the app in about a minute, not instantly. The
 // carousel is the same bytes for every caller, so caching it is what stops the
@@ -21,15 +21,14 @@ Deno.serve(async (req) => {
     const notAllowed = requireMethod(req, ['GET'])
     if (notAllowed) return notAllowed
 
-    // carousel_items already filters to active, in-window slides whose book is
-    // published, and RLS enforces the same thing a second time on the table
-    // underneath. Ordering is the admin's, not ours.
-    const { data, error } = await anonClient()
-      .from('carousel_items')
-      .select('*')
-      .order('sort_order', { ascending: true, nullsFirst: true })
-      .order('slide_id', { ascending: true })
-      .limit(MAX_SLIDES)
+    // home_carousel returns the admin's live slides in the admin's order, or —
+    // when there are none — this week's five-book fallback draw, so the rail
+    // is never empty while the catalogue has anything published. Both come
+    // back as carousel_items rows; fallback rows have a null slide_id.
+    const { data, error } = await anonClient().rpc('home_carousel', {
+      p_limit: CAROUSEL_MAX_SLIDES,
+      p_fallback_limit: CAROUSEL_FALLBACK_SLIDES,
+    })
 
     if (error) {
       return failFromDbError(
@@ -40,10 +39,14 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Same coverUrl / imageUrl contract as every other card the app receives.
-    const slides = withCarouselUrls((data ?? []) as Record<string, unknown>[])
+    const rows = (data ?? []) as Record<string, unknown>[]
 
-    return ok({ slides }, 200, publicCache(CACHE_SECONDS))
+    // Same coverUrl / imageUrl contract as every other card the app receives.
+    return ok(
+      { slides: withCarouselUrls(rows), source: carouselSource(rows) },
+      200,
+      publicCache(CACHE_SECONDS),
+    )
   } catch (error) {
     return handleError('carousel-list', error)
   }

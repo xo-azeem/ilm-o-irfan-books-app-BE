@@ -1,0 +1,14 @@
+# Line endings are part of what gets stored in the database: a migration pushed
+# from a CRLF checkout stores CRLF inside function bodies, and `supabase db diff`
+# then reports every one of them as changed on an LF machine. Pin everything to
+# LF so a checkout looks the same on every OS (and `deno fmt --check` agrees).
+* text=auto eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.pdf binary
+*.woff binary
+*.woff2 binary

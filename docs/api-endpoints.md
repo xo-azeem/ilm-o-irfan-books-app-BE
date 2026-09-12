@@ -87,6 +87,7 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | `/functions/v1/admin-carousel-delete` | POST | Admin | Remove slides, by slide id or book id |
 | `/functions/v1/admin-carousel-reorder` | POST | Admin | Persist a drag-reorder of the carousel |
 | `/functions/v1/admin-refresh-trending` | POST | Admin | Redraw this week's trending picks without waiting for Monday |
+| `/functions/v1/admin-refresh-carousel` | POST | Admin | Redraw this week's carousel fallback picks without waiting for Monday |
 
 ## Webhooks
 
@@ -290,7 +291,8 @@ blank while `collection_books` is unpopulated. `trending` is the one rail that c
 describe the catalogue rather than an editor's taste, so it is now the weekly draw and needs
 no fallback: the draw already covers everything published.
 
-`home-feed` also returns a top-level `carousel` array, the same payload as `carousel-list`.
+`home-feed` also returns a top-level `carousel` array, the same payload as `carousel-list`'s
+`slides`, plus `carouselSource` (`admin` or `fallback` — see [Home carousel](#home-carousel)).
 It ships inside `home-feed` because it is the first thing on the screen and a second round
 trip to fill it is a second chance for Home to render half-empty. A `carousel` read failure
 degrades to `[]` rather than failing the screen; the other four reads still 500.
@@ -378,6 +380,23 @@ containing `&`, `|` or `:*` is data rather than syntax.
 The carousel is admin-owned. The app renders `carousel-list` (or `home-feed`'s `carousel`)
 in the order it arrives and picks nothing itself.
 
+```json
+{ "data": { "source": "admin", "slides": [ ... ] } }
+```
+
+While the admin has **no live slide**, the rail is filled server-side with **five books drawn at
+random from the published catalogue, once a week** — the same five for every caller until
+Monday 00:00 UTC, drawn the same way as [Weekly trending](#weekly-trending) and stored in
+`carousel_weekly`. `source` says which you are looking at: `admin` (the curated rail) or
+`fallback` (the weekly draw). Fallback slides have `slide_id: null` and no `badge`,
+`subtitle` or `cta_label`; `headline`, `imageUrl` and `accent` are the book's own title,
+cover and colour, so one renderer handles both. The draw prefers books that are not already
+at the top of this week's Trending rail, so Home does not show the same covers twice.
+
+The fallback is a fallback, not a merge: the moment one admin slide is live it is the whole
+carousel, and removing the last slide brings the draw back. `source` is `admin` with an
+empty `slides` only when the catalogue itself has nothing published.
+
 One row per slide in `carousel_slides`, one slide per book. `headline`, `image_path` and
 `accent` come back already resolved: the admin's override where there is one, the book's own
 `title` / `cover_path` / `cover_color` where there is not. Every `book_list_items` column
@@ -407,6 +426,8 @@ statement — the app never observes a half-applied carousel — and slides that
 keep the headline and artwork already written for them.
 
 Cached `public, max-age=60`. Editorial changes reach the app within about a minute.
+`admin-refresh-carousel` redraws this week's fallback picks (only visible while no admin
+slide is live); `admin_carousel_fallback_rows` shows the CMS what the app is falling back to.
 
 ## Weekly trending
 
