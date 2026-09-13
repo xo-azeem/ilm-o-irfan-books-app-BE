@@ -49,12 +49,14 @@ books.pdf_path   → Storage pdfs/
 
 ### Users & library
 
-- **profiles** — `id = auth.users.id`, contact + address fields, `role` (`user` | `admin`). Guest/subscriber are **not** stored here (anon session vs `entitlements`).
-- **reading_progress** — page, fraction, chapter label, `last_read_at`
+- **profiles** — `id = auth.users.id`, contact + address fields, `role` (`user` | `admin`), `monthly_goal` (1–100, default 4). Guest/subscriber are **not** stored here (anon session vs `entitlements`).
+- **reading_progress** — page, fraction, chapter label, `last_read_at`, `finished_at` (server-set once at `progress >= 0.99`, never cleared)
 - **wishlist** — saved books
 - **downloads** — status + size metadata
 - **highlights** — optional notes
-- **reading_streaks** — day streak for profile stats
+- **reading_streaks** — day streak for profile stats, maintained by `private.record_reading_activity()` (local day of `last_read_at`; UTC without a zone)
+- **reading_days** — one row per (user, local day): `pages_read`, `sessions`, `night_sessions`. Same trigger; owner SELECT only
+- **achievements** — `(user_id, achievement_id, earned_at)`, insert-only via `private.award_achievements()`; owner SELECT only
 
 ### Subscriptions
 
@@ -161,11 +163,16 @@ before flipping `is_published`.
 
 ### Reading progress
 
-`upsert_reading_progress(book_id, current_page, total_pages, progress, chapter_label)` —
+`upsert_reading_progress(book_id, current_page, total_pages, progress, chapter_label, client_updated_at, tz)` —
 `security invoker`, writes only `auth.uid()`'s row. Null means "leave this column alone" and
 `''` clears `chapter_label`, so a partial sync cannot reset a reader to page 1. The merge is
 one `INSERT ... ON CONFLICT DO UPDATE`, so two devices syncing at once cannot interleave the
-way a read-then-write would.
+way a read-then-write would. `tz` (IANA name or `+HH:MM`) is passed to the streak trigger
+through the transaction-local setting `app.reading_tz`.
+
+`reading_record(tz)` — `security definer`, scoped to `auth.uid()`: the profile screen's
+`readingGoal`, `streak.recent_days` (seven days ending today in `tz`) and the four
+`achievements`, in one call.
 
 ### Search limits
 

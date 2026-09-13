@@ -22,12 +22,16 @@ import {
   resolveClientUpdatedAt,
   resolveProgress,
 } from '../_shared/progress.ts'
+import { resolveWriteTimeZone } from '../_shared/timezone.ts'
 
 // The compact row the app caches per book. No book embed on purpose: the
 // launch-time hydrate pulls every row the user has, and the catalogue is
 // already cached on the device under its own key.
+//
+// finished_at is server-owned: set once when progress first reaches 0.99 and
+// never cleared, so "finished this month" survives a reader flipping back.
 const ROW_COLUMNS =
-  'id, user_id, book_id, current_page, total_pages, progress, chapter_label, last_read_at, created_at, updated_at'
+  'id, user_id, book_id, current_page, total_pages, progress, chapter_label, last_read_at, finished_at, created_at, updated_at'
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)
@@ -129,6 +133,10 @@ Deno.serve(async (req) => {
     const progress = resolveProgress(payload)
     const clientUpdatedAt = resolveClientUpdatedAt(payload)
 
+    // Which calendar day (and whether it was a night) this read lands on for
+    // the streak: the client_updated_at offset, else tz, else UTC.
+    const tz = resolveWriteTimeZone(payload)
+
     const { data, error } = await ctx.supabase
       .rpc('upsert_reading_progress', {
         p_book_id: bookId,
@@ -137,6 +145,7 @@ Deno.serve(async (req) => {
         p_progress: progress ?? null,
         p_chapter_label: chapterLabel,
         p_client_updated_at: clientUpdatedAt,
+        p_tz: tz,
       })
 
     if (error) {

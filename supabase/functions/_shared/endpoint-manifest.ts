@@ -80,10 +80,22 @@ export const endpointManifest: EndpointDefinition[] = [
   },
   {
     name: 'profile-read',
-    route: '/functions/v1/profile-read',
+    route: '/functions/v1/profile-read?tz=<IANA zone>',
     method: 'GET',
     access: 'authenticated',
-    description: 'Returns the current user profile.',
+    description:
+      'Returns the current user profile with streak (incl. recent_days), readingGoal and achievements.',
+    notes:
+      'Optional tz (IANA name, default UTC) sets "today" for streak.recent_days (always 7 entries, oldest first) and the month for readingGoal.completedThisMonth; readingGoal.timezone echoes the zone used. achievements is always the same four ids in order: first-book, streak-7, books-25, night-reader.',
+  },
+  {
+    name: 'reading-goal-update',
+    route: '/functions/v1/reading-goal-update',
+    method: 'POST',
+    access: 'authenticated',
+    description: 'Sets the caller\x27s monthly reading goal ({ target: 1-100 }).',
+    notes:
+      'Responds with the same readingGoal object profile-read returns. Optional tz as on profile-read. Non-integer or out-of-range target is a 400 INVALID_REQUEST.',
   },
   {
     name: 'profile-update',
@@ -100,7 +112,7 @@ export const endpointManifest: EndpointDefinition[] = [
     description:
       'With book_id: the caller\x27s position in that book as one row, or { data: null }. Without: every position the caller has, newest first, paginated (pageSize up to 200).',
     notes:
-      'Compact rows, no book embed. Call the list once at launch to hydrate the local cache; call the single form when opening a book.',
+      'Compact rows, no book embed, including finished_at (server-set once progress first reaches 0.99). Call the list once at launch to hydrate the local cache; call the single form when opening a book.',
   },
   {
     name: 'reading-progress',
@@ -109,7 +121,7 @@ export const endpointManifest: EndpointDefinition[] = [
     access: 'authenticated',
     description: 'Upserts read progress for one book (partial merge, last-write-wins).',
     notes:
-      'Send progress (0–1) or progress_percent (0–100), never both. Optional client_updated_at (ISO-8601): the write is skipped when the stored last_read_at is newer. Response is the stored row plus applied:true|false. current_page one past total_pages is clamped.',
+      'Send progress (0–1) or progress_percent (0–100), never both. Optional client_updated_at (ISO-8601): the write is skipped when the stored last_read_at is newer. Optional tz (IANA name): with the client_updated_at offset it decides the calendar day for the streak / reading_days; default UTC. Response is the stored row (incl. finished_at) plus applied:true|false. current_page one past total_pages is clamped.',
   },
   {
     name: 'wishlist-list',
@@ -172,6 +184,8 @@ export const endpointManifest: EndpointDefinition[] = [
     method: 'GET',
     access: 'authenticated',
     description: 'Returns saved, read, and downloaded book groups.',
+    notes:
+      'readingProgress and finished shelf rows carry finished_at (null until progress first reaches 0.99).',
   },
   {
     name: 'entitlements-status',

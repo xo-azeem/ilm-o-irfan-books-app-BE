@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
     const limit = normalizePageSize(url.searchParams.get('limit') ?? undefined, 20, 50)
 
     const progressSelect =
-      `book_id, current_page, total_pages, progress, chapter_label, last_read_at, ${BOOK_CARD}`
+      `book_id, current_page, total_pages, progress, chapter_label, last_read_at, finished_at, ${BOOK_CARD}`
 
     const [
       wishlistRes,
@@ -99,11 +99,15 @@ Deno.serve(async (req) => {
 
     return ok({
       limit,
-      wishlist: shelf(wishlistRes as { data: Record<string, unknown>[] | null; count: number | null }),
+      wishlist: shelf(
+        wishlistRes as { data: Record<string, unknown>[] | null; count: number | null },
+      ),
       readingProgress: shelf(
         progressRes as { data: Record<string, unknown>[] | null; count: number | null },
       ),
-      finished: shelf(finishedRes as { data: Record<string, unknown>[] | null; count: number | null }),
+      finished: shelf(
+        finishedRes as { data: Record<string, unknown>[] | null; count: number | null },
+      ),
       downloads: shelf(
         downloadsRes as { data: Record<string, unknown>[] | null; count: number | null },
       ),

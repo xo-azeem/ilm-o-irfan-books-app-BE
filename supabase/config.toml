@@ -114,6 +114,9 @@ verify_jwt = true
 [functions.reading-progress]
 verify_jwt = true
 
+[functions.reading-goal-update]
+verify_jwt = true
+
 [functions.wishlist-list]
 verify_jwt = true
 

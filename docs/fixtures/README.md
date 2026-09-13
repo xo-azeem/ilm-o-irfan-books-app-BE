@@ -30,7 +30,8 @@ Full mobile contract: [`../mobile-contract.md`](../mobile-contract.md).
 | `revenuecat-webhook.expiration.request.json` | Inbound RC body (`EXPIRATION`) |
 | `revenuecat-webhook.billing-issue.request.json` | Inbound RC body (`BILLING_ISSUE`) |
 | `library-overview.response.json` | `GET /functions/v1/library-overview` |
-| `profile-read.response.json` | `GET /functions/v1/profile-read` |
+| `profile-read.response.json` | `GET /functions/v1/profile-read?tz=Asia/Karachi` (streak + `recent_days`, `readingGoal`, `achievements`) |
+| `reading-goal-update.response.json` | `POST /functions/v1/reading-goal-update` |
 | `reading-progress.response.json` | `POST /functions/v1/reading-progress` (stored row + `applied`) |
 | `reading-progress.single.response.json` | `GET /functions/v1/reading-progress?book_id=<uuid>` (`{ data: null }` when never opened) |
 | `highlights-upsert.response.json` | `POST /functions/v1/highlights-upsert` (row + `created`) |

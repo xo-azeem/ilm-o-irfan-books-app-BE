@@ -27,7 +27,8 @@ The Edge Function endpoint base is `/functions/v1/...`.
 
 | Endpoint | Method | Auth | Purpose |
 | --- | --- | --- | --- |
-| `/functions/v1/profile-read` | GET | User | Own profile + `streak` (`current_streak`, `longest_streak`, `last_read_date`) |
+| `/functions/v1/profile-read?tz=` | GET | User | Own profile + `streak` (with `recent_days`), `readingGoal`, `achievements` — see [Reading record](#reading-record) |
+| `/functions/v1/reading-goal-update` | POST | User | `{ target: 1-100 }` → the `readingGoal` object — see [Reading record](#reading-record) |
 | `/functions/v1/profile-update` | PUT/PATCH | User | Partial contact fields including `date_of_birth` (YYYY-MM-DD); email/role not writable |
 | `/functions/v1/reading-progress` | GET/POST | User | Reading position: one row (`?book_id=`), the full list, or a last-write-wins upsert — see [Reading position](#reading-position-and-bookmarks) |
 | `/functions/v1/wishlist-list` | GET | User | List saved books |
@@ -38,7 +39,7 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | `/functions/v1/highlights-upsert` | POST | User | Upsert on `(book_id, page_number)` → row + `created`; edit by `id` |
 | `/functions/v1/highlights-toggle` | POST | User | Bookmark button: create or delete on `(book_id, page_number)` in one call |
 | `/functions/v1/highlights-delete` | POST | User | Delete by `{ id }` or `{ book_id, page_number }`; missing → `deleted: false` |
-| `/functions/v1/library-overview` | GET | User | Combined shelves: wishlist, in-progress, finished (`progress >= 0.99`), downloads, highlights |
+| `/functions/v1/library-overview` | GET | User | Combined shelves: wishlist, in-progress, finished (`progress >= 0.99`), downloads, highlights. Progress rows carry `finished_at` |
 | `/functions/v1/entitlements-status` | GET | User | Current premium state |
 | `/functions/v1/get-signed-pdf` | POST | User | Signed PDF URL for premium or allowed access |
 | `/functions/v1/avatar-upload-url` | POST | User | One-shot signed upload URL for the caller's avatar |
@@ -544,11 +545,11 @@ one-call bookmark toggle.
 | `GET` (no `book_id`) | Every row for the caller, `last_read_at DESC`, paginated, `pageSize` up to 200 (default 100). Call once at launch to hydrate the local cache. |
 | `POST` | Upsert on `(user_id, book_id)`; response is **the stored row after the call** plus `applied`. |
 
-Row: `{ id, user_id, book_id, current_page, total_pages, progress, chapter_label, last_read_at, created_at, updated_at }`.
+Row: `{ id, user_id, book_id, current_page, total_pages, progress, chapter_label, last_read_at, finished_at, created_at, updated_at }`.
 
 ```json
 { "book_id": "uuid", "current_page": 42, "total_pages": 310, "progress": 0.135,
-  "chapter_label": "optional", "client_updated_at": "2026-09-12T10:22:31.000Z" }
+  "chapter_label": "optional", "client_updated_at": "2026-09-12T15:22:31+05:00", "tz": "Asia/Karachi" }
 ```
 
 - **Conflict rule.** `client_updated_at` is optional. When present, the write lands only if
@@ -563,6 +564,11 @@ Row: `{ id, user_id, book_id, current_page, total_pages, progress, chapter_label
   merged row, so `current_page` sent alone is checked against the stored `total_pages`.
 - The merge and the conflict check are one `INSERT … ON CONFLICT … WHERE` inside
   `upsert_reading_progress()`, so two devices syncing at once cannot both win.
+- `finished_at` is server-owned: set once, the first time a row's `progress` reaches 0.99, and
+  never overwritten or cleared (a reader flipping back to page 1 stays finished). A value sent
+  by the client is ignored.
+- `tz` (optional IANA name) and the offset on `client_updated_at` decide which calendar day
+  the write counts as for the streak — see [Reading record](#reading-record).
 - Errors: `AUTH_REQUIRED` 401, `INVALID_REQUEST` 400, `NOT_FOUND` 404 (unknown book),
   `READING_PROGRESS_WRITE_FAILED` / `READING_PROGRESS_READ_FAILED` 500.
 
@@ -584,6 +590,103 @@ A bookmark is a highlight with a `page_number`; the unique index
 book card, so the Library can jump straight to the page; `readingProgress` / `finished`
 items carry `current_page`, `total_pages`, `progress`, `last_read_at` sorted
 `last_read_at DESC`.
+
+## Reading record
+
+The Profile screen's monthly goal, streak sparkline and achievements are computed
+server-side and embedded in `profile-read`. Nothing that was there before moved; the three
+objects below are additive.
+
+### Timezone
+
+"Today" and "this month" are calendar concepts and the calendar is the reader's, so the zone
+travels with the request:
+
+| Call | Zone comes from | Default |
+| --- | --- | --- |
+| `GET profile-read?tz=Asia/Karachi` | `tz` query param (IANA name) | UTC |
+| `POST reading-goal-update { tz }` | `tz` body field | UTC |
+| `POST reading-progress` | the numeric offset on `client_updated_at` (`+05:00`); if it is `Z`/absent, the `tz` body field | UTC |
+
+`Z` counts as "no information", not "UTC": JavaScript's `toISOString()` emits `Z` whatever
+the device zone. An unknown `tz` is `INVALID_REQUEST` 400. `readingGoal.timezone` echoes
+the zone that was actually used. **Send the device zone on every one of these calls** — a
+write with no zone is a UTC day, and a 23:30 read in Karachi lands on the wrong day and is
+not a night session.
+
+### `profile-read` additions
+
+```json
+"streak": {
+  "current_streak": 3, "longest_streak": 3, "last_read_date": "2026-09-13",
+  "updated_at": "2026-09-13T00:07:28.019832+00:00",
+  "recent_days": [
+    { "day": "2026-09-07", "read": false, "pages_read": 0 },
+    { "day": "2026-09-12", "read": true,  "pages_read": 122 },
+    { "day": "2026-09-13", "read": true,  "pages_read": 124 }
+  ]
+},
+"readingGoal": { "target": 4, "completedThisMonth": 1, "month": "2026-09", "timezone": "Asia/Karachi" },
+"achievements": [
+  { "id": "first-book",   "earned": true,  "earned_at": "2026-09-13T00:10:00+00:00", "progress": { "current": 1, "target": 1 } },
+  { "id": "streak-7",     "earned": false, "earned_at": null, "progress": { "current": 3, "target": 7 } },
+  { "id": "books-25",     "earned": false, "earned_at": null, "progress": { "current": 1, "target": 25 } },
+  { "id": "night-reader", "earned": false, "earned_at": null, "progress": { "current": 1, "target": 5 } }
+]
+```
+
+- `recent_days` is always exactly seven entries, oldest first, ending on today in the
+  resolved zone; days with no read are `read: false, pages_read: 0`.
+- `completedThisMonth` counts `reading_progress` rows whose `finished_at` falls in the
+  current calendar month of the resolved zone.
+- `achievements` is always the same four ids in this order. Labels and icons are the app's;
+  the rules are the server's (below). Once earned, an achievement stays earned and
+  `earned_at` never changes.
+- A user with no reads still gets all three objects: zero streak, seven `read: false` days,
+  `completedThisMonth: 0`, four unearned achievements.
+
+### `reading-goal-update`
+
+`POST { "target": 6, "tz": "Asia/Karachi" }` → `{ "data": <readingGoal> }`. `target` must be an
+integer 1–100 (`INVALID_REQUEST` 400 otherwise; missing is also 400). Default for every user
+is 4. Stored in `profiles.monthly_goal`, which the direct-table fallback can also read.
+
+### Streak and reading days — how they are written
+
+Everything below happens inside one AFTER trigger on `reading_progress`
+(`private.record_reading_activity()`), so the RPC, the Edge Function and a direct table write
+all behave the same. Nothing is written by the client.
+
+- **A reading day** is any applied `reading_progress` insert or update of
+  `last_read_at` / `current_page` / `progress`. A write the conflict rule skipped
+  (`applied: false`) is not a read. An update that moves nothing forward and carries no new
+  `last_read_at` is not a read either.
+- **Day boundary**: the calendar day of the row's `last_read_at` (the client's own timestamp
+  when `client_updated_at` was sent, capped at server now) in the request's zone — see the
+  timezone table. Without a zone it is the UTC day.
+- **Streak rule**: same day as `last_read_date` → no change; the day after → `current_streak + 1`;
+  any later day → `current_streak = 1`. `longest_streak = greatest(longest, current)`.
+  A day *before* `last_read_date` (an offline entry replayed late) leaves the streak alone but
+  still records the day. `current_streak` is only touched by a read, so after a missed day
+  it keeps its old value until the next read resets it to 1 — the app can compare
+  `last_read_date` with today to show a broken streak.
+- **`reading_days`** (`user_id, day, pages_read, sessions, night_sessions`): one row per local
+  day; each applied write is `sessions + 1`, `pages_read += max(0, new_page − old_page)`
+  (`new_page − 1` on the first write for a book), and `night_sessions + 1` when the local
+  time of the write is 23:00–03:59.
+
+### Achievement rules
+
+| id | earned when | `progress.current` | `target` |
+| --- | --- | --- | --- |
+| `first-book` | ≥ 1 `reading_progress` row with `finished_at` set | finished rows | 1 |
+| `streak-7` | `reading_streaks.longest_streak >= 7` | `longest_streak` | 7 |
+| `books-25` | ≥ 25 rows with `finished_at` set | finished rows | 25 |
+| `night-reader` | ≥ 5 `reading_days` rows with `night_sessions > 0` | such rows | 5 |
+
+Awarded by `private.award_achievements()` right after every streak update, insert-only into
+`achievements` (`user_id, achievement_id, earned_at`). `earned_at` is the first / 25th
+`finished_at` or the streak's bump time where that is knowable, else the award time.
 
 ## Rules for implementation
 

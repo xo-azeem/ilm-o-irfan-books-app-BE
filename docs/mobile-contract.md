@@ -85,7 +85,8 @@ unauthenticated, so it cannot know what this reader downloaded. That state comes
 | Wishlist | GET/POST | `wishlist-list` / `wishlist-toggle` | User |
 | Downloads | GET/POST | `downloads-list` / `downloads-create` | User |
 | Highlights / bookmarks | GET/POST | `highlights-list` / `highlights-upsert` / `highlights-toggle` / `highlights-delete` | User |
-| Profile | GET/PUT | `profile-read` / `profile-update` | User |
+| Profile | GET/PUT | `profile-read?tz=` / `profile-update` — `readingGoal`, `streak.recent_days`, `achievements` | User |
+| Monthly reading goal | POST | `reading-goal-update` `{ target }` | User |
 | Avatar | POST | `avatar-upload-url` then upload then `profile-update` | User |
 | Subscription status | GET | `entitlements-status` | User |
 | Plan catalog | GET | `plans-list` | Public |

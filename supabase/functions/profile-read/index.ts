@@ -1,5 +1,6 @@
 import { requireMethod, requireUser, serviceClient } from '../_shared/auth.ts'
 import { fail, failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
+import { resolveTimeZone } from '../_shared/timezone.ts'
 
 const PROFILE_COLUMNS =
   'id, full_name, email, phone, avatar_path, date_of_birth, address_line1, address_line2, city, state, postal_code, country, role, created_at, updated_at'
@@ -19,7 +20,12 @@ Deno.serve(async (req) => {
     const ctx = await requireUser(req)
     if (ctx instanceof Response) return ctx
 
-    const [profileRes, streakRes] = await Promise.all([
+    // The reading record is calendar-shaped ("today", "this month"), and the
+    // calendar is the reader's. ?tz=Asia/Karachi sets it; the default is UTC
+    // and the response says which one was used.
+    const tz = resolveTimeZone(new URL(req.url).searchParams.get('tz'))
+
+    const [profileRes, streakRes, recordRes] = await Promise.all([
       ctx.supabase
         .from('profiles')
         .select(PROFILE_COLUMNS)
@@ -30,10 +36,16 @@ Deno.serve(async (req) => {
         .select('current_streak, longest_streak, last_read_date, updated_at')
         .eq('user_id', ctx.user.id)
         .maybeSingle(),
+      ctx.supabase.rpc('reading_record', { p_tz: tz }),
     ])
 
     if (profileRes.error) {
-      return failFromDbError('profile-read', 'PROFILE_READ_FAILED', 'Unable to load profile', profileRes.error)
+      return failFromDbError(
+        'profile-read',
+        'PROFILE_READ_FAILED',
+        'Unable to load profile',
+        profileRes.error,
+      )
     }
 
     if (!profileRes.data) {
@@ -41,7 +53,27 @@ Deno.serve(async (req) => {
     }
 
     if (streakRes.error) {
-      return failFromDbError('profile-read', 'STREAK_READ_FAILED', 'Unable to load reading streak', streakRes.error)
+      return failFromDbError(
+        'profile-read',
+        'STREAK_READ_FAILED',
+        'Unable to load reading streak',
+        streakRes.error,
+      )
+    }
+
+    if (recordRes.error) {
+      return failFromDbError(
+        'profile-read',
+        'READING_RECORD_READ_FAILED',
+        'Unable to load reading record',
+        recordRes.error,
+      )
+    }
+
+    const record = (recordRes.data ?? {}) as {
+      readingGoal?: Record<string, unknown>
+      streak?: { recent_days?: unknown[] }
+      achievements?: unknown[]
     }
 
     // A missing or unsignable avatar is not a failed profile read - the screen
@@ -65,12 +97,19 @@ Deno.serve(async (req) => {
       ...profileRes.data,
       avatarUrl,
       avatarUrlExpiresIn: avatarUrl ? AVATAR_URL_TTL_SECONDS : null,
-      streak: streakRes.data ?? {
-        current_streak: 0,
-        longest_streak: 0,
-        last_read_date: null,
-        updated_at: null,
+      // The four streak fields keep coming from the table read they always
+      // came from; the RPC only adds the seven-day history beside them.
+      streak: {
+        ...(streakRes.data ?? {
+          current_streak: 0,
+          longest_streak: 0,
+          last_read_date: null,
+          updated_at: null,
+        }),
+        recent_days: record.streak?.recent_days ?? [],
       },
+      readingGoal: record.readingGoal ?? null,
+      achievements: record.achievements ?? [],
     })
   } catch (error) {
     return handleError('profile-read', error)

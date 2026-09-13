@@ -96,6 +96,39 @@ export type Database = {
           },
         ]
       }
+      achievements: {
+        Row: {
+          achievement_id: string
+          earned_at: string
+          user_id: string
+        }
+        Insert: {
+          achievement_id: string
+          earned_at?: string
+          user_id: string
+        }
+        Update: {
+          achievement_id?: string
+          earned_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "achievements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "admin_user_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "achievements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_audit_log: {
         Row: {
           action: string
@@ -991,6 +1024,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          monthly_goal: number
           phone: string | null
           postal_code: string | null
           role: string
@@ -1008,6 +1042,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          monthly_goal?: number
           phone?: string | null
           postal_code?: string | null
           role?: string
@@ -1025,6 +1060,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          monthly_goal?: number
           phone?: string | null
           postal_code?: string | null
           role?: string
@@ -1033,12 +1069,55 @@ export type Database = {
         }
         Relationships: []
       }
+      reading_days: {
+        Row: {
+          day: string
+          night_sessions: number
+          pages_read: number
+          sessions: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          day: string
+          night_sessions?: number
+          pages_read?: number
+          sessions?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          day?: string
+          night_sessions?: number
+          pages_read?: number
+          sessions?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reading_days_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "admin_user_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reading_days_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reading_progress: {
         Row: {
           book_id: string
           chapter_label: string | null
           created_at: string
           current_page: number
+          finished_at: string | null
           id: string
           last_read_at: string
           progress: number
@@ -1051,6 +1130,7 @@ export type Database = {
           chapter_label?: string | null
           created_at?: string
           current_page?: number
+          finished_at?: string | null
           id?: string
           last_read_at?: string
           progress?: number
@@ -1063,6 +1143,7 @@ export type Database = {
           chapter_label?: string | null
           created_at?: string
           current_page?: number
+          finished_at?: string | null
           id?: string
           last_read_at?: string
           progress?: number
@@ -2347,6 +2428,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      reading_record: { Args: { p_tz?: string }; Returns: Json }
       rebuild_user_recommendations: {
         Args: { p_limit?: number; p_user_id: string }
         Returns: number
@@ -2412,6 +2494,7 @@ export type Database = {
           p_current_page?: number
           p_progress?: number
           p_total_pages?: number
+          p_tz?: string
         }
         Returns: Json
       }
