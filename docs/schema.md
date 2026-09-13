@@ -236,6 +236,10 @@ Renaming to `v_current_role` is the whole fix; the surrounding logic was already
 `entitlements(plan_id)`, `book_categories(category_id)`, `collection_books(book_id)` — each
 is a foreign key that Postgres does not index for you and that the new delete guards scan.
 
+`profiles(full_name | email | phone)` trigram GIN and `books(slug)` trigram GIN (`20260917120000`) — the
+admin People and Library searches are `ilike '%q%'` over these columns, which only pg_trgm can
+serve with a leading wildcard; `profiles(created_at desc, id)` backs the directory's newest-first paging.
+
 ## Applying schema
 
 - **Canonical:** `supabase/migrations/` via `npm run db:push` (preferred for staging/production)
