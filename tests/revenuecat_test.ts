@@ -107,14 +107,21 @@ Deno.test('event ordering falls back to purchased_at_ms, then gives up', () => {
   assertEquals(resolveEventTimestampMs({ event_timestamp_ms: Number.NaN }), null)
 })
 
-Deno.test('plan lookup prefers store product_id, else premium_monthly', () => {
-  assertEquals(resolvePlanLookup('com.ilmoirfan.premium.monthly'), {
-    by: 'revenuecat_product_id',
+Deno.test('plan lookup prefers store product_id columns, else premium_monthly', () => {
+  assertEquals(resolvePlanLookup('com.ilmoirfan.premium.monthly', 'APP_STORE'), {
+    by: 'product_id',
     value: 'com.ilmoirfan.premium.monthly',
+    columns: ['app_store_product_id', 'revenuecat_product_id', 'play_store_product_id'],
+  })
+  assertEquals(resolvePlanLookup('premium_monthly', 'PLAY_STORE'), {
+    by: 'product_id',
+    value: 'premium_monthly',
+    columns: ['play_store_product_id', 'revenuecat_product_id', 'app_store_product_id'],
   })
   assertEquals(resolvePlanLookup('  premium_monthly  '), {
-    by: 'revenuecat_product_id',
+    by: 'product_id',
     value: 'premium_monthly',
+    columns: ['revenuecat_product_id', 'app_store_product_id', 'play_store_product_id'],
   })
   assertEquals(resolvePlanLookup(''), { by: 'code', value: FALLBACK_PLAN_CODE })
   assertEquals(resolvePlanLookup(null), { by: 'code', value: FALLBACK_PLAN_CODE })

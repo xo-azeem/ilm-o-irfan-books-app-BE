@@ -29,12 +29,17 @@ where id = 1
   and featured_collection_id is null;
 
 -- Premium plan (matches FE subscription copy)
--- revenuecat_product_id is a PLACEHOLDER until App Store / Play SKUs exist.
--- Replace with the real store product id (same string in RevenueCat +
--- plans.revenuecat_product_id). Webhook matches event.product_id first, then
--- falls back to code = premium_monthly.
+-- Store SKUs: set app_store_product_id / play_store_product_id to the real
+-- App Store Connect / Play Console product ids (they may differ).
+-- revenuecat_product_id remains a shared alias. Webhook matches event.product_id
+-- against all three, preferring the column for event.store, then falls back to
+-- code = premium_monthly.
+-- Apple Pay / Google Pay are payment methods inside those store sheets — not
+-- separate product ids or Edge Functions.
 insert into public.plans (
-  id, code, name, price_cents, currency, interval, features, revenuecat_product_id, is_active, sort_order
+  id, code, name, price_cents, currency, interval, features,
+  revenuecat_product_id, app_store_product_id, play_store_product_id,
+  is_active, sort_order
 ) values (
   '55555555-5555-5555-5555-555555555001',
   'premium_monthly',
@@ -48,6 +53,8 @@ insert into public.plans (
     "Audio lessons & highlights",
     "Early access to new releases"
   ]'::jsonb,
+  'premium_monthly',
+  'premium_monthly',
   'premium_monthly',
   true,
   1

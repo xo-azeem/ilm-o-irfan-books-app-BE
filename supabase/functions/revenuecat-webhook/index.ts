@@ -154,18 +154,24 @@ Deno.serve(async (req) => {
     const hasPremiumEntitlement = grantsEntitlement(event, entitlementId)
     const status = mapStatus(eventType, hasPremiumEntitlement, event.expiration_at_ms)
 
-    const planLookup = resolvePlanLookup(event.product_id)
+    const planLookup = resolvePlanLookup(event.product_id, event.store)
     let plan: { id: string } | null = null
     let planError: { message?: string; code?: string } | null = null
 
-    if (planLookup.by === 'revenuecat_product_id') {
-      const byProduct = await admin
-        .from('plans')
-        .select('id')
-        .eq('revenuecat_product_id', planLookup.value)
-        .maybeSingle()
-      planError = byProduct.error
-      plan = byProduct.data
+    if (planLookup.by === 'product_id') {
+      for (const column of planLookup.columns) {
+        const byProduct = await admin
+          .from('plans')
+          .select('id')
+          .eq(column, planLookup.value)
+          .maybeSingle()
+        planError = byProduct.error
+        if (planError) break
+        if (byProduct.data) {
+          plan = byProduct.data
+          break
+        }
+      }
     }
 
     if (!planError && !plan) {

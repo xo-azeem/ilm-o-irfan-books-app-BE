@@ -9,17 +9,26 @@ API URL: `https://rwnmckrepvycydmtgvcq.supabase.co`
 2. Entitlement id must be **`premium`** (matches `REVENUECAT_ENTITLEMENT_ID`).
 3. Create one auto-renewing subscription in **App Store Connect** and **Google Play Console**.
 4. In RevenueCat, attach both store products to entitlement `premium` (default offering).
-5. Set `plans.revenuecat_product_id` for `premium_monthly` to that store/RC product id.
-   Seed currently uses the placeholder string `premium_monthly` — replace before live sandbox:
+5. Set plan SKUs on `premium_monthly` (Apple and Play may differ):
 
 ```sql
 update public.plans
-set revenuecat_product_id = 'YOUR_STORE_OR_RC_PRODUCT_ID'
+set
+  revenuecat_product_id = 'YOUR_SHARED_OR_PRIMARY_SKU',
+  app_store_product_id = 'YOUR_APPLE_PRODUCT_ID',
+  play_store_product_id = 'YOUR_PLAY_PRODUCT_ID'
 where code = 'premium_monthly';
 ```
 
-   The webhook prefers `event.product_id` → `plans.revenuecat_product_id`, then falls back to
-   `code = 'premium_monthly'` if the SKU row is missing.
+   Or CMS: `admin-plan-update` with `app_store_product_id` / `play_store_product_id` /
+   `revenuecat_product_id`.
+
+   The webhook matches `event.product_id` against those columns (store-preferred order),
+   then falls back to `code = 'premium_monthly'`.
+
+   **Apple Pay / Google Pay:** not separate backends. iOS uses StoreKit (Apple Pay may
+   appear in the sheet); Android uses Play Billing (Google Pay may appear). Both flow
+   through RevenueCat → `revenuecat-webhook` → `entitlements`.
 6. Webhook URL:
 
 ```text
@@ -40,13 +49,12 @@ npx supabase secrets set REVENUECAT_WEBHOOK_AUTH="Bearer YOUR_REAL_SHARED_SECRET
 
 ### Product id checklist
 
-- [ ] App Store product id created
-- [ ] Play product id created (may match or differ; map both in RC)
+- [ ] App Store product id created → `plans.app_store_product_id`
+- [ ] Play product id created → `plans.play_store_product_id`
 - [ ] RC entitlement `premium` linked to both
-- [ ] `plans.revenuecat_product_id` updated on staging (and later prod)
+- [ ] `plans.revenuecat_product_id` set (shared alias / primary)
 - [ ] Webhook auth no longer a placeholder
 - [ ] Sandbox INITIAL_PURCHASE → `entitlements.store` is `app_store` or `play_store`
-
 ### Manual comps (no RC)
 
 Admin only — `POST /functions/v1/admin-set-entitlement`:

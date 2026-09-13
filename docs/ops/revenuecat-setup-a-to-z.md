@@ -153,20 +153,29 @@ npx supabase functions deploy revenuecat-webhook --project-ref rwnmckrepvycydmtg
 
 ---
 
-## Phase 6 — Align Postgres plan product id
+## Phase 6 — Align Postgres plan product ids
 
 On staging SQL (Dashboard → SQL):
 
 ```sql
 update public.plans
-set revenuecat_product_id = 'PASTE_EXACT_STORE_OR_RC_PRODUCT_ID'
+set
+  revenuecat_product_id = 'SHARED_OR_PRIMARY_SKU',
+  app_store_product_id = 'APPLE_PRODUCT_ID',
+  play_store_product_id = 'PLAY_PRODUCT_ID'
 where code = 'premium_monthly';
 
-select code, revenuecat_product_id from public.plans where code = 'premium_monthly';
+select code, revenuecat_product_id, app_store_product_id, play_store_product_id
+from public.plans
+where code = 'premium_monthly';
 ```
 
-If Apple and Play product ids **differ**, prefer matching the id RC puts in `event.product_id` (check one sandbox webhook payload). Our webhook falls back to plan code `premium_monthly` if the SKU row is missing — still set the real id so plan joins stay correct.
+Apple and Play product ids often **differ**. The webhook matches `event.product_id`
+against all three columns (store-preferred order) and falls back to plan code
+`premium_monthly` if nothing matches.
 
+**Apple Pay / Google Pay:** payment methods inside the App Store / Play purchase
+sheet — not separate products, SKUs, or Edge Functions.
 ---
 
 ## Phase 7 — App identity (already coded — verify)
