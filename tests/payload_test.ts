@@ -13,10 +13,10 @@ import {
   asStringArray,
   asUuid,
   asUuidArray,
+  type FieldSpec,
   pickProvided,
   requireUuidArrayField,
   requireUuidField,
-  type FieldSpec,
 } from '../supabase/functions/_shared/payload.ts'
 
 const UUID = '2f9c1a6e-0f3b-4a54-9c9e-2ad9a7c9d1b2'
@@ -24,7 +24,11 @@ const UUID = '2f9c1a6e-0f3b-4a54-9c9e-2ad9a7c9d1b2'
 const FIELDS: FieldSpec[] = [
   { column: 'full_name', aliases: ['full_name', 'fullName'], coerce: asOptionalText('full_name') },
   { column: 'city', aliases: ['city'], coerce: asOptionalText('city') },
-  { column: 'date_of_birth', aliases: ['date_of_birth', 'dateOfBirth'], coerce: asOptionalDate('dob') },
+  {
+    column: 'date_of_birth',
+    aliases: ['date_of_birth', 'dateOfBirth'],
+    coerce: asOptionalDate('dob'),
+  },
 ]
 
 Deno.test('pickProvided emits only the keys the caller sent', () => {
@@ -63,6 +67,9 @@ Deno.test('asOptionalDate accepts YYYY-MM-DD and rejects anything else', () => {
   assertEquals(asOptionalDate('dob')(''), null)
   assertThrows(() => asOptionalDate('dob')('17-04-1998'), BadRequestError)
   assertThrows(() => asOptionalDate('dob')('1998-13-01'), BadRequestError)
+  assertThrows(() => asOptionalDate('dob')('1995-02-30'), BadRequestError)
+  assertThrows(() => asOptionalDate('dob')('2023-02-29'), BadRequestError)
+  assertEquals(asOptionalDate('dob')('2024-02-29'), '2024-02-29')
 })
 
 Deno.test('asBoolean accepts the string and number spellings a form sends', () => {

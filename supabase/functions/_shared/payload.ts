@@ -69,8 +69,11 @@ export function asOptionalDate(label: string) {
       throw new BadRequestError(`${label} must be YYYY-MM-DD`)
     }
 
+    // Date.parse rolls an impossible day over ("1995-02-30" becomes 2 March),
+    // so the value only counts as a real date if it survives the round trip.
+    // Without this Postgres rejected it and the caller got a 500, not a 400.
     const ms = Date.parse(`${trimmed}T00:00:00.000Z`)
-    if (!Number.isFinite(ms)) {
+    if (!Number.isFinite(ms) || new Date(ms).toISOString().slice(0, 10) !== trimmed) {
       throw new BadRequestError(`${label} must be a valid calendar date`)
     }
 
