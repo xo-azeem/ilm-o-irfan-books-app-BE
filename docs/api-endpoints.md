@@ -60,6 +60,7 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | `/functions/v1/admin-bulk-update-books` | POST | Admin | Bulk publish / premium |
 | `/functions/v1/admin-set-book-relations` | POST | Admin | Set category + collection membership for a book |
 | `/functions/v1/admin-set-collection-books` | POST | Admin | Replace ordered books in a collection |
+| `/functions/v1/admin-set-category-books` | POST | Admin | Replace the set of books tagged with a category |
 | `/functions/v1/admin-reorder` | POST | Admin | Reorder categories or collections |
 | `/functions/v1/admin-set-entitlement` | POST | Admin | Comp / adjust entitlement (promotional) |
 | `/functions/v1/admin-set-user-role` | POST | Admin | Promote / demote admin |

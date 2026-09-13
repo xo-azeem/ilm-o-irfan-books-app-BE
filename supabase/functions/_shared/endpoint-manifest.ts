@@ -279,6 +279,13 @@ export const endpointManifest: EndpointDefinition[] = [
     description: 'Replaces ordered membership for one collection.',
   },
   {
+    name: 'admin-set-category-books',
+    route: '/functions/v1/admin-set-category-books',
+    method: 'POST',
+    access: 'admin',
+    description: 'Replaces the set of books tagged with one category.',
+  },
+  {
     name: 'admin-reorder',
     route: '/functions/v1/admin-reorder',
     method: 'POST',

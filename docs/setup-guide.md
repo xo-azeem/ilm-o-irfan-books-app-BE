@@ -126,6 +126,7 @@ npx supabase functions deploy admin-book-delete
 npx supabase functions deploy admin-bulk-update-books
 npx supabase functions deploy admin-set-book-relations
 npx supabase functions deploy admin-set-collection-books
+npx supabase functions deploy admin-set-category-books
 npx supabase functions deploy admin-reorder
 npx supabase functions deploy admin-set-entitlement
 npx supabase functions deploy admin-set-user-role

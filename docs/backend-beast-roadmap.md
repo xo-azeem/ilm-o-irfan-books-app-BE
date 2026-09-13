@@ -161,6 +161,7 @@ SQL RPCs exist; day-to-day CMS should not require SQL. Wrap:
 | `admin_bulk_update_books` | [x] `admin-bulk-update-books`, now storage-aware on publish |
 | `admin_set_book_relations` | [x] `admin-set-book-relations` |
 | `admin_set_collection_books` | [x] `admin-set-collection-books` |
+| `admin_set_category_books` | [x] `admin-set-category-books` |
 | `admin_reorder` (categories / collections) | [x] `admin-reorder` |
 | `admin-authors` CRUD (`admin_author_rows`) | [x] list + create / update / delete |
 | `admin-categories` write / reorder | [x] `admin-category-create` / `-update` / `-delete` |

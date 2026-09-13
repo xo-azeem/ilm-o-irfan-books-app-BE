@@ -132,6 +132,7 @@ All are `security_invoker`, so admin RLS still applies.
 | `admin_delete_books(ids)` | Deletes rows and returns the storage paths to purge |
 | `admin_set_book_relations(book, categories, collections)` | Replaces a book's joins in one call |
 | `admin_set_collection_books(collection, ordered_ids)` | Replaces membership, preserving order |
+| `admin_set_category_books(category, ids)` | Replaces the set of books tagged with a category (no order) |
 | `admin_reorder(table, ids)` | Persists a `sort_order` reorder for categories or collections |
 | `admin_set_entitlement(user, status, plan, expires_at)` | Comps and support fixes; marks `store = 'promotional'` |
 | `admin_user_detail(user)` | Profile, streak, recent reading, downloads, and counts |

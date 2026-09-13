@@ -2103,6 +2103,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_set_category_books: {
+        Args: { p_book_ids: string[]; p_category_id: string }
+        Returns: undefined
+      }
       admin_set_collection_books: {
         Args: { p_book_ids: string[]; p_collection_id: string }
         Returns: undefined

@@ -134,6 +134,7 @@ Wrapped existing SQL RPCs so day-to-day CMS work does not need raw SQL. All use 
 | `admin-bulk-update-books` | `admin_bulk_update_books` |
 | `admin-set-book-relations` | `admin_set_book_relations` (preserves omitted side) |
 | `admin-set-collection-books` | `admin_set_collection_books` |
+| `admin-set-category-books` | `admin_set_category_books` |
 | `admin-reorder` | `admin_reorder` |
 | `admin-set-entitlement` | `admin_set_entitlement` |
 | `admin-set-user-role` | `admin_set_user_role` |
