@@ -73,6 +73,7 @@ Goal: production-grade Supabase backend that is secure, operable, content-ready,
   - Staging: seed created `admin@gmail.com` (`role=admin`, JWT `app_role=admin`); password reset + `entitlements-status` verified (`isAdmin` + `canAccessPremium`)
   - Helpers: `scripts/reset-hosted-user-password.mjs`, `scripts/verify-hosted-admin.mjs`, `scripts/run-authenticated-smokes.mjs`
 - [x] Storage policies verified against the hosted project; the broad `covers_public_read` SELECT policy that let any client enumerate the bucket was dropped in `20260905140000`
+- [x] Admin-only SELECT policies on `covers` and `pdfs` (`20260916140000`) so the Storage API can delete (`DELETE … RETURNING` needs SELECT under RLS); `admin_delete_storage_object()` is a guard only — SQL deletes on `storage.objects` are blocked by Storage's `protect_objects_delete` trigger (`20260916130000`)
 - [x] Private ops note template: `docs/ops/private-ops.example.md` (fill locally; never commit secrets)
 - [ ] Upgrade to Supabase Pro before public launch (PITR / reliability)
 

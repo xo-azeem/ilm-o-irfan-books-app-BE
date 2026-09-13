@@ -32,7 +32,11 @@ Deno.serve(async (req) => {
       return fail('INVALID_REQUEST', 'name is required', 400)
     }
 
-    const { error } = await ctx.supabase.rpc('admin_delete_storage_object', {
+    // The database only clears the delete: admin, managed bucket, and nothing
+    // still pointing at the object. Rows in storage.objects cannot be deleted
+    // with SQL (Storage's protect_objects_delete trigger), so the object itself
+    // goes through the Storage API under the admin delete policies.
+    const { data: exists, error } = await ctx.supabase.rpc('admin_delete_storage_object', {
       p_bucket: bucket,
       p_name: name,
     })
@@ -46,7 +50,14 @@ Deno.serve(async (req) => {
       )
     }
 
-    return ok({ bucket, name, deleted: true })
+    if (exists) {
+      const { error: removeError } = await ctx.supabase.storage.from(bucket).remove([name])
+      if (removeError) {
+        return fail('ADMIN_DELETE_STORAGE_FAILED', removeError.message, 500)
+      }
+    }
+
+    return ok({ bucket, name, deleted: Boolean(exists) })
   } catch (error) {
     return handleError('admin-delete-storage-object', error)
   }

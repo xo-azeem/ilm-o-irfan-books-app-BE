@@ -138,7 +138,7 @@ All are `security_invoker`, so admin RLS still applies.
 | `admin_user_detail(user)` | Profile, streak, recent reading, downloads, and counts |
 | `admin_analytics(days)` | Day-bucketed signups / reads / downloads, top books and categories |
 | `admin_storage_audit()` | Unreferenced storage objects and books pointing at missing files |
-| `admin_delete_storage_object(bucket, name)` | Deletes an orphan; refuses if a book still references it |
+| `admin_delete_storage_object(bucket, name)` | Clears an orphan for deletion (refuses if a book or author still references it); the caller removes it via the Storage API |
 | `admin_dashboard_stats()` | Extended with catalog, plan, and 7-day activity counters |
 
 RevenueCat still owns store purchases — a webhook event overwrites a manual `admin_set_entitlement`

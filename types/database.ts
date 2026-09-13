@@ -2081,7 +2081,7 @@ export type Database = {
       }
       admin_delete_storage_object: {
         Args: { p_bucket: string; p_name: string }
-        Returns: undefined
+        Returns: boolean
       }
       admin_refresh_carousel_week: {
         Args: { p_pool?: number; p_week?: string }
