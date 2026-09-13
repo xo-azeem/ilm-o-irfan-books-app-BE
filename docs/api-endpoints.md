@@ -41,7 +41,8 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | `/functions/v1/highlights-delete` | POST | User | Delete by `{ id }` or `{ book_id, page_number }`; missing → `deleted: false` |
 | `/functions/v1/library-overview` | GET | User | Combined shelves: wishlist, in-progress, finished (`progress >= 0.99`), downloads, highlights. Progress rows carry `finished_at` |
 | `/functions/v1/entitlements-status` | GET | User | Current premium state |
-| `/functions/v1/get-signed-pdf` | POST | User | Signed PDF URL for premium or allowed access |
+| `/functions/v1/get-signed-pdf` | POST | User | Signed PDF URL for premium or allowed access; carries `pdfUpdatedAt`, the stamp of the file being served |
+| `/functions/v1/vault-check` | POST | User | `{ bookIds }` → which still exist and their `pdfUpdatedAt` — see [Replaced and deleted books](#replaced-and-deleted-books) |
 | `/functions/v1/avatar-upload-url` | POST | User | One-shot signed upload URL for the caller's avatar |
 | `/functions/v1/recommendations` | GET | User | Personalised "Because you read …" rails — see [Recommendations](#recommendations) |
 
@@ -61,6 +62,7 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | `/functions/v1/admin-set-book-relations` | POST | Admin | Set category + collection membership for a book |
 | `/functions/v1/admin-set-collection-books` | POST | Admin | Replace ordered books in a collection |
 | `/functions/v1/admin-set-category-books` | POST | Admin | Replace the set of books tagged with a category |
+| `/functions/v1/admin-publish-upload-batch` | POST | Admin | `{ batchId }` → publish every book in a bulk upload — see [Bulk uploads](#bulk-uploads) |
 | `/functions/v1/admin-reorder` | POST | Admin | Reorder categories or collections |
 | `/functions/v1/admin-set-entitlement` | POST | Admin | Comp / adjust entitlement (promotional) |
 | `/functions/v1/admin-set-user-role` | POST | Admin | Promote / demote admin |
@@ -548,6 +550,124 @@ per-user and sends no cache headers; never cache it across users.
 The same check runs for `admin-book-create`, `admin-book-update`, and each id in
 `admin-bulk-update-books` — the bulk response returns `skippedBooks: [{ id, reason }]`
 rather than failing the batch. Upload the PDF first, then publish.
+
+## Bulk uploads
+
+A set of books can be added one at a time and released together. The admin app
+creates an `upload_batches` row (a title, an optional destination
+`collection_id` and `category_id`), then saves each book as an ordinary
+unpublished row with `books.upload_batch_id` set. Nothing else changes: drafts
+are already invisible to every reader endpoint, and a collection created for
+the upload is inserted with `is_published = false`.
+
+`admin-publish-upload-batch` takes `{ batchId }` and calls
+`admin_publish_upload_batch(uuid)` with the caller's JWT:
+
+1. Every book in the batch is joined to the destination collection (appended
+   in creation order) and category, `on conflict do nothing` — so a
+   destination chosen after the books were added still gets them.
+2. The books go through `admin_bulk_update_books(ids, true, null)`, so the
+   storage check above applies to each one and the response carries the same
+   `updated` / `skipped` / `skippedBooks`.
+3. Only when nothing was skipped and every book in the batch is live does the
+   batch become `status = 'published'` (with `published_at`), and a hidden
+   destination collection is switched on. A partial run leaves the batch in
+   draft with the eligible titles already live; fix the skipped ones and call
+   again.
+
+Response: `{ batchId, updated, skipped, skippedBooks, batchPublished }`.
+`404 NOT_FOUND` for an unknown batch; `400 INVALID_REQUEST` when the batch has
+no books. The admin list reads `admin_upload_batch_rows` (`book_count`,
+`ready_count`, `published_count`, destination titles) and the books of one
+batch come from `admin_book_rows` filtered by `upload_batch_id`. Deleting a
+batch sets the column to null on its books; they stay as drafts.
+
+## Replaced and deleted books
+
+A downloaded book is a sealed copy of one particular file on the device, opened
+with no round trip. Two admin actions make that copy wrong, and the device is
+told about both through one stamp: `books.pdf_updated_at`, the instant the
+current `pdf_path` was attached. Every upload lands at a fresh storage path, so
+a trigger bumps the stamp on exactly the writes that replace the file.
+
+| Admin action | Server | Device |
+| --- | --- | --- |
+| Replace the PDF (`pdf_path` changes) | `pdf_updated_at` bumped; the book's `downloads` rows deleted — nobody has the new file | Copy dropped; the reader is told the file was updated and can download again |
+| Delete the book | Cascade removes downloads, progress, wishlist, highlights | Copy dropped; the reader is told the book is no longer available |
+| Unpublish | Nothing | Nothing — the copy stays; only fetching it again is refused |
+
+`get-signed-pdf` returns `pdfUpdatedAt` so the device records which file it
+downloaded. `vault-check` takes `{ bookIds: uuid[] }` (at most 200) and answers
+`{ books: [{ bookId, pdfUpdatedAt, hasPdf, isPublished }] }` for the ids that
+still exist; the device treats an absent id as deleted and a different stamp as
+replaced, and touches nothing on any error. It runs at sign-in, on every return
+to the foreground, and behind every offline open — so a revoked book is closed
+the moment the device has a connection, even mid-read. The same rows come from
+the `vault_check(uuid[])` RPC directly.
+
+## Push notifications
+
+Readers get tray notifications for the catalogue changes that concern them.
+The database records each change in `push_outbox`; the `push-dispatch` Edge
+Function sends it through FCM HTTP v1. Nothing in the app calls the dispatcher —
+the outbox's insert trigger kicks it through pg_net, and a minutely pg_cron tick
+catches merged and retried rows. Wiring (secrets, `private.runtime_config`) is
+in [setup-guide.md → Push notifications](./setup-guide.md#push-notifications).
+
+| Kind | Trigger | Audience | Tap opens |
+| --- | --- | --- | --- |
+| `books_published` | A book (or, in one statement, N books) goes live and does not sit wholly inside one collection | topic `catalog` | the book, or Home |
+| `collection_published` | A non-system collection is live *and* has its first live book — on publish, on its first book being published, or on a bulk upload | topic `catalog` | the collection |
+| `collection_books_added` | Live books join an already-announced collection, or a bulk upload lands in one; 2-minute merge window | topic `catalog` | the collection |
+| `book_deleted` | A book is deleted | readers who downloaded, read, saved or bookmarked it | My Library |
+| `book_file_replaced` | A live book's `pdf_path` changes | the same readers (captured before `downloads` is cleared) | the book |
+| `book_updated` | A live book's title, description, author, cover, page count, read time, language or genre changes; 2-minute merge window | the same readers | the book |
+| `membership_activated` | `access_events.is_active` flips to true | that reader | Home |
+| `membership_expired` | `access_events.is_active` flips to false | that reader | Membership |
+
+Rules that keep it quiet: the admin who made the change is never a recipient;
+unpublishing sends nothing (the device keeps its copy, see above); admins get no
+membership pushes; a bulk publish is one row, not one per book
+(`admin_publish_upload_batch` silences the row triggers with the transaction
+setting `app.push_suppress` and enqueues once); pending rows for the same
+`(kind, entity_id)` merge, so four saves in two minutes are one push; and the
+dispatcher folds several `book_deleted` / `book_updated` / `book_file_replaced`
+rows for one reader into a single "3 books were removed".
+
+**Message contract.** Every message carries `notification.title` / `body`
+(so the OS draws the tray entry when the app is in the background or killed)
+and a string-only `data` map the app routes on:
+
+```json
+{ "kind": "book_file_replaced", "route": "book", "bookId": "<uuid>", "count": "1" }
+```
+
+`route` is one of `book` (`bookId`), `collection` (`collectionId`), `home`,
+`library`, `membership`. Android messages name a notification channel
+(`catalog`, `library`, `account`) and a `tag` / `collapse_key` of
+`<kind>:<entity>`, so a repeat replaces the earlier tray entry instead of
+stacking; iOS gets the same value as `apns-collapse-id` and `thread-id`. The
+copy for every kind lives in `_shared/push.ts`.
+
+**Tokens.** The app registers its FCM token with `register_push_token(token,
+platform, app_version, device_name, notify_library, notify_membership)` at
+sign-in, on every token refresh, once per launch, and whenever a preference
+switch flips; `unregister_push_token(token)` on sign-out. Both scope to
+`auth.uid()`. The two flags mirror the app's Notifications screen and are
+applied by the dispatcher per kind; catalogue announcements go out on the FCM
+topic `catalog`, which the device subscribes to itself, so they need no row.
+Tokens FCM reports dead are marked `disabled_at`; `prune_push_tables()` (daily)
+drops those after 30 days, tokens unseen for 120 days, and sent rows after 14.
+
+**Dispatcher.** `POST /functions/v1/push-dispatch` with header `x-push-secret`
+equal to the `PUSH_DISPATCH_SECRET` Edge secret. Claims up to 50 due rows
+(`push_outbox_claim`, skip-locked, reclaims rows stuck in `processing` for ten
+minutes), sends with 16-way concurrency, and answers
+`{ claimed, sent, failed, skipped, requests, disabledTokens }`. A row whose
+sends all failed with a retryable FCM error goes back to `pending` with
+exponential backoff, up to five attempts. `skipped` means every recipient had
+since signed out or turned that kind off. Without the FCM key configured the
+function answers `500 PUSH_CONFIG_ERROR` and claims nothing, so rows wait.
 
 ## Request notes
 

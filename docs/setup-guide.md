@@ -127,6 +127,7 @@ npx supabase functions deploy admin-bulk-update-books
 npx supabase functions deploy admin-set-book-relations
 npx supabase functions deploy admin-set-collection-books
 npx supabase functions deploy admin-set-category-books
+npx supabase functions deploy admin-publish-upload-batch
 npx supabase functions deploy admin-reorder
 npx supabase functions deploy admin-set-entitlement
 npx supabase functions deploy admin-set-user-role
@@ -371,6 +372,58 @@ That user must **sign out and sign back in** so the JWT picks up `app_metadata.a
    - Older than last applied event → ledger kept, entitlement unchanged → `200` `{ data: { stale: true } }`
    - Unknown / non-UUID `app_user_id` → `400`
    - Applied updates go through `apply_revenuecat_entitlement()` (race-safe)
+
+---
+
+## Push notifications
+
+The database queues every notification (`push_outbox`); the `push-dispatch`
+Edge Function sends them through FCM. Until both halves below are configured
+the queue simply fills and nothing is sent — safe to deploy ahead of Firebase.
+
+1. **Firebase project** → Project settings → Service accounts → *Generate new
+   private key*. Base64 the JSON so it survives the secrets file:
+
+   ```bash
+   # macOS / Linux
+   base64 -w0 service-account.json > sa.b64
+   # PowerShell
+   [Convert]::ToBase64String([IO.File]::ReadAllBytes('service-account.json')) > sa.b64
+   ```
+
+2. **Edge secrets** (or put both in `.env` and run `npm run deploy:hosted`):
+
+   ```bash
+   npx supabase secrets set PUSH_DISPATCH_SECRET=<long random string> --project-ref <ref>
+   npx supabase secrets set FCM_SERVICE_ACCOUNT_B64=<contents of sa.b64> --project-ref <ref>
+   npx supabase functions deploy push-dispatch --project-ref <ref>
+   ```
+
+3. **Tell the database where to kick** (SQL editor, same table the keep-warm
+   job reads; `supabase_url` may already be there):
+
+   ```sql
+   insert into private.runtime_config (key, value) values
+     ('supabase_url', 'https://<ref>.supabase.co'),
+     ('push_dispatch_secret', '<the same long random string>')
+   on conflict (key) do update set value = excluded.value, updated_at = timezone('utc', now());
+   ```
+
+4. **Check it moves.** Publish a book from the admin app, then:
+
+   ```sql
+   select id, kind, audience, status, count, attempts, last_error, sent_count
+   from public.push_outbox order by id desc limit 10;
+   select count(*) from public.device_push_tokens where disabled_at is null;
+   ```
+
+   A row stuck in `pending` with the cron running means `runtime_config` is
+   missing a key (the tick logs a notice); `failed` with `last_error` names the
+   FCM status. `select * from net._http_response order by id desc limit 5`
+   shows the dispatcher's own HTTP answers.
+
+The app-side setup (google-services.json, APNs key, channels) is documented in
+the FE repo: `docs/push-notifications.md`.
 
 ---
 

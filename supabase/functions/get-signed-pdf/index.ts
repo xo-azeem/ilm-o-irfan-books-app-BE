@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
         .from('books')
         // is_premium is not selected: it no longer decides anything here, and
         // reading it would invite someone to branch on it again.
-        .select('id, title, pdf_path, is_published, file_size_bytes')
+        .select('id, title, pdf_path, is_published, file_size_bytes, pdf_updated_at')
         .eq('id', bookId)
         .maybeSingle(),
     ])
@@ -151,6 +151,10 @@ Deno.serve(async (req) => {
       signedUrl,
       expiresIn,
       fileSizeBytes: book.file_size_bytes ?? null,
+      // Which file this is. The device keeps it beside the copy it downloads
+      // and compares it through vault-check later: a different stamp means
+      // the admin replaced the PDF and the copy on the device is the old one.
+      pdfUpdatedAt: book.pdf_updated_at ?? null,
 
       // Opening a book is the moment the reader is most likely to be in the
       // app and least likely to tolerate a stale lock, so the countdown is

@@ -351,6 +351,7 @@ export type Database = {
           language: string | null
           page_count: number | null
           pdf_path: string | null
+          pdf_updated_at: string
           price_cents: number
           published_at: string | null
           rating: number
@@ -363,6 +364,7 @@ export type Database = {
           tags: string[]
           title: string
           updated_at: string
+          upload_batch_id: string | null
         }
         Insert: {
           author_id: string
@@ -381,6 +383,7 @@ export type Database = {
           language?: string | null
           page_count?: number | null
           pdf_path?: string | null
+          pdf_updated_at?: string
           price_cents?: number
           published_at?: string | null
           rating?: number
@@ -393,6 +396,7 @@ export type Database = {
           tags?: string[]
           title: string
           updated_at?: string
+          upload_batch_id?: string | null
         }
         Update: {
           author_id?: string
@@ -411,6 +415,7 @@ export type Database = {
           language?: string | null
           page_count?: number | null
           pdf_path?: string | null
+          pdf_updated_at?: string
           price_cents?: number
           published_at?: string | null
           rating?: number
@@ -423,6 +428,7 @@ export type Database = {
           tags?: string[]
           title?: string
           updated_at?: string
+          upload_batch_id?: string | null
         }
         Relationships: [
           {
@@ -452,6 +458,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "carousel_items"
             referencedColumns: ["author_id"]
+          },
+          {
+            foreignKeyName: "books_upload_batch_id_fkey"
+            columns: ["upload_batch_id"]
+            isOneToOne: false
+            referencedRelation: "admin_upload_batch_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "books_upload_batch_id_fkey"
+            columns: ["upload_batch_id"]
+            isOneToOne: false
+            referencedRelation: "upload_batches"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -727,6 +747,59 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      device_push_tokens: {
+        Row: {
+          app_version: string | null
+          created_at: string
+          device_name: string | null
+          disabled_at: string | null
+          disabled_reason: string | null
+          last_seen_at: string
+          notify_library: boolean
+          notify_membership: boolean
+          platform: string
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          app_version?: string | null
+          created_at?: string
+          device_name?: string | null
+          disabled_at?: string | null
+          disabled_reason?: string | null
+          last_seen_at?: string
+          notify_library?: boolean
+          notify_membership?: boolean
+          platform: string
+          token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          app_version?: string | null
+          created_at?: string
+          device_name?: string | null
+          disabled_at?: string | null
+          disabled_reason?: string | null
+          last_seen_at?: string
+          notify_library?: boolean
+          notify_membership?: boolean
+          platform?: string
+          token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_push_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       downloads: {
         Row: {
@@ -1065,6 +1138,66 @@ export type Database = {
           postal_code?: string | null
           role?: string
           state?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      push_outbox: {
+        Row: {
+          attempts: number
+          audience: string
+          count: number
+          created_at: string
+          data: Json
+          deliver_after: string
+          entity_id: string | null
+          failed_count: number | null
+          id: number
+          kind: string
+          last_error: string | null
+          processed_at: string | null
+          recipients: string[]
+          sent_count: number | null
+          status: string
+          topic: string | null
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          audience: string
+          count?: number
+          created_at?: string
+          data?: Json
+          deliver_after?: string
+          entity_id?: string | null
+          failed_count?: number | null
+          id?: never
+          kind: string
+          last_error?: string | null
+          processed_at?: string | null
+          recipients?: string[]
+          sent_count?: number | null
+          status?: string
+          topic?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          audience?: string
+          count?: number
+          created_at?: string
+          data?: Json
+          deliver_after?: string
+          entity_id?: string | null
+          failed_count?: number | null
+          id?: never
+          kind?: string
+          last_error?: string | null
+          processed_at?: string | null
+          recipients?: string[]
+          sent_count?: number | null
+          status?: string
+          topic?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1464,6 +1597,71 @@ export type Database = {
           },
         ]
       }
+      upload_batches: {
+        Row: {
+          category_id: string | null
+          collection_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          published_at: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category_id?: string | null
+          collection_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          published_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string | null
+          collection_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          published_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upload_batches_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "admin_category_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_batches_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_batches_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "admin_collection_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_batches_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wishlist: {
         Row: {
           book_id: string
@@ -1597,6 +1795,7 @@ export type Database = {
           tags: string[] | null
           title: string | null
           updated_at: string | null
+          upload_batch_id: string | null
           wishlist_count: number | null
         }
         Relationships: [
@@ -1627,6 +1826,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "carousel_items"
             referencedColumns: ["author_id"]
+          },
+          {
+            foreignKeyName: "books_upload_batch_id_fkey"
+            columns: ["upload_batch_id"]
+            isOneToOne: false
+            referencedRelation: "admin_upload_batch_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "books_upload_batch_id_fkey"
+            columns: ["upload_batch_id"]
+            isOneToOne: false
+            referencedRelation: "upload_batches"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1904,6 +2117,54 @@ export type Database = {
           },
         ]
       }
+      admin_upload_batch_rows: {
+        Row: {
+          book_count: number | null
+          category_id: string | null
+          category_label: string | null
+          collection_id: string | null
+          collection_title: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string | null
+          published_at: string | null
+          published_count: number | null
+          ready_count: number | null
+          status: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upload_batches_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "admin_category_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_batches_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_batches_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "admin_collection_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_batches_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_user_directory: {
         Row: {
           avatar_path: string | null
@@ -2083,6 +2344,7 @@ export type Database = {
         Args: { p_bucket: string; p_name: string }
         Returns: boolean
       }
+      admin_publish_upload_batch: { Args: { p_batch_id: string }; Returns: Json }
       admin_refresh_carousel_week: {
         Args: { p_pool?: number; p_week?: string }
         Returns: Json
@@ -2421,6 +2683,11 @@ export type Database = {
       }
       my_access_state: { Args: never; Returns: Json }
       prune_access_events: { Args: { p_keep_days?: number }; Returns: number }
+      prune_push_tables: { Args: never; Returns: number }
+      push_outbox_claim: {
+        Args: { p_limit?: number }
+        Returns: Database["public"]["Tables"]["push_outbox"]["Row"][]
+      }
       random_published_books: {
         Args: { p_limit?: number }
         Returns: {
@@ -2511,6 +2778,18 @@ export type Database = {
         }
         Returns: Json
       }
+      register_push_token: {
+        Args: {
+          p_token: string
+          p_platform: string
+          p_app_version?: string | null
+          p_device_name?: string | null
+          p_notify_library?: boolean
+          p_notify_membership?: boolean
+        }
+        Returns: undefined
+      }
+      unregister_push_token: { Args: { p_token: string }; Returns: undefined }
       upsert_reading_progress: {
         Args: {
           p_book_id: string
@@ -2524,6 +2803,15 @@ export type Database = {
         Returns: Json
       }
       user_access_state: { Args: { p_user_id: string }; Returns: Json }
+      vault_check: {
+        Args: { p_book_ids: string[] }
+        Returns: {
+          book_id: string
+          pdf_updated_at: string
+          has_pdf: boolean
+          is_published: boolean
+        }[]
+      }
       user_has_active_premium: {
         Args: { p_user_id?: string }
         Returns: boolean

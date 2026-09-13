@@ -73,12 +73,20 @@ policy = "per_worker"
 [functions.get-signed-pdf]
 verify_jwt = true
 
+[functions.vault-check]
+verify_jwt = true
+
 # Deprecated alias. Left open so callers receive the 410 body rather than a
 # gateway 401 that tells them nothing.
 [functions.signed-pdf]
 verify_jwt = false
 
 [functions.revenuecat-webhook]
+verify_jwt = false
+
+# Server-to-server: the database kicks it through pg_net with a shared secret
+# (x-push-secret). No user JWT is ever involved.
+[functions.push-dispatch]
 verify_jwt = false
 
 [functions.home-feed]
@@ -175,6 +183,9 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.admin-set-category-books]
+verify_jwt = true
+
+[functions.admin-publish-upload-batch]
 verify_jwt = true
 
 [functions.admin-reorder]

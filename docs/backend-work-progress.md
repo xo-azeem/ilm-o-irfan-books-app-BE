@@ -135,6 +135,7 @@ Wrapped existing SQL RPCs so day-to-day CMS work does not need raw SQL. All use 
 | `admin-set-book-relations` | `admin_set_book_relations` (preserves omitted side) |
 | `admin-set-collection-books` | `admin_set_collection_books` |
 | `admin-set-category-books` | `admin_set_category_books` |
+| `admin-publish-upload-batch` | `admin_publish_upload_batch` (bulk uploads; `upload_batches` + `books.upload_batch_id`) |
 | `admin-reorder` | `admin_reorder` |
 | `admin-set-entitlement` | `admin_set_entitlement` |
 | `admin-set-user-role` | `admin_set_user_role` |
@@ -343,6 +344,19 @@ the RLS regression block, and the corrected last-admin guard.
 ### Updated (this + prior)
 
 - Seed / import / get-signed-pdf / revenuecat-webhook / home-feed / profile-* / library-overview / payload helper / Cursor rules / README / `.env.example` / setup-guide / schema / api-endpoints / audit / package.json
+
+---
+
+## Push notifications (2026-09-13)
+
+Done, not yet deployed:
+
+- `supabase/migrations/20260919120000_push_notifications.sql` — `device_push_tokens`, `push_outbox`, register/unregister RPCs, enqueue triggers on `books` / `collections` / `collection_books` / `access_events`, `admin_publish_upload_batch` announcing once, pg_net kick + pg_cron tick + prune.
+- `supabase/functions/push-dispatch` + `_shared/fcm.ts` (FCM HTTP v1 on WebCrypto, no Admin SDK) + `_shared/push.ts` (copy and routing contract).
+- `deploy-hosted.mjs` sets `PUSH_DISPATCH_SECRET` / `FCM_SERVICE_ACCOUNT_B64` when present; `ci-static-check.mjs` treats `push-dispatch` as a server-only caller.
+- Docs: api-endpoints (Push notifications), schema, setup-guide (secrets + `runtime_config`).
+
+Blocked on you: Firebase project + service-account key, then steps 1–3 in setup-guide → Push notifications.
 
 ---
 

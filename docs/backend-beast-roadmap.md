@@ -74,6 +74,7 @@ Goal: production-grade Supabase backend that is secure, operable, content-ready,
   - Helpers: `scripts/reset-hosted-user-password.mjs`, `scripts/verify-hosted-admin.mjs`, `scripts/run-authenticated-smokes.mjs`
 - [x] Storage policies verified against the hosted project; the broad `covers_public_read` SELECT policy that let any client enumerate the bucket was dropped in `20260905140000`
 - [x] Admin-only SELECT policies on `covers` and `pdfs` (`20260916140000`) so the Storage API can delete (`DELETE … RETURNING` needs SELECT under RLS); `admin_delete_storage_object()` is a guard only — SQL deletes on `storage.objects` are blocked by Storage's `protect_objects_delete` trigger (`20260916130000`)
+- [x] Replaced/deleted books leave every device: `books.pdf_updated_at` + trigger that drops the book's `downloads` on a file replacement, `vault_check()` RPC + `vault-check` function, `pdfUpdatedAt` on `get-signed-pdf` (`20260917130000`)
 - [x] Trigram indexes on `profiles.full_name/email/phone` and `books.slug`, plus `profiles(created_at desc, id)` (`20260917120000`) so the admin People/Library searches and the directory's paging are index reads instead of sequential scans
 - [x] Private ops note template: `docs/ops/private-ops.example.md` (fill locally; never commit secrets)
 - [ ] Upgrade to Supabase Pro before public launch (PITR / reliability)
@@ -114,6 +115,7 @@ Seed intentionally has **no books, no authors, no collections**. Old dummy shelv
 - [x] Document INP→PDF pipeline handoff — pointer in `docs/ops/books-ingest.md`
 - [x] Decide: audio lessons are marketing copy only for v1 (no audio schema) — keep out of catalog schema
 - [x] Sample ingest pack: `fixtures/sample-books` + `npm run books:sample` / `smoke:pdf`
+- [x] In-app bulk upload: `upload_batches` + `books.upload_batch_id` + `admin_publish_upload_batch()` (`20260918120000`) — a set of drafts released together, through the same storage-checked publish gate
 
 ---
 
@@ -164,6 +166,7 @@ SQL RPCs exist; day-to-day CMS should not require SQL. Wrap:
 | `admin_set_book_relations` | [x] `admin-set-book-relations` |
 | `admin_set_collection_books` | [x] `admin-set-collection-books` |
 | `admin_set_category_books` | [x] `admin-set-category-books` |
+| `admin_publish_upload_batch` (bulk uploads) | [x] `admin-publish-upload-batch` |
 | `admin_reorder` (categories / collections) | [x] `admin-reorder` |
 | `admin-authors` CRUD (`admin_author_rows`) | [x] list + create / update / delete |
 | `admin-categories` write / reorder | [x] `admin-category-create` / `-update` / `-delete` |

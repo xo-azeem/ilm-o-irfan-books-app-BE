@@ -9,6 +9,8 @@
  *   SIGNED_PDF_EXPIRES_IN
  *
  * Optional:
+ *   PUSH_DISPATCH_SECRET          shared secret the database sends as x-push-secret
+ *   FCM_SERVICE_ACCOUNT_B64       base64 of the Firebase service-account JSON key
  *   DEPLOY_SEED=1                 run supabase/seed.sql after db push
  *   DEPLOY_ALLOW_PLACEHOLDER_RC=1 allow a staging-only placeholder webhook auth
  *   SUPABASE_DB_PASSWORD          passed to `supabase link` when non-interactive
@@ -37,6 +39,8 @@ Required environment:
   SIGNED_PDF_EXPIRES_IN         Seconds, usually "300"
 
 Optional:
+  PUSH_DISPATCH_SECRET          Shared secret for push-dispatch (see docs/setup-guide.md)
+  FCM_SERVICE_ACCOUNT_B64       base64 of the Firebase service-account JSON key
   DEPLOY_SEED=1                 Apply supabase/seed.sql after migrations
   DEPLOY_ALLOW_PLACEHOLDER_RC=1 Use a staging placeholder if RC is not ready
   SUPABASE_DB_PASSWORD          Database password for non-interactive link
@@ -110,6 +114,8 @@ const rcEntitlement = (process.env.REVENUECAT_ENTITLEMENT_ID ?? '').trim()
 const pdfTtl = (process.env.SIGNED_PDF_EXPIRES_IN ?? '').trim()
 const allowPlaceholder = process.env.DEPLOY_ALLOW_PLACEHOLDER_RC === '1'
 const doSeed = process.env.DEPLOY_SEED === '1'
+const pushSecret = (process.env.PUSH_DISPATCH_SECRET ?? '').trim()
+const fcmServiceAccount = (process.env.FCM_SERVICE_ACCOUNT_B64 ?? '').trim()
 
 if (!rcAuth) {
   if (allowPlaceholder) {
@@ -170,6 +176,9 @@ writeFileSync(
     `REVENUECAT_WEBHOOK_AUTH=${rcAuth}`,
     `REVENUECAT_ENTITLEMENT_ID=${rcEntitlement}`,
     `SIGNED_PDF_EXPIRES_IN=${pdfTtl}`,
+    // Push is optional: without these the outbox fills and nothing is sent.
+    ...(pushSecret ? [`PUSH_DISPATCH_SECRET=${pushSecret}`] : []),
+    ...(fcmServiceAccount ? [`FCM_SERVICE_ACCOUNT_B64=${fcmServiceAccount}`] : []),
     '',
   ].join('\n'),
   'utf8',
@@ -223,6 +232,10 @@ FE handoff (Dashboard → Settings → API):
 
 Webhook URL (when RevenueCat is ready):
   ${url}/functions/v1/revenuecat-webhook
+
+Push (when Firebase is ready — docs/setup-guide.md → Push notifications):
+  ${pushSecret ? 'PUSH_DISPATCH_SECRET set' : 'PUSH_DISPATCH_SECRET not set'} · ${fcmServiceAccount ? 'FCM key set' : 'FCM key not set'}
+  Then: insert supabase_url + push_dispatch_secret into private.runtime_config
 
 Next:
   1. Dashboard → Authentication → enable Email provider

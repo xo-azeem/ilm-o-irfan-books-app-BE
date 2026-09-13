@@ -202,6 +202,13 @@ export const endpointManifest: EndpointDefinition[] = [
     description: 'Generates a signed PDF URL after premium and auth checks.',
   },
   {
+    name: 'vault-check',
+    route: '/functions/v1/vault-check',
+    method: 'POST',
+    access: 'authenticated',
+    description: 'For books held offline: which still exist and when their PDF was last replaced.',
+  },
+  {
     name: 'admin-books',
     route: '/functions/v1/admin-books',
     method: 'GET',
@@ -284,6 +291,13 @@ export const endpointManifest: EndpointDefinition[] = [
     method: 'POST',
     access: 'admin',
     description: 'Replaces the set of books tagged with one category.',
+  },
+  {
+    name: 'admin-publish-upload-batch',
+    route: '/functions/v1/admin-publish-upload-batch',
+    method: 'POST',
+    access: 'admin',
+    description: 'Publishes every book in one bulk upload; skips titles whose PDF is missing.',
   },
   {
     name: 'admin-reorder',
@@ -477,6 +491,15 @@ export const endpointManifest: EndpointDefinition[] = [
     method: 'POST',
     access: 'public',
     description: 'Receives authenticated RevenueCat subscription events.',
+  },
+  {
+    name: 'push-dispatch',
+    route: '/functions/v1/push-dispatch',
+    method: 'POST',
+    access: 'public',
+    description: 'Drains push_outbox into FCM. Called by the database (pg_net trigger + minutely pg_cron) with the x-push-secret header, never by the app.',
+    notes:
+      'Claims due rows, composes the tray text per kind, sends one request per topic row and one per (reader, device) for targeted rows, disables tokens FCM reports dead. Answers { claimed, sent, failed, skipped, requests, disabledTokens }.',
   },
   {
     name: 'carousel-list',

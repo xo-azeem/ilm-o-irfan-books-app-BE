@@ -133,6 +133,7 @@ All are `security_invoker`, so admin RLS still applies.
 | `admin_set_book_relations(book, categories, collections)` | Replaces a book's joins in one call |
 | `admin_set_collection_books(collection, ordered_ids)` | Replaces membership, preserving order |
 | `admin_set_category_books(category, ids)` | Replaces the set of books tagged with a category (no order) |
+| `admin_publish_upload_batch(batch)` | Joins a bulk upload's books to its destination, publishes them through `admin_bulk_update_books`, marks the batch published only on a clean run |
 | `admin_reorder(table, ids)` | Persists a `sort_order` reorder for categories or collections |
 | `admin_set_entitlement(user, status, plan, expires_at)` | Comps and support fixes; marks `store = 'promotional'` |
 | `admin_user_detail(user)` | Profile, streak, recent reading, downloads, and counts |
@@ -236,9 +237,45 @@ Renaming to `v_current_role` is the whole fix; the surrounding logic was already
 `entitlements(plan_id)`, `book_categories(category_id)`, `collection_books(book_id)` — each
 is a foreign key that Postgres does not index for you and that the new delete guards scan.
 
+`books.pdf_updated_at` (`20260917130000`) — when the current `pdf_path` was attached, bumped by trigger on
+every change of it; the same trigger deletes the book's `downloads` rows, since nobody has the new file.
+`vault_check(uuid[])` (SECURITY DEFINER, authenticated) answers a device's "do I still hold the right file"
+for every book in its vault in one read. See [Replaced and deleted books](./api-endpoints.md#replaced-and-deleted-books).
+
 `profiles(full_name | email | phone)` trigram GIN and `books(slug)` trigram GIN (`20260917120000`) — the
 admin People and Library searches are `ilike '%q%'` over these columns, which only pg_trgm can
 serve with a leading wildcard; `profiles(created_at desc, id)` backs the directory's newest-first paging.
+
+`upload_batches` (`20260918120000`) — a bulk upload: `title`, `status` (`draft` | `published`), optional
+destination `collection_id` / `category_id` (both `on delete set null`), `created_by`, `published_at`.
+Admin-only RLS, audited, `set_updated_at`. `books.upload_batch_id` (nullable, `on delete set null`,
+partial index) ties a draft to the batch it arrived in; `admin_book_rows` exposes it as its last column and
+`admin_upload_batch_rows` lists batches with `book_count` / `ready_count` (has a PDF) / `published_count`
+and the destination titles. See [Bulk uploads](./api-endpoints.md#bulk-uploads).
+
+## Push notifications
+
+`20260919120000_push_notifications.sql`. See [api-endpoints.md → Push notifications](./api-endpoints.md#push-notifications)
+for what is sent and when.
+
+| Object | Purpose |
+| --- | --- |
+| `device_push_tokens` | FCM token per (device, reader): `platform`, `app_version`, `device_name`, `notify_library`, `notify_membership`, `last_seen_at`, `disabled_at`. Owner `SELECT`; writes only via `register_push_token` / `unregister_push_token` (`SECURITY DEFINER`, scoped to `auth.uid()`) |
+| `push_outbox` | The queue: `kind`, `audience` (`topic` / `users`), `topic`, `recipients uuid[]`, `entity_id`, `data` (facts the dispatcher composes copy from), `count`, `status`, `attempts`, `deliver_after`. No client access. Partial unique index on `(kind, entity_id) where status = 'pending'` is the merge target |
+| `private.push_announced_collections` | Which collections have had their announcement, so it happens once — kept off `collections` so it never shows as an admin edit in the audit log |
+| `private.push_enqueue(...)` | Insert-or-merge into the outbox (recipients unioned, counts added, newest facts win, window extended) |
+| `private.book_holders(book_id)` | Readers who downloaded, read, saved or bookmarked a book, minus the acting admin (`private.push_actor_id()`: `auth.uid()`, or `x-audit-actor-id` on a service-role request) |
+| `private.push_suppressed()` | True while `app.push_suppress = '1'` is set for the transaction — `admin_publish_upload_batch` uses it to announce once |
+| `private.push_dispatch_kick()` | pg_net `POST` to `push-dispatch` with `x-push-secret`, when due rows exist; reads `supabase_url` + `push_dispatch_secret` from `private.runtime_config`. Fired by the outbox's insert trigger and by pg_cron `push-dispatch-tick` (`* * * * *`) |
+| `push_outbox_claim(limit)` | service_role only: marks due rows `processing` (skip-locked) and returns them |
+| `prune_push_tables()` | pg_cron `prune-push-tables` daily: sent/failed rows > 14 days, disabled tokens > 30 days, tokens unseen > 120 days |
+
+Triggers: `books_push_published_insert` / `_update` (statement-level, transition
+tables — one row per statement), `books_push_deleted` (BEFORE, so recipients are
+read before the cascade), `books_push_file_replaced` (BEFORE UPDATE OF pdf_path,
+before the 20260917130000 trigger clears `downloads`), `books_push_updated`
+(BEFORE UPDATE, reader-visible columns only), `collections_push_published`,
+`collection_books_push_added` (statement-level), `access_events_push_membership`.
 
 ## Applying schema
 
