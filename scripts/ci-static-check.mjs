@@ -155,7 +155,14 @@ if (!existsSync(FIXTURES_DIR)) {
     'access.serverTime',
     'access.reason',
   ])
-  requireKeys('home-feed.response.json', ['carousel', 'carouselSource', 'shelves', 'supportEmail'])
+  requireKeys('home-feed.response.json', [
+    'carousel',
+    'carouselSource',
+    'shelves',
+    'shelvesMeta.trending.collectionId',
+    'shelvesMeta.newArrivals.totalCount',
+    'supportEmail',
+  ])
   requireKeys('carousel-list.response.json', ['slides', 'source'])
   requireKeys('trending-weekly.response.json', ['weekStart', 'expiresAt', 'books'])
   requireKeys('recommendations.response.json', ['sections', 'books', 'isPersonalized'])

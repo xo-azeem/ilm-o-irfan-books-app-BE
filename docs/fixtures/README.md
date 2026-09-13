@@ -10,12 +10,14 @@ Full mobile contract: [`../mobile-contract.md`](../mobile-contract.md).
 
 | File | Endpoint |
 | --- | --- |
-| `home-feed.response.json` | `GET /functions/v1/home-feed` (includes `carousel` + shelves) |
+| `home-feed.response.json` | `GET /functions/v1/home-feed` (includes `carousel`, `shelves`, `shelvesMeta`) |
 | `carousel-list.response.json` | `GET /functions/v1/carousel-list` |
 | `trending-weekly.response.json` | `GET /functions/v1/trending-weekly` |
 | `recommendations.response.json` | `GET /functions/v1/recommendations` (user) |
 | `book-detail.response.json` | `GET /functions/v1/book-detail` |
-| `collection-books.response.json` | `GET /functions/v1/collection-books` |
+| `collection-books.response.json` | `GET /functions/v1/collection-books?id=` (admin-made collection, `source: curated`) |
+| `collection-books.trending.response.json` | `GET /functions/v1/collection-books?slug=trending` (`source: weekly`) |
+| `collections-list.response.json` | `GET /functions/v1/collections-list` (admin-made only, `is_system`) |
 | `entitlements-status.response.json` | `GET /functions/v1/entitlements-status` (lifecycle + realtime) |
 | `get-signed-pdf.response.json` | `POST /functions/v1/get-signed-pdf` (success + `access`) |
 | `get-signed-pdf.premium-required.json` | `POST /functions/v1/get-signed-pdf` (403) |
@@ -59,7 +61,7 @@ Full mobile contract: [`../mobile-contract.md`](../mobile-contract.md).
 - List endpoints stop at 10,000 rows of offset and answer `PAGE_OUT_OF_RANGE` past that.
 - `book-detail` never includes `pdf_path` — open files via `get-signed-pdf`.
 - `books-list?category=<uuid-or-slug>` filters the catalog for Search chips.
-- `collection-books` returns list pagination plus a `collection` meta object.
+- `collection-books` returns list pagination plus a `collection` meta object and `source` (`curated` | `weekly` | `newest`).
   `totalCount` / paging only include **published** membership (drafts in the
   junction table do not inflate the count or eat offset slots).
 

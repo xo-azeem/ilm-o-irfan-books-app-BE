@@ -75,9 +75,12 @@ unauthenticated, so it cannot know what this reader downloaded. That state comes
 | Categories chips | GET | `/functions/v1/categories-list` | Public |
 | Collection tap | GET | `/functions/v1/collection-books?id=` or `?slug=` | Public |
 
-`collection-books` paginates only **published** books. Draft / missing titles still listed in `collection_books` do not count toward `totalCount` or consume page offset.
+`collection-books` paginates only **published** books. Draft / missing titles still listed in `collection_books` do not count toward `totalCount` or consume page offset. The response carries `source` (`curated` | `weekly` | `newest`): `slug=trending` pages this week's draw, `slug=new-arrivals` pages curated members or, when there are none, every published book newest-first.
 
 | Collections strip | GET | `/functions/v1/collections-list` | Public |
+
+`collections-list` (and `home-feed.collections`) lists admin-made collections only; `home-hero`, `trending` and `new-arrivals` are rails on Home and are excluded. Rows carry `is_system` (always `false` there).
+
 | Book detail | GET | `/functions/v1/book-detail?id=<uuid>` | Public |
 | Reader open / download | POST | `/functions/v1/get-signed-pdf` body `{ "bookId" }` | User |
 | Progress sync | GET/POST | `/functions/v1/reading-progress` (`?book_id=` for one row; list for launch hydrate) | User |
@@ -179,7 +182,7 @@ Email comes from Auth, not metadata. After admin promote, force re-login so JWT 
 
 ## Home shelves
 
-`shelves.trending` / `newArrivals` / `hero` are **curated** collection membership (`trending`, `new-arrivals`, `home-hero`), not a most-read algorithm. Empty shelves fall back to newest published books.
+`shelves.trending` is this week's random draw (first 10); `shelves.newArrivals` is the `new-arrivals` collection's curated members or, when empty, the 10 newest published books; `shelves.hero` is the curated `home-hero` shelf with a newest-books fallback. `trending` and `newArrivals` are the first page of what `collection-books?id=<shelvesMeta.*.collectionId>` returns, so "See all" opens the same list. `shelvesMeta.{trending,newArrivals}` = `{ collectionId, slug, totalCount, source }`; `collectionId` is `null` when the admin unpublished that shelf (rail is `[]`) or the read degraded.
 
 - `progress` is a fraction **0.0–1.0**.
 - Or send `progress_percent` **0–100**. Never both.

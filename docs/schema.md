@@ -119,7 +119,7 @@ books.pdf_path   → Storage pdfs/
 | `admin_book_rows` | One row per book with author name, `category_ids`, `collection_ids`, and reader / download / wishlist counts |
 | `admin_author_rows` | Authors with book and published counts |
 | `admin_category_rows` | Categories with book counts |
-| `admin_collection_rows` | Collections with membership counts |
+| `admin_collection_rows` | Collections with `book_count` (all members), `published_count` and `is_system` |
 | `admin_user_directory` | Rebuilt: adds `is_subscriber`, reading and download counts, `last_read_at` |
 
 All are `security_invoker`, so admin RLS still applies.

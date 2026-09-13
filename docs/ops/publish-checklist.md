@@ -30,7 +30,7 @@ Expect zero broken paths and no unexpected orphans.
 | --- | --- |
 | `hero` | Featured / banner shelf (seed: `home-hero`) |
 | `shelf` | Horizontal rows (`trending`, `new-arrivals`, …) |
-| `carousel` | Rotating seasonal strips (seed: `ramadan-reading`) |
+| `carousel` | Rotating seasonal strips |
 
 Invalid kinds are rejected by `admin_upsert_collection` / CMS create (`400`).
 

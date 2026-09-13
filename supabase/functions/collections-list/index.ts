@@ -12,9 +12,13 @@ Deno.serve(async (req) => {
 
     const { page, pageSize, from, to } = rangeFromRequest(req, { defaultPageSize: 50 })
 
+    // Admin-made collections only. The three system shelves (home-hero,
+    // trending, new-arrivals) are rails on Home with their own pages via
+    // home-feed.shelvesMeta, so listing them here would show each one twice.
     const { data, count, error } = await anonClient()
       .from('collection_summaries')
       .select('*', { count: 'exact' })
+      .eq('is_system', false)
       .order('sort_order', { ascending: true, nullsFirst: true })
       .order('id', { ascending: true })
       .range(from, to)

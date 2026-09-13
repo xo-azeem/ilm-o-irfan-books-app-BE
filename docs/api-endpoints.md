@@ -12,13 +12,13 @@ The Edge Function endpoint base is `/functions/v1/...`.
 
 | Endpoint | Method | Auth | Purpose |
 | --- | --- | --- | --- |
-| `/functions/v1/home-feed` | GET | Public | Collections, categories, newest books, `carousel`, `shelves.hero` / `trending` / `newArrivals`, `featuredCollectionId`, `supportEmail` (book cards include `coverUrl`) — see [Home shelves](#home-shelves) |
+| `/functions/v1/home-feed` | GET | Public | Collections (admin-made only), categories, newest books, `carousel`, `shelves.hero` / `trending` / `newArrivals`, `shelvesMeta`, `featuredCollectionId`, `supportEmail` (book cards include `coverUrl`) — see [Home shelves](#home-shelves) |
 | `/functions/v1/books-list` | GET | Public | Paginated published books — see [Discover filters](#discover-filters) |
 | `/functions/v1/book-detail?id=<bookId>` | GET | Public | Book detail with author and metadata (`coverUrl`; no `pdf_path`) |
 | `/functions/v1/books-search?q=<query>` | GET | Public | Prefix search, plus the same [Discover filters](#discover-filters) as `books-list` |
 | `/functions/v1/categories-list` | GET | Public | Browse categories |
-| `/functions/v1/collections-list` | GET | Public | Returns collections and shelves |
-| `/functions/v1/collection-books?id=` or `?slug=` | GET | Public | Paginated books in one published collection (`sort_order`) |
+| `/functions/v1/collections-list` | GET | Public | Admin-made collections (published, `sort_order`); the three system shelves are excluded — see [Collections](#collections) |
+| `/functions/v1/collection-books?id=` or `?slug=` | GET | Public | Paginated books of one published collection, plus `source` — see [Collections](#collections) |
 | `/functions/v1/plans-list` | GET | Public | Plan catalog for premium screen |
 | `/functions/v1/carousel-list` | GET | Public | The admin-curated home carousel — see [Home carousel](#home-carousel) |
 | `/functions/v1/trending-weekly?limit=10` | GET | Public | Ten books drawn at random once a week — see [Weekly trending](#weekly-trending) |
@@ -279,19 +279,30 @@ bypasses it.
 `home-feed` returns three rails under `shelves`. The app renders them verbatim — it does
 not re-sort them or top them up — so what the backend puts there is exactly what Home shows.
 
-`home-feed` returns three rails under `shelves`. The app renders them verbatim — it does
-not re-sort them or top them up — so what the backend puts there is exactly what Home shows.
+| Rail | Source | Length | Empty-source fallback |
+| --- | --- | --- | --- |
+| `hero` | `collections.slug = 'home-hero'`, in `sort_order` | up to 8 | 5 newest published books |
+| `trending` | `collection_page('trending')` — this week's draw, see [Weekly trending](#weekly-trending) | 10 | none needed |
+| `newArrivals` | `collection_page('new-arrivals')` — curated members, else every published book newest-first | 10 | built in (`source: "newest"`) |
 
-| Rail | Source | Empty-source fallback |
-| --- | --- | --- |
-| `hero` | `collections.slug = 'home-hero'`, in `sort_order` | 5 newest published books |
-| `trending` | `weekly_trending_books(12)` — see [Weekly trending](#weekly-trending) | none needed |
-| `newArrivals` | `collections.slug = 'new-arrivals'`, in `sort_order` | 12 newest published books |
+`trending` and `newArrivals` are the **first page of the same list `collection-books`
+serves** for that collection, so "See all" on a rail opens the rail continued. The
+`shelvesMeta` object says where to go and what it will find:
 
-`hero` and `newArrivals` are editorial shelves and keep their fallback, so Home is never
-blank while `collection_books` is unpopulated. `trending` is the one rail that claimed to
-describe the catalogue rather than an editor's taste, so it is now the weekly draw and needs
-no fallback: the draw already covers everything published.
+```jsonc
+"shelvesMeta": {
+  "trending":    { "collectionId": "4444…4002", "slug": "trending",     "totalCount": 20, "source": "weekly" },
+  "newArrivals": { "collectionId": "4444…4003", "slug": "new-arrivals", "totalCount": 20, "source": "newest" }
+}
+```
+
+- `collectionId` — pass to `collection-books?id=`. `null` when the rail has no page right
+  now: the admin unpublished that system shelf (the rail is then `[]` too), or the trending
+  read failed and the rail degraded to the newest books.
+- `totalCount` — length of the full list, for "See all N".
+- `source` — `curated` | `weekly` | `newest`, the same value `collection-books` returns.
+
+`hero` stays a plain curated shelf with its newest-books fallback and has no page.
 
 `home-feed` also returns a top-level `carousel` array, the same payload as `carousel-list`'s
 `slides`, plus `carouselSource` (`admin` or `fallback` — see [Home carousel](#home-carousel)).
@@ -305,6 +316,35 @@ returns — so a card never renders with a blank field and the app never builds 
 Book rows are not seeded from this repo, so a local `supabase db reset` gives an empty
 catalogue and every rail comes back `[]`; run `npm run books:import` if you need titles
 locally.
+
+## Collections
+
+Every collection is a row in `collections`. Three of them are **system shelves** —
+`home-hero`, `trending`, `new-arrivals` — which `home-feed` renders as its own rails. An
+admin can retitle, re-subtitle, reorder or unpublish them, but they cannot be deleted or
+given another slug: `admin-collection-delete` (and a direct `DELETE` on `collections`)
+answers `409 CONFLICT` — `system collection "trending" cannot be deleted; unpublish it
+instead` — and a slug change is `400 INVALID_REQUEST`.
+
+`collections-list` and `home-feed.collections` return only the **admin-made** collections
+(published, in `sort_order`). The rows also carry `is_system` (always `false` there);
+`admin_collection_rows` carries it too, alongside `book_count` (all members) and
+`published_count` (what readers will see). `collection_summaries.book_count` counts
+published members only.
+
+`collection-books?id=` / `?slug=` pages one collection and says what it paged:
+
+| Collection | List | `source` |
+| --- | --- | --- |
+| `trending` | this week's draw (`weekly_trending_books`), draw order; `totalCount` = draw length | `weekly` |
+| `new-arrivals` with curated members | members, published only, admin `sort_order` | `curated` |
+| `new-arrivals` with no members | every published book, newest first; `totalCount` = published count | `newest` |
+| anything else | members, published only, admin `sort_order` | `curated` |
+
+Unknown or unpublished collections are `404 NOT_FOUND`. A page past the end is an empty
+page with the true `totalCount`, not an error. Both endpoints send `public, max-age=60`, so
+an admin edit — including an `admin-refresh-trending` re-roll — reaches the app within a
+minute (`trending-weekly` itself still caches for 15 minutes).
 
 ## Discover filters
 

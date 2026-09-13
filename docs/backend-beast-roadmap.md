@@ -96,7 +96,7 @@ Goal: production-grade Supabase backend that is secure, operable, content-ready,
 
 Seed intentionally has **no books, no authors, no collections**. Old dummy shelves were removed (`sql/pgadmin/05_remove_dummy_seed_books.sql`). After `db reset`, `home-feed` / `collections-list` are empty.
 
-- [x] Canonical collections seeded (`home-hero`, `trending`, `new-arrivals`, `beginners-path`, `ramadan-reading`)
+- [x] Canonical collections seeded (`home-hero`, `trending`, `new-arrivals`; the demo `beginners-path` / `ramadan-reading` were retired in 20260915120000)
 - [x] Canonical folder layout for covers + PDFs documented beside `books:import`
 - [x] Hardened `scripts/import-folder-books.mjs`:
   - Stop hardcoding `BOOKS_DIR=D:/Projects/Books` as the only default

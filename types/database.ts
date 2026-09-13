@@ -1772,7 +1772,9 @@ export type Database = {
           created_at: string | null
           id: string | null
           is_published: boolean | null
+          is_system: boolean | null
           kind: string | null
+          published_count: number | null
           slug: string | null
           sort_order: number | null
           subtitle: string | null
@@ -1785,7 +1787,9 @@ export type Database = {
           created_at?: string | null
           id?: string | null
           is_published?: boolean | null
+          is_system?: never
           kind?: string | null
+          published_count?: never
           slug?: string | null
           sort_order?: number | null
           subtitle?: string | null
@@ -1798,7 +1802,9 @@ export type Database = {
           created_at?: string | null
           id?: string | null
           is_published?: boolean | null
+          is_system?: never
           kind?: string | null
+          published_count?: never
           slug?: string | null
           sort_order?: number | null
           subtitle?: string | null
@@ -1997,6 +2003,7 @@ export type Database = {
           accent: string | null
           book_count: number | null
           id: string | null
+          is_system: boolean | null
           kind: string | null
           slug: string | null
           sort_order: number | null
@@ -2297,6 +2304,19 @@ export type Database = {
           total_count: number
         }[]
       }
+      collection_page: {
+        Args: {
+          p_id?: string
+          p_limit?: number
+          p_offset?: number
+          p_slug?: string
+        }
+        Returns: Json
+      }
+      collection_page_meta: {
+        Args: { c: Database["public"]["Tables"]["collections"]["Row"] }
+        Returns: Json
+      }
       collection_shelf: {
         Args: { p_limit?: number; p_slug: string }
         Returns: {
@@ -2471,6 +2491,7 @@ export type Database = {
         Args: { p_bucket: string; p_path: string }
         Returns: string
       }
+      system_collection_slugs: { Args: never; Returns: string[] }
       toggle_highlight: {
         Args: { p_book_id: string; p_page_number: number }
         Returns: Json

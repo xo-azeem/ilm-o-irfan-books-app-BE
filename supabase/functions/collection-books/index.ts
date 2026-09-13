@@ -1,5 +1,6 @@
 import { anonClient, requireMethod } from '../_shared/auth.ts'
-import { withCoverUrl, type WithCoverUrl } from '../_shared/covers.ts'
+import { asCollectionPage, fetchCollectionPage } from '../_shared/collections.ts'
+import { withCoverUrls } from '../_shared/covers.ts'
 import {
   CATALOGUE_CACHE_SECONDS,
   fail,
@@ -9,11 +10,12 @@ import {
   list,
   publicCache,
 } from '../_shared/http.ts'
-import { isRangeNotSatisfiable, paginate, rangeFromRequest } from '../_shared/pagination.ts'
+import { paginate, rangeFromRequest } from '../_shared/pagination.ts'
 import { asUuid } from '../_shared/payload.ts'
 
-type BookCard = Record<string, unknown> & { id: string }
-
+// One RPC does what used to be three round trips (collection, membership,
+// books), and it is the same RPC home-feed builds its rails from, so the page
+// behind "See all" is the rail continued rather than a different list.
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)
   if (preflight) return preflight
@@ -34,110 +36,32 @@ Deno.serve(async (req) => {
       return fail('INVALID_REQUEST', 'Pass id or slug, not both', 400)
     }
 
-    const { page, pageSize, from, to } = rangeFromRequest(req)
-    const supabase = anonClient()
+    const { page, pageSize, from } = rangeFromRequest(req)
+    const ref = idParam ? { id: asUuid('id')(idParam) } : { slug: slugParam }
 
-    let collectionQuery = supabase
-      .from('collections')
-      .select('id, slug, title, subtitle, kind, sort_order')
-      .eq('is_published', true)
+    const { data, error } = await fetchCollectionPage(anonClient(), ref, from, pageSize)
 
-    if (idParam) {
-      collectionQuery = collectionQuery.eq('id', asUuid('id')(idParam))
-    } else {
-      collectionQuery = collectionQuery.eq('slug', slugParam)
-    }
-
-    const { data: collection, error: collectionError } = await collectionQuery.maybeSingle()
-
-    if (collectionError) {
+    if (error) {
       return failFromDbError(
         'collection-books',
         'COLLECTION_READ_FAILED',
-        'Unable to load collection',
-        collectionError,
+        'Unable to load collection books',
+        error,
       )
     }
 
-    if (!collection) {
+    const result = asCollectionPage(data)
+
+    if (!result) {
       return fail('NOT_FOUND', 'Collection not found', 404)
     }
 
-    const collectionMeta = {
-      id: collection.id,
-      slug: collection.slug,
-      title: collection.title,
-      subtitle: collection.subtitle,
-      kind: collection.kind,
-      sort_order: collection.sort_order,
-    }
-
-    // Count and page only membership whose book is still published.
-    // Junction rows for drafts / deleted titles must not inflate totalCount or
-    // consume offset slots — otherwise hasNextPage lies and pages skip titles.
-    const { data: membership, count, error: membershipError } = await supabase
-      .from('collection_books')
-      .select('book_id, sort_order, book:books!inner(id)', { count: 'exact' })
-      .eq('collection_id', collection.id)
-      .eq('book.is_published', true)
-      .order('sort_order', { ascending: true })
-      .order('book_id', { ascending: true })
-      .range(from, to)
-
-    if (membershipError) {
-      if (isRangeNotSatisfiable(membershipError)) {
-        return list({
-          ...paginate([], count ?? null, page, pageSize),
-          collection: collectionMeta,
-        }, publicCache(CATALOGUE_CACHE_SECONDS))
-      }
-
-      return failFromDbError(
-        'collection-books',
-        'COLLECTION_READ_FAILED',
-        'Unable to load collection books',
-        membershipError,
-      )
-    }
-
-    const ids = (membership ?? []).map((row) => row.book_id as string).filter(Boolean)
-
-    if (ids.length === 0) {
-      return list({
-        ...paginate([], count ?? 0, page, pageSize),
-        collection: collectionMeta,
-      }, publicCache(CATALOGUE_CACHE_SECONDS))
-    }
-
-    const { data: books, error: booksError } = await supabase
-      .from('book_list_items')
-      .select('*')
-      .in('id', ids)
-
-    if (booksError) {
-      return failFromDbError(
-        'collection-books',
-        'COLLECTION_READ_FAILED',
-        'Unable to load collection books',
-        booksError,
-      )
-    }
-
-    const byId = new Map(
-      ((books ?? []) as BookCard[]).map((book) => [book.id, withCoverUrl(book)]),
-    )
-    const ordered = ids
-      .map((id) => byId.get(id))
-      .filter((book): book is WithCoverUrl<BookCard> => book !== undefined)
-
-    // After the published filter, every id should resolve in book_list_items.
-    // If a row vanished mid-request, prefer the truthful page length over a
-    // stale junction count so hasNextPage cannot stay stuck true.
-    const totalCount = count ?? ordered.length
-
+    // A page past the end is the last call of every "load more" loop: an empty
+    // page with the true count, never an error.
     return list({
-      ...paginate(ordered, totalCount, page, pageSize),
-      collection: collectionMeta,
+      ...paginate(withCoverUrls(result.books), result.totalCount, page, pageSize),
+      collection: result.collection,
+      source: result.source,
     }, publicCache(CATALOGUE_CACHE_SECONDS))
   } catch (error) {
     return handleError('collection-books', error)

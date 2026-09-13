@@ -1,0 +1,21 @@
+{
+  "data": [
+    {
+      "id": "a1d2bec9-7ddb-45b2-9d14-5712fc76bf77",
+      "slug": "editors-picks",
+      "title": "Editor's picks",
+      "subtitle": "Hand-picked by the Ilm o Irfan team",
+      "accent": "#7CB518",
+      "kind": "shelf",
+      "sort_order": 10,
+      "book_count": 5,
+      "is_system": false
+    }
+  ],
+  "page": 1,
+  "pageSize": 50,
+  "totalCount": 1,
+  "totalPages": 1,
+  "hasNextPage": false,
+  "hasPreviousPage": false
+}

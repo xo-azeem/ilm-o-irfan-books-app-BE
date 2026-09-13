@@ -60,14 +60,14 @@ export const endpointManifest: EndpointDefinition[] = [
     route: '/functions/v1/collections-list',
     method: 'GET',
     access: 'public',
-    description: 'Returns hero and shelf collections.',
+    description: 'Returns published admin-made collections; the system shelves are excluded.',
   },
   {
     name: 'collection-books',
     route: '/functions/v1/collection-books?id=<uuid>|slug=<slug>',
     method: 'GET',
     access: 'public',
-    description: 'Returns paginated books in one published collection, ordered by sort_order.',
+    description: 'Returns paginated books in one published collection (curated order, or the weekly draw for trending), plus source.',
     notes:
       'Pass id or slug (not both). Envelope includes collection meta beside page fields. Pagination count excludes unpublished membership.',
   },
