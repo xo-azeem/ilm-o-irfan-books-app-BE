@@ -728,9 +728,12 @@ after insert on public.books
 referencing new table as new_rows
 for each statement execute function private.push_books_inserted();
 
+-- No `of is_published` column list: Postgres refuses transition tables on a
+-- trigger with one (0A000). The function does the old/new comparison itself,
+-- so an UPDATE that touches nothing else costs one join over two empty sets.
 drop trigger if exists books_push_published_update on public.books;
 create trigger books_push_published_update
-after update of is_published on public.books
+after update on public.books
 referencing old table as old_rows new table as new_rows
 for each statement execute function private.push_books_published();
 
