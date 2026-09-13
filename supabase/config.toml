@@ -49,21 +49,31 @@ file_size_limit = "100MiB"
 [auth]
 enabled = true
 site_url = "http://127.0.0.1:3000"
-additional_redirect_urls = ["http://127.0.0.1:3000"]
+additional_redirect_urls = ["http://127.0.0.1:3000", "ilmoirfan://**"]
 jwt_expiry = 3600
 enable_signup = true
 enable_anonymous_sign_ins = false
+# Lets a signed-in user link Google via auth.linkIdentity / linkIdentityWithIdToken.
+# Same-email Google ↔ email/password is automatic when the email is verified.
+enable_manual_linking = true
 
 [auth.email]
 enable_signup = true
 double_confirm_changes = true
+# Local Inbucket: confirmations off for DX. Hosted staging keeps confirmations On
+# so automatic Google↔email linking stays safe (unverified emails are not linked).
 enable_confirmations = false
 
 [auth.external.google]
+# Set GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the environment, then flip enabled.
+# Prefer the Web client ID first (required for native Android ID-token exchange).
+# Multiple clients: "WEB_CLIENT_ID,ANDROID_CLIENT_ID,IOS_CLIENT_ID"
 enabled = false
 client_id = "env(GOOGLE_CLIENT_ID)"
 secret = "env(GOOGLE_CLIENT_SECRET)"
 redirect_uri = ""
+# Native RN Google Sign-In often cannot pass Supabase's nonce; enable Skip nonce
+# check in Dashboard / hosted config when using @react-native-google-signin.
 skip_nonce_check = false
 
 [edge_runtime]

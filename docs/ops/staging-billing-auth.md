@@ -76,13 +76,20 @@ Client must **never** write `entitlements` (RLS + contract).
 
 ## Google OAuth
 
-1. Google Cloud Console → OAuth client (iOS + Android / Web as needed).
-2. Supabase Dashboard → Authentication → Providers → Google → enable + client id/secret.
-3. Add redirect / deep-link URLs for the RN app (not only localhost).  
-   Staging `site_url` is already `https://rwnmckrepvycydmtgvcq.supabase.co` with localhost allow-listed. When the app scheme exists (e.g. `ilmoirfan://`), PATCH `uri_allow_list` or use Dashboard → URL Configuration.
-4. Optional local: set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` and enable in `supabase/config.toml`.
+Email/password and Google share one Auth user when the **same verified email** is used (Supabase automatic identity linking). Manual linking (`linkIdentity`) is also enabled for signed-in users.
 
-Helper: `node scripts/configure-hosted-auth-uris.mjs` (site_url + allow list). Raising `rate_limit_email_sent` needs **custom SMTP**.
+1. Google Cloud Console → OAuth clients:
+   - **Web** (client id + secret) — put Web client id **first** in `GOOGLE_CLIENT_ID` (comma-list if you also add Android/iOS ids).
+   - **Android** — package `com.ilmoirfanapp` + signing SHA-1 (needed for native Sign-In; Web id is still what the app sends to Supabase).
+   - Web client authorized redirect: `https://rwnmckrepvycydmtgvcq.supabase.co/auth/v1/callback`
+2. Put credentials in `.env`, then: `npm run auth:google`  
+   (or Dashboard → Authentication → Providers → Google). For native RN without nonce: `GOOGLE_SKIP_NONCE_CHECK=1`.
+3. Deep links: `AUTH_APP_REDIRECTS=ilmoirfan://**` (default in `npm run auth:uris` / `auth:google`).
+4. Local: same env vars; set `[auth.external.google] enabled = true` in `config.toml` after credentials exist.
+
+FE contract: native Google ID token → `supabase.auth.signInWithIdToken({ provider: 'google', token })`. Same email as an existing confirmed email/password user lands on that user.
+
+Helpers: `npm run auth:uris`, `npm run auth:google`, `npm run auth:print`. Raising `rate_limit_email_sent` needs **custom SMTP**.
 
 ## Auth email / password reset
 

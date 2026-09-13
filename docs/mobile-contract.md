@@ -93,7 +93,8 @@ unauthenticated, so it cannot know what this reader downloaded. That state comes
 | Avatar | POST | `avatar-upload-url` then upload then `profile-update` | User |
 | Subscription status | GET | `entitlements-status` | User |
 | Plan catalog | GET | `plans-list` | Public |
-| Login / Sign up / Google | — | Supabase Auth SDK (not an Edge Function) | — |
+| Login / Sign up | — | Supabase Auth: `signInWithPassword` / `signUp` (not an Edge Function) | — |
+| Google sign-in | — | Native Google ID token → `signInWithIdToken({ provider: 'google', token })`. Same verified email as email/password = one user (automatic linking). Optional: `linkIdentity` when already signed in. | — |
 | Theme / language / notifications | — | MMKV only | — |
 
 Purchases: RevenueCat SDK. Entitlements land via webhook — the app only **reads** `entitlements-status`.

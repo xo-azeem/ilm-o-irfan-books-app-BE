@@ -1,6 +1,6 @@
 /**
- * Set staging Auth site_url + raise email rate limit slightly for ops testing.
- * Does not enable Google. Deep-link schemes are added when the FE ships them.
+ * Set staging Auth site_url + redirect allow list (email recovery + OAuth return).
+ * Does not enable Google by itself — use enable-hosted-google-auth.mjs for that.
  *
  * Usage: node scripts/configure-hosted-auth-uris.mjs
  */
@@ -37,18 +37,22 @@ const ref = (process.env.SUPABASE_PROJECT_REF ?? '').trim()
 const siteUrl =
   process.env.AUTH_SITE_URL?.trim() ||
   `https://${ref}.supabase.co`
+const appRedirects = (process.env.AUTH_APP_REDIRECTS ?? 'ilmoirfan://**')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
 
 if (!token || !ref) {
   console.error('SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF required')
   process.exit(1)
 }
 
-// Keep localhost for local FE experiments; add project URL for hosted recovery links.
 const allowList = [
   'http://localhost:3000',
   'http://127.0.0.1:3000',
   siteUrl,
   `${siteUrl}/**`,
+  ...appRedirects,
 ]
   .filter(Boolean)
   .join(',')
@@ -56,6 +60,7 @@ const allowList = [
 const body = {
   site_url: siteUrl,
   uri_allow_list: allowList,
+  security_manual_linking_enabled: true,
 }
 
 const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/config/auth`, {
@@ -75,5 +80,7 @@ if (!res.ok) {
 console.log('AUTH_URIS_UPDATED', {
   site_url: cfg.site_url,
   uri_allow_list: cfg.uri_allow_list,
+  security_manual_linking_enabled: cfg.security_manual_linking_enabled,
   rate_limit_email_sent: cfg.rate_limit_email_sent,
+  external_google_enabled: cfg.external_google_enabled,
 })
