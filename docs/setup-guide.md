@@ -381,6 +381,9 @@ The database queues every notification (`push_outbox`); the `push-dispatch`
 Edge Function sends them through FCM. Until both halves below are configured
 the queue simply fills and nothing is sent — safe to deploy ahead of Firebase.
 
+**Shortcut:** with `PUSH_DISPATCH_SECRET` and `FCM_SERVICE_ACCOUNT_B64` in `.env`,
+`npm run push:configure` does steps 2–3 (and the migration push) in one go.
+
 1. **Firebase project** → Project settings → Service accounts → *Generate new
    private key*. Base64 the JSON so it survives the secrets file:
 
