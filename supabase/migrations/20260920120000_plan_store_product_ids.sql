@@ -23,6 +23,33 @@ where revenuecat_product_id is not null
     or play_store_product_id is null
   );
 
+-- The three ids become unique below. `revenuecat_product_id` never was, so a
+-- catalogue that reused one SKU across two plans would kill this migration
+-- halfway, and the backfill just copied that duplicate into both new columns.
+-- Say which rows collide instead of failing on an index name nobody can map
+-- back to the data.
+do $do$
+declare
+  v_dupes text;
+begin
+  select string_agg(format('%s (%s plans)', d.sku, d.n), ', ' order by d.sku)
+  into v_dupes
+  from (
+    select revenuecat_product_id as sku, count(*) as n
+    from public.plans
+    where revenuecat_product_id is not null
+    group by revenuecat_product_id
+    having count(*) > 1
+  ) d;
+
+  if v_dupes is not null then
+    raise exception
+      'plans.revenuecat_product_id must be unique before store SKUs can be split: %', v_dupes
+      using errcode = '23505';
+  end if;
+end;
+$do$;
+
 create unique index if not exists plans_app_store_product_id_uidx
   on public.plans (app_store_product_id)
   where app_store_product_id is not null;
@@ -154,7 +181,15 @@ grant execute on function public.admin_upsert_plan(
   uuid, text, text, integer, text, text, jsonb, text, text, text, boolean, integer
 ) to authenticated, service_role;
 
-create or replace view public.admin_plan_rows
+-- The two new columns sit next to revenuecat_product_id rather than at the end,
+-- and `create or replace view` can only append: it reads a column added in the
+-- middle as a rename of the one that was there (42P16, "cannot change name of
+-- view column is_active"). Dropping first is the only way to reorder.
+-- Safe because admin_plan_rows has no dependents; the grant below is restated
+-- for the same reason.
+drop view if exists public.admin_plan_rows;
+
+create view public.admin_plan_rows
 with (security_invoker = true)
 as
 select

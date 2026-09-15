@@ -796,6 +796,13 @@ export type Database = {
             foreignKeyName: "device_push_tokens_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "admin_user_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "device_push_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -1042,6 +1049,7 @@ export type Database = {
       }
       plans: {
         Row: {
+          app_store_product_id: string | null
           code: string
           created_at: string
           currency: string
@@ -1050,14 +1058,14 @@ export type Database = {
           interval: string
           is_active: boolean
           name: string
+          play_store_product_id: string | null
           price_cents: number
           revenuecat_product_id: string | null
-          app_store_product_id: string | null
-          play_store_product_id: string | null
           sort_order: number
           updated_at: string
         }
         Insert: {
+          app_store_product_id?: string | null
           code: string
           created_at?: string
           currency?: string
@@ -1066,14 +1074,14 @@ export type Database = {
           interval?: string
           is_active?: boolean
           name: string
+          play_store_product_id?: string | null
           price_cents: number
           revenuecat_product_id?: string | null
-          app_store_product_id?: string | null
-          play_store_product_id?: string | null
           sort_order?: number
           updated_at?: string
         }
         Update: {
+          app_store_product_id?: string | null
           code?: string
           created_at?: string
           currency?: string
@@ -1082,10 +1090,9 @@ export type Database = {
           interval?: string
           is_active?: boolean
           name?: string
+          play_store_product_id?: string | null
           price_cents?: number
           revenuecat_product_id?: string | null
-          app_store_product_id?: string | null
-          play_store_product_id?: string | null
           sort_order?: number
           updated_at?: string
         }
@@ -1466,6 +1473,85 @@ export type Database = {
           },
         ]
       }
+      upload_batches: {
+        Row: {
+          category_id: string | null
+          collection_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          published_at: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category_id?: string | null
+          collection_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          published_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string | null
+          collection_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          published_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upload_batches_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "admin_category_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_batches_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_batches_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "category_with_counts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_batches_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "admin_collection_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_batches_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collection_summaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_batches_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_recommendations: {
         Row: {
           book_id: string
@@ -1599,71 +1685,6 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      upload_batches: {
-        Row: {
-          category_id: string | null
-          collection_id: string | null
-          created_at: string
-          created_by: string | null
-          id: string
-          published_at: string | null
-          status: string
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          category_id?: string | null
-          collection_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          published_at?: string | null
-          status?: string
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          category_id?: string | null
-          collection_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          published_at?: string | null
-          status?: string
-          title?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "upload_batches_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "admin_category_rows"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "upload_batches_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "upload_batches_collection_id_fkey"
-            columns: ["collection_id"]
-            isOneToOne: false
-            referencedRelation: "admin_collection_rows"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "upload_batches_collection_id_fkey"
-            columns: ["collection_id"]
-            isOneToOne: false
-            referencedRelation: "collections"
             referencedColumns: ["id"]
           },
         ]
@@ -2034,6 +2055,7 @@ export type Database = {
       }
       admin_plan_rows: {
         Row: {
+          app_store_product_id: string | null
           code: string | null
           created_at: string | null
           currency: string | null
@@ -2043,14 +2065,14 @@ export type Database = {
           interval: string | null
           is_active: boolean | null
           name: string | null
+          play_store_product_id: string | null
           price_cents: number | null
           revenuecat_product_id: string | null
-          app_store_product_id: string | null
-          play_store_product_id: string | null
           sort_order: number | null
           updated_at: string | null
         }
         Insert: {
+          app_store_product_id?: string | null
           code?: string | null
           created_at?: string | null
           currency?: string | null
@@ -2060,14 +2082,14 @@ export type Database = {
           interval?: string | null
           is_active?: boolean | null
           name?: string | null
+          play_store_product_id?: string | null
           price_cents?: number | null
           revenuecat_product_id?: string | null
-          app_store_product_id?: string | null
-          play_store_product_id?: string | null
           sort_order?: number | null
           updated_at?: string | null
         }
         Update: {
+          app_store_product_id?: string | null
           code?: string | null
           created_at?: string | null
           currency?: string | null
@@ -2077,10 +2099,9 @@ export type Database = {
           interval?: string | null
           is_active?: boolean | null
           name?: string | null
+          play_store_product_id?: string | null
           price_cents?: number | null
           revenuecat_product_id?: string | null
-          app_store_product_id?: string | null
-          play_store_product_id?: string | null
           sort_order?: number | null
           updated_at?: string | null
         }
@@ -2162,10 +2183,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "upload_batches_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "category_with_counts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "upload_batches_collection_id_fkey"
             columns: ["collection_id"]
             isOneToOne: false
             referencedRelation: "admin_collection_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_batches_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collection_summaries"
             referencedColumns: ["id"]
           },
           {
@@ -2356,7 +2391,10 @@ export type Database = {
         Args: { p_bucket: string; p_name: string }
         Returns: boolean
       }
-      admin_publish_upload_batch: { Args: { p_batch_id: string }; Returns: Json }
+      admin_publish_upload_batch: {
+        Args: { p_batch_id: string }
+        Returns: Json
+      }
       admin_refresh_carousel_week: {
         Args: { p_pool?: number; p_week?: string }
         Returns: Json
@@ -2472,6 +2510,7 @@ export type Database = {
           p_sort_order?: number
         }
         Returns: {
+          app_store_product_id: string | null
           code: string
           created_at: string
           currency: string
@@ -2480,10 +2519,9 @@ export type Database = {
           interval: string
           is_active: boolean
           name: string
+          play_store_product_id: string | null
           price_cents: number
           revenuecat_product_id: string | null
-          app_store_product_id: string | null
-          play_store_product_id: string | null
           sort_order: number
           updated_at: string
         }
@@ -2702,7 +2740,31 @@ export type Database = {
       prune_push_tables: { Args: never; Returns: number }
       push_outbox_claim: {
         Args: { p_limit?: number }
-        Returns: Database["public"]["Tables"]["push_outbox"]["Row"][]
+        Returns: {
+          attempts: number
+          audience: string
+          count: number
+          created_at: string
+          data: Json
+          deliver_after: string
+          entity_id: string | null
+          failed_count: number | null
+          id: number
+          kind: string
+          last_error: string | null
+          processed_at: string | null
+          recipients: string[]
+          sent_count: number | null
+          status: string
+          topic: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "push_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       random_published_books: {
         Args: { p_limit?: number }
@@ -2744,6 +2806,17 @@ export type Database = {
         Args: { p_limit?: number; p_per_section?: number; p_sections?: number }
         Returns: Json
       }
+      register_push_token: {
+        Args: {
+          p_app_version?: string
+          p_device_name?: string
+          p_notify_library?: boolean
+          p_notify_membership?: boolean
+          p_platform: string
+          p_token: string
+        }
+        Returns: undefined
+      }
       search_books: {
         Args: { p_limit?: number; p_offset?: number; p_query: string }
         Returns: {
@@ -2784,6 +2857,7 @@ export type Database = {
         Returns: Json
       }
       unaccent: { Args: { "": string }; Returns: string }
+      unregister_push_token: { Args: { p_token: string }; Returns: undefined }
       upsert_highlight: {
         Args: {
           p_book_id: string
@@ -2794,18 +2868,6 @@ export type Database = {
         }
         Returns: Json
       }
-      register_push_token: {
-        Args: {
-          p_token: string
-          p_platform: string
-          p_app_version?: string | null
-          p_device_name?: string | null
-          p_notify_library?: boolean
-          p_notify_membership?: boolean
-        }
-        Returns: undefined
-      }
-      unregister_push_token: { Args: { p_token: string }; Returns: undefined }
       upsert_reading_progress: {
         Args: {
           p_book_id: string
@@ -2819,18 +2881,18 @@ export type Database = {
         Returns: Json
       }
       user_access_state: { Args: { p_user_id: string }; Returns: Json }
+      user_has_active_premium: {
+        Args: { p_user_id?: string }
+        Returns: boolean
+      }
       vault_check: {
         Args: { p_book_ids: string[] }
         Returns: {
           book_id: string
-          pdf_updated_at: string
           has_pdf: boolean
           is_published: boolean
+          pdf_updated_at: string
         }[]
-      }
-      user_has_active_premium: {
-        Args: { p_user_id?: string }
-        Returns: boolean
       }
       weekly_trending_books: {
         Args: { p_limit?: number }

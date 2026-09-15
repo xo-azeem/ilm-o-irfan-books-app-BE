@@ -144,16 +144,23 @@ export type PlanLookup =
  * Column order for matching `event.product_id` against `plans`.
  * App Store / Play SKUs often differ; Apple Pay and Google Pay are payment
  * methods inside those stores, not separate product ids.
+ *
+ * A known store never falls back to the *other* store's column. The two are
+ * independent namespaces, so a match there is a coincidence, not the plan the
+ * reader bought - and the cost of believing it is entitling someone to the
+ * wrong plan. `revenuecat_product_id` stays in every list: it is the shared
+ * alias, and it is what a catalogue that has not split its SKUs still uses.
+ * An unknown store has nothing better to go on, so it tries all three.
  */
 export function preferredPlanProductColumns(
   store: string | null | undefined,
 ): PlanProductColumn[] {
   const mapped = mapStore(store)
   if (mapped === 'app_store') {
-    return ['app_store_product_id', 'revenuecat_product_id', 'play_store_product_id']
+    return ['app_store_product_id', 'revenuecat_product_id']
   }
   if (mapped === 'play_store') {
-    return ['play_store_product_id', 'revenuecat_product_id', 'app_store_product_id']
+    return ['play_store_product_id', 'revenuecat_product_id']
   }
   return ['revenuecat_product_id', 'app_store_product_id', 'play_store_product_id']
 }

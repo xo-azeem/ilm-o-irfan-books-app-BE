@@ -111,12 +111,12 @@ Deno.test('plan lookup prefers store product_id columns, else premium_monthly', 
   assertEquals(resolvePlanLookup('com.ilmoirfan.premium.monthly', 'APP_STORE'), {
     by: 'product_id',
     value: 'com.ilmoirfan.premium.monthly',
-    columns: ['app_store_product_id', 'revenuecat_product_id', 'play_store_product_id'],
+    columns: ['app_store_product_id', 'revenuecat_product_id'],
   })
   assertEquals(resolvePlanLookup('premium_monthly', 'PLAY_STORE'), {
     by: 'product_id',
     value: 'premium_monthly',
-    columns: ['play_store_product_id', 'revenuecat_product_id', 'app_store_product_id'],
+    columns: ['play_store_product_id', 'revenuecat_product_id'],
   })
   assertEquals(resolvePlanLookup('  premium_monthly  '), {
     by: 'product_id',
