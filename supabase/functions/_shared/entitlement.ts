@@ -29,6 +29,11 @@ export type AccessState = {
   reason: AccessReason
   serverTime: string
   secondsRemaining: number | null
+  // 20260922120000: which store bills the row, and whether the reader has
+  // asked to cancel in the app without the store confirming yet.
+  store?: string | null
+  cancelRequestedAt?: string | null
+  cancelPending?: boolean
 }
 
 // How a reader is told their access changed.

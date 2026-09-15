@@ -40,7 +40,8 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | `/functions/v1/highlights-toggle` | POST | User | Bookmark button: create or delete on `(book_id, page_number)` in one call |
 | `/functions/v1/highlights-delete` | POST | User | Delete by `{ id }` or `{ book_id, page_number }`; missing → `deleted: false` |
 | `/functions/v1/library-overview` | GET | User | Combined shelves: wishlist, in-progress, finished (`progress >= 0.99`), downloads, highlights. Progress rows carry `finished_at` |
-| `/functions/v1/entitlements-status` | GET | User | Current premium state |
+| `/functions/v1/entitlements-status` | GET | User | Current premium state, plus `store` / `cancelRequestedAt` / `cancelPending` |
+| `/functions/v1/subscription-cancel` | POST | User | Records the reader's request to cancel; the app then opens the store's manage-subscriptions sheet — see [Cancelling a membership](#cancelling-a-membership) |
 | `/functions/v1/get-signed-pdf` | POST | User | Signed PDF URL for premium or allowed access; carries `pdfUpdatedAt`, the stamp of the file being served |
 | `/functions/v1/vault-check` | POST | User | `{ bookIds }` → which still exist and their `pdfUpdatedAt` — see [Replaced and deleted books](#replaced-and-deleted-books) |
 | `/functions/v1/avatar-upload-url` | POST | User | One-shot signed upload URL for the caller's avatar |
@@ -267,6 +268,9 @@ hardcoding it.
     "expiresAt": null,          // null = no end date (lifetime, comp, or admin)
     "secondsRemaining": null,   // null when expiresAt is null; never negative
     "reason": "admin",          // why, so the paywall can say something useful
+    "store": null,              // app_store | play_store | stripe | promotional | unknown | null
+    "cancelRequestedAt": null,  // set by subscription-cancel until the store confirms
+    "cancelPending": false,     // cancelRequestedAt set AND status still renewing
     "serverTime": "2026-09-09T12:00:00Z",   // client clock-skew correction
     "realtime": { "mode": "postgres_changes", "channel": "access:<user_id>",
                   "schema": "public", "table": "access_events", "event": "INSERT",
@@ -668,6 +672,123 @@ sends all failed with a retryable FCM error goes back to `pending` with
 exponential backoff, up to five attempts. `skipped` means every recipient had
 since signed out or turned that kind off. Without the FCM key configured the
 function answers `500 PUSH_CONFIG_ERROR` and claims nothing, so rows wait.
+
+## Account deletion
+
+Both stores require in-app account deletion. It is a request, not a button:
+a reader files it, an admin approves or declines, and an approved request runs
+after a 7-day grace period during which the reader may still cancel. All of the
+policy — what blocks a request, how long the grace is — lives in the database
+(`20260921120000_account_deletion.sql`); the app only renders it.
+
+**Reader RPCs** (`supabase.rpc`, authenticated, scoped to `auth.uid()`):
+
+| RPC | Answers |
+| --- | --- |
+| `account_deletion_status()` | `{ request, canRequest, blockers[], warnings[], graceDays }` — `request` is the latest row of any status (so a declined one shows its note), `blockers` are why a new request would be refused, `warnings` what to say before confirming |
+| `request_account_deletion(p_reason)` | Files the request; returns the same status object. Raises `SUBSCRIPTION_ACTIVE`, `BILLING_UNRESOLVED`, `ADMIN_ACCOUNT`, `REQUEST_EXISTS` or `REASON_TOO_LONG` as the error *message*, with the human sentence in *details* |
+| `cancel_account_deletion_request()` | Withdraws a `pending`, `approved` or `failed` request (not one already `processing`). Raises `NO_OPEN_REQUEST` |
+
+Blockers and warnings, decided by `private.account_deletion_blockers` /
+`_warnings`:
+
+| Code | Kind | When |
+| --- | --- | --- |
+| `SUBSCRIPTION_ACTIVE` | blocker | store entitlement `active` / `trial` and not past `expires_at` — we cannot cancel a store subscription for the reader, and deleting the account would leave them billed |
+| `BILLING_UNRESOLVED` | blocker | entitlement `grace` / `billing_issue` — the store is still retrying |
+| `ADMIN_ACCOUNT` | blocker | `profiles.role = 'admin'` — demote first |
+| `PAID_TIME_FORFEITED` | warning | `cancelled` but paid through a future `expires_at` — remaining time is lost; refunds are the store's |
+| `COMP_ACCESS_LOST` | warning | promotional entitlement (never blocks: nobody is billed) |
+| `DOWNLOADS_REMOVED` | warning | the reader holds downloads (they stop opening once the account is gone) |
+
+**Admin RPCs** (`is_admin()`):
+
+| RPC | Answers |
+| --- | --- |
+| `admin_deletion_requests(p_status, p_limit)` | `{ rows[], counts, graceDays }`; `p_status` is a status, `'open'` (pending / approved / processing / failed) or null. Each open row carries its *current* `blockers` and `profileExists` |
+| `admin_decide_deletion_request(p_request_id, p_approve, p_note, p_immediate)` | Approve (schedules `now + grace`, or `now` with `p_immediate`) or reject a `pending` / `failed` row. Approval re-checks the blockers. Audited (`entity_type = 'account_deletion_request'`); the reader gets an `account_deletion_approved` / `_rejected` push (route `privacy`) |
+
+**Executor.** `POST /functions/v1/account-deletion-run` with header
+`x-ops-secret` equal to the `ACCOUNT_DELETION_SECRET` Edge secret (pg_cron
+`account-deletion-tick`, every 15 minutes, via `private.account_deletion_kick`),
+or with an admin JWT (the CMS's *Run now*). Claims due `approved` rows
+(`account_deletion_claim`, skip-locked → `processing`), re-checks the blockers,
+removes the reader's `avatars/<uid>/*` objects and the `auth.users` row (which
+cascades through `profiles` to entitlements, downloads, progress, highlights,
+wishlist and push tokens), then marks the row `completed` — or `failed` with
+the blocker code, for an admin to approve again or reject. The request row has
+no foreign key and survives as the record. Answers
+`{ claimed, completed, failed, outcomes[] }`.
+
+The app should expect its session to die when the run completes: the next
+token refresh fails and `onAuthStateChange` reports `SIGNED_OUT`.
+
+## Cancelling a membership
+
+Memberships are billed by the App Store or Google Play, and **only the store can stop
+one renewing** — neither Apple nor Google exposes an API for a third party to cancel a
+subscription on the reader's behalf. The backend owns everything around that moment:
+
+1. **The request.** `POST /functions/v1/subscription-cancel` (or the
+   `request_subscription_cancellation()` RPC) stamps `entitlements.cancel_requested_at`
+   and answers `user_access_state()` plus `{ requested, alreadyCancelled, manageUrl }`.
+   The app then opens the store's own sheet (RevenueCat `showManageSubscriptions`, or
+   `manageUrl`). Refusals, as `{ error: { code, message } }` with 409:
+
+   | Code | When |
+   | --- | --- |
+   | `NO_SUBSCRIPTION` | no entitlement, or one that no longer grants access |
+   | `NOT_STORE_MANAGED` | `store` is `promotional` / `stripe` / `unknown` — nothing a store sheet can end; the app points at support |
+
+   A row that is already `cancelled` is not an error: `alreadyCancelled: true`.
+   A reader who backs out of the store sheet withdraws with the
+   `withdraw_subscription_cancellation()` RPC (RPC only; answers the state plus
+   `withdrawn`), which clears the pending request and its reminder.
+
+2. **The confirmation.** RevenueCat's `CANCELLATION` webhook → `status = 'cancelled'`.
+   Nothing about access changes: `entitlement_has_access()` already keeps a cancelled
+   membership open until `expires_at`, the period the reader has paid for, and
+   `reason` reads `cancelled_paid_through`. `UNCANCELLATION` puts it back to `active`.
+   The BEFORE UPDATE trigger clears `cancel_requested_at` on either.
+
+3. **The mail.** An AFTER UPDATE trigger on `entitlements` writes to `email_outbox` on
+   each real status transition, and `email-dispatch` sends through Resend:
+
+   | Kind | Trigger |
+   | --- | --- |
+   | `membership_cancelled` | `* → cancelled` — "you keep access until *date*, you will not be charged again" |
+   | `membership_resumed` | `cancelled → active / trial / grace / billing_issue` |
+   | `membership_ended` | `* → expired` (EXPIRATION webhook or the minutely sweep) |
+   | `cancellation_unfinished` | `cancel_requested_at` over an hour old with the status still renewing (10-minute sweep, once per request), **or** a renewal landing after the request — the reader was billed; the letter says how to finish in the store and that refunds are the store's |
+
+   Deduplicated per (reader, kind, `expiresAt`) inside an hour, so a webhook replay or
+   an admin re-save does not send twice.
+
+**Dispatcher.** `POST /functions/v1/email-dispatch` with header `x-ops-secret` equal to
+the `EMAIL_DISPATCH_SECRET` Edge secret (pg_net on insert via
+`private.email_dispatch_kick`, plus pg_cron `email-dispatch-tick` every minute). Claims
+due rows (`email_outbox_claim`, skip-locked → `processing`, recipient re-read from
+`profiles.email`), sends with an idempotency key, writes back `sent` / `failed` /
+`skipped` (no address) or a backoff (`pending` again; 429 / 5xx; 5 attempts). Needs
+`RESEND_API_KEY` + `EMAIL_FROM`; until they are set every row waits in `pending` and
+nothing is lost. Answers `{ claimed, sent, failed, skipped, retried }`.
+
+## Account self-service (sessions, data export, passwords)
+
+`20260923120000_account_sessions_export.sql`. RPC-only; nothing to deploy but the migration.
+
+| RPC | Answers |
+| --- | --- |
+| `my_sessions()` | The reader's rows from `auth.sessions`: `{ id, createdAt, lastActiveAt, userAgent, ip, isCurrent }[]`, current first. The app sends a readable User-Agent (`IlmOIrfan/<version> (<platform> <os>; <model>)`) so the row names the device |
+| `revoke_session(p_session_id)` | Signs one *other* device out (deletes the session; refresh tokens cascade; its access token lives out the hour). Raises `CURRENT_SESSION`, `SESSION_NOT_FOUND`. "Sign out everywhere else" is the client's `signOut({ scope: 'others' })` |
+| `my_data_export()` | One JSON document: `account` (email, providers), `profile`, `membership` (minus RevenueCat payloads), `readingProgress`, `highlights`, `wishlist`, `downloads` (with book titles), `readingDays`, `readingStreak`, `achievements`, `notificationDevices` (minus tokens), `deletionRequests`, `sessions`, `previousExports`. One per 10 minutes (`EXPORT_RATE_LIMITED` with the wait in *details*); each call logged in `data_export_log` |
+
+Password reset and change are Supabase Auth: `resetPasswordForEmail` → the
+**Reset password** template (add `{{ .Token }}` so the app can take a code) →
+`verifyOtp({ type: 'recovery' })` → `updateUser({ password })`; a signed-in
+change is `reauthenticate()` (the **Reauthentication** template, a code to the
+account email) → `updateUser({ password, nonce })`. Turn **Secure password
+change** on in Auth → Providers → Email so the nonce is enforced server-side.
 
 ## Request notes
 

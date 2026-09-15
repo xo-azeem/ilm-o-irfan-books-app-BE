@@ -360,6 +360,40 @@ Blocked on you: Firebase project + service-account key, then steps 1–3 in setu
 
 ---
 
+## Account deletion (2026-09-16)
+
+Done, not yet deployed:
+
+- `supabase/migrations/20260921120000_account_deletion.sql` — `account_deletion_requests`, reader / admin / executor RPCs, billing blockers, 7-day grace, pg_net kick + pg_cron tick, two new push kinds.
+- `supabase/functions/account-deletion-run` — claims due rows, removes avatars + the auth user, marks the outcome. Secret header or admin JWT.
+- `_shared/push.ts` — copy for `account_deletion_approved` / `_rejected`, route `privacy`.
+- Docs: api-endpoints (Account deletion), schema, setup-guide (secret + `runtime_config`).
+
+Blocked on you: `ACCOUNT_DELETION_SECRET` Edge secret + the `account_deletion_secret` row in `private.runtime_config` (setup-guide → Account deletion). Until then approved requests run only from the admin app's *Run now*.
+
+---
+
+## Subscription cancellation + membership emails (2026-09-16)
+
+Done, not yet deployed:
+
+- `supabase/migrations/20260922120000_subscription_cancellation.sql` — `entitlements.cancel_requested_at` / `cancel_reminder_sent_at`, `request_subscription_cancellation()` RPC, `user_access_state()` now carries `store` / `cancelRequestedAt` / `cancelPending`, `email_outbox` + `email_outbox_claim`, BEFORE/AFTER UPDATE triggers on `entitlements` that maintain the request and queue the letters, 10-minute reminder sweep, pg_net kick + minutely tick, daily prune.
+- `supabase/functions/subscription-cancel` — the RPC over HTTP, with `manageUrl`.
+- `supabase/functions/email-dispatch` + `_shared/email.ts` — Resend transport and the four letters.
+- `entitlements-status` — exposes the cancel facts. Docs: api-endpoints (Cancelling a membership), schema, setup-guide (Membership emails), `.env.example`, deploy script.
+
+Not possible from the backend, by design: actually stopping the store subscription. Apple has no API for it; Google's is a Play Developer API call that needs a service account and the purchase token, which RevenueCat does not hand out. The app opens the store's sheet; the webhook confirms.
+
+Blocked on you: `EMAIL_DISPATCH_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM` Edge secrets + the `email_dispatch_secret` row in `private.runtime_config` (setup-guide → Membership emails). Until then letters wait in `email_outbox`.
+
+---
+
+## Account self-service (2026-09-16)
+
+Done, not yet deployed: `supabase/migrations/20260923120000_account_sessions_export.sql` — `my_sessions` / `revoke_session` (signed-in devices), `my_data_export` + `data_export_log` (download my data). RPC-only. Password reset / change use Supabase Auth; the app needs `{{ .Token }}` in the **Reset password** template and **Secure password change** on.
+
+---
+
 ## Next actions
 
 | # | Action | Owner | Blocker |

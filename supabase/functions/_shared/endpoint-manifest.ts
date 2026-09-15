@@ -195,6 +195,16 @@ export const endpointManifest: EndpointDefinition[] = [
     description: 'Returns the current subscription and entitlement state.',
   },
   {
+    name: 'subscription-cancel',
+    route: '/functions/v1/subscription-cancel',
+    method: 'POST',
+    access: 'authenticated',
+    description:
+      'Records the reader's request to cancel their membership; the app then opens the store's manage-subscriptions sheet, which is the only place a store subscription can be stopped.',
+    notes:
+      'Wraps request_subscription_cancellation(). Answers user_access_state() plus { requested, alreadyCancelled, manageUrl }. 409 NO_SUBSCRIPTION when nothing is renewing; 409 NOT_STORE_MANAGED for a promotional / Stripe row. The store confirms by webhook (status -> cancelled, access runs to expires_at) and the reader is emailed by email-dispatch.',
+  },
+  {
     name: 'get-signed-pdf',
     route: '/functions/v1/get-signed-pdf',
     method: 'POST',
@@ -491,6 +501,24 @@ export const endpointManifest: EndpointDefinition[] = [
     method: 'POST',
     access: 'public',
     description: 'Receives authenticated RevenueCat subscription events.',
+  },
+  {
+    name: 'account-deletion-run',
+    route: '/functions/v1/account-deletion-run',
+    method: 'POST',
+    access: 'admin',
+    description: 'Executes approved account deletions whose grace period has elapsed. Called by pg_cron (x-ops-secret) every 15 minutes, or by an admin pressing Run now.',
+    notes:
+      'Claims due rows via account_deletion_claim, re-checks the billing blockers, removes the reader's avatars and the auth user (cascades through profiles), marks each row completed or failed. Readers file and withdraw through the account_deletion_status / request_account_deletion / cancel_account_deletion_request RPCs; admins decide through admin_deletion_requests / admin_decide_deletion_request. Answers { claimed, completed, failed, outcomes[] }.',
+  },
+  {
+    name: 'email-dispatch',
+    route: '/functions/v1/email-dispatch',
+    method: 'POST',
+    access: 'public',
+    description: 'Drains email_outbox into Resend. Called by the database (pg_net trigger + minutely pg_cron) with the x-ops-secret header, never by the app.',
+    notes:
+      'Claims via email_outbox_claim (skip-locked), composes each letter from _shared/email.ts, sends with an idempotency key, writes back sent / failed / skipped or a backoff. Needs EMAIL_DISPATCH_SECRET (= runtime_config.email_dispatch_secret), RESEND_API_KEY and EMAIL_FROM; until they are set, rows wait in pending. Answers { claimed, sent, failed, skipped, retried }.',
   },
   {
     name: 'push-dispatch',

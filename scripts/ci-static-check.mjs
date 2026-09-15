@@ -216,7 +216,7 @@ console.log('== HTTP contract ==')
 // Exempt: signed-pdf answers 410 to everything on purpose.
 // revenuecat-webhook and push-dispatch are server-to-server only (no CORS / handleOptions).
 const METHOD_EXEMPT = new Set(['signed-pdf'])
-const NO_CORS_WEBHOOKS = new Set(['revenuecat-webhook', 'push-dispatch'])
+const NO_CORS_WEBHOOKS = new Set(['revenuecat-webhook', 'push-dispatch', 'email-dispatch'])
 
 for (const name of dirs) {
   const source = readFileSync(join(FUNCTIONS_DIR, name, 'index.ts'), 'utf8')

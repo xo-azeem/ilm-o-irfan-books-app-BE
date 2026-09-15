@@ -131,6 +131,8 @@ Seed intentionally has **no books, no authors, no collections**. Old dummy shelv
 - [x] Never allow client writes to `entitlements` (RLS + mobile-contract hard rule)
 - [x] Align plan display: `price_cents` = marketing; IAP button = RevenueCat localized price (`mobile-contract.md`)
 - [x] Webhook auth rotation runbook (`docs/runbooks/secret-rotation.md`)
+- [x] In-app cancellation: `subscription-cancel` records the request, the app opens the store sheet, the webhook confirms; `cancelled` stays paid through `expires_at` (`api-endpoints.md` → Cancelling a membership)
+- [x] Membership emails via Resend (`email_outbox` + `email-dispatch`): cancelled / resumed / ended / unfinished-cancellation reminder — needs `RESEND_API_KEY` + `EMAIL_FROM` + `EMAIL_DISPATCH_SECRET`
 
 ---
 

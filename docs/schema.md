@@ -61,7 +61,8 @@ books.pdf_path   → Storage pdfs/
 ### Subscriptions
 
 - **plans** — Premium definition + RevenueCat product id + features JSON
-- **entitlements** — active/expired status, expiry, RC ids, store, `last_revenuecat_event_id` / `last_revenuecat_event_at`
+- **entitlements** — active/expired status, expiry, RC ids, store, `last_revenuecat_event_id` / `last_revenuecat_event_at`; `cancel_requested_at` / `cancel_reminder_sent_at` record a cancel request made in the app until the store confirms (maintained by `private.entitlement_cancel_request_maintain()`)
+- **email_outbox** — transactional mail queue (`membership_cancelled` / `membership_resumed` / `membership_ended` / `cancellation_unfinished`), written by `private.email_membership_change()` and the reminder sweep, drained by `email-dispatch`. Service role only
 - **revenuecat_events** — webhook idempotency ledger (service role only; unique event id)
 - **app_settings** — singleton product flags (maintenance, sign-ups, featured collection). `allow_pdf_without_entitlement` has been **dropped**: it was already unread, and a dormant column that means "serve paid content to everyone" is a liability. PDF access follows the admin role and the entitlement alone — `books.is_premium` does not enter into it.
 
@@ -89,6 +90,7 @@ books.pdf_path   → Storage pdfs/
 | progress / wishlist / downloads / highlights / streaks | CRUD own rows |
 | `entitlements` | `SELECT` own (admins may `SELECT` all); writes via service role |
 | `revenuecat_events` | No client access; service role / webhook only |
+| `email_outbox` | No client access; written by definer triggers, read by `email-dispatch` |
 | `app_settings` | `SELECT` for anon + authenticated; `UPDATE` for `is_admin()` only |
 | Catalog writes + unpublished reads | `authenticated` + `is_admin()` (JWT `app_metadata.app_role`) |
 | Storage `covers` / `pdfs` writes | admin JWT only |
@@ -276,6 +278,31 @@ read before the cascade), `books_push_file_replaced` (BEFORE UPDATE OF pdf_path,
 before the 20260917130000 trigger clears `downloads`), `books_push_updated`
 (BEFORE UPDATE, reader-visible columns only), `collections_push_published`,
 `collection_books_push_added` (statement-level), `access_events_push_membership`.
+
+## Account deletion
+
+`20260921120000_account_deletion.sql`. See [api-endpoints.md → Account deletion](./api-endpoints.md#account-deletion).
+
+| Object | Purpose |
+| --- | --- |
+| `account_deletion_requests` | One row per request: `user_id` (no FK — outlives the account), `email` / `full_name` snapshot, `reason`, `status` (`pending` → `approved` → `processing` → `completed` / `failed`; or `rejected` / `cancelled`), `decided_at/by`, `decision_note`, `scheduled_for`, `attempts`, `last_error`, `snapshot` (entitlement at request time). Partial unique index: one open row per reader. Owner + admin `SELECT`; writes only via RPC |
+| `private.account_deletion_grace()` | 7 days |
+| `private.account_deletion_blockers(uid)` / `_warnings(uid)` | The billing / role rules (see the endpoint doc) — used by the reader's status, the admin's approval and the executor's run alike |
+| `account_deletion_status()` / `request_account_deletion(text)` / `cancel_account_deletion_request()` | Reader RPCs, scoped to `auth.uid()` |
+| `admin_deletion_requests(text, int)` / `admin_decide_deletion_request(uuid, bool, text, bool)` | Admin list and decision; decision audited and pushed (`push_outbox` kinds `account_deletion_approved` / `_rejected`) |
+| `account_deletion_claim(int)` / `account_deletion_mark(uuid, text, text)` | service_role only: the executor's claim and verdict |
+| `private.account_deletion_kick()` | pg_net `POST` to `account-deletion-run` with `x-ops-secret` from `private.runtime_config.account_deletion_secret`; pg_cron `account-deletion-tick` (`*/15 * * * *`) |
+
+## Account self-service
+
+`20260923120000_account_sessions_export.sql`. See [api-endpoints.md → Account self-service](./api-endpoints.md#account-self-service-sessions-data-export-passwords).
+
+| Object | Purpose |
+| --- | --- |
+| `my_sessions()` / `revoke_session(uuid)` | Read / delete the reader's own `auth.sessions` rows (SECURITY DEFINER; the current session cannot be revoked here) |
+| `data_export_log` | One row per `my_data_export()` call — the 10-minute rate limit and the record. Owner `SELECT` |
+| `private.export_rows(sql, uid, strip[])` | Helper: one table's rows for one reader as a JSON array minus named keys |
+| `my_data_export()` | The reader's data as one JSON document (see the endpoint doc for the sections) |
 
 ## Applying schema
 

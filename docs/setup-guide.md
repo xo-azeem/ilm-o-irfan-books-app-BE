@@ -430,6 +430,88 @@ the FE repo: `docs/push-notifications.md`.
 
 ---
 
+## Account deletion
+
+Readers file a deletion request in the app; an admin approves it in the CMS;
+after a 7-day grace period the `account-deletion-run` Edge Function removes
+the auth user. The schema and RPCs land with the migrations. The scheduled run
+needs one secret, in two places:
+
+1. **Edge secret** (or put it in `.env` and run `npm run deploy:hosted`):
+
+   ```bash
+   npx supabase secrets set ACCOUNT_DELETION_SECRET=<long random string> --project-ref <ref>
+   npx supabase functions deploy account-deletion-run --project-ref <ref>
+   ```
+
+2. **Tell the database where to kick** (`supabase_url` is shared with push):
+
+   ```sql
+   insert into private.runtime_config (key, value) values
+     ('supabase_url', 'https://<ref>.supabase.co'),
+     ('account_deletion_secret', '<the same long random string>')
+   on conflict (key) do update set value = excluded.value, updated_at = timezone('utc', now());
+   ```
+
+3. **Check it moves.** Approve a request in the admin app, then either wait for
+   the grace period (or approve with *Delete now*), and:
+
+   ```sql
+   select id, email, status, scheduled_for, attempts, last_error, completed_at
+   from public.account_deletion_requests order by requested_at desc limit 10;
+   ```
+
+   `approved` past its `scheduled_for` with the cron running means
+   `runtime_config` is missing a key (the tick logs a notice). `failed` with
+   `last_error` naming `SUBSCRIPTION_ACTIVE` means the reader bought a
+   membership during the grace period — approve again once it is cancelled, or
+   reject. The admin app's *Run now* calls the same function with the admin's
+   JWT, so the flow works before the secret is set; only the unattended run
+   waits on it.
+
+---
+
+## Membership emails
+
+When a membership is cancelled, resumed or ends — or a reader started cancelling in
+the app and the store never confirmed — the database queues a letter in
+`public.email_outbox` and the `email-dispatch` Edge Function sends it through
+[Resend](https://resend.com). Three secrets, one runtime_config row:
+
+1. **Resend.** Create an API key and verify the sending domain
+   (Resend → Domains). `EMAIL_FROM` must be on that domain.
+
+2. **Edge secrets** (or put them in `.env` and run `npm run deploy:hosted`):
+
+   ```bash
+   npx supabase secrets set EMAIL_DISPATCH_SECRET=<long random string> RESEND_API_KEY=re_... "EMAIL_FROM=Ilm o Irfan <no-reply@yourdomain>" --project-ref <ref>
+   npx supabase functions deploy email-dispatch subscription-cancel entitlements-status --project-ref <ref>
+   ```
+
+3. **Tell the database where to kick** (`supabase_url` is shared with push):
+
+   ```sql
+   insert into private.runtime_config (key, value) values
+     ('supabase_url', 'https://<ref>.supabase.co'),
+     ('email_dispatch_secret', '<the same long random string>')
+   on conflict (key) do update set value = excluded.value, updated_at = timezone('utc', now());
+   ```
+
+4. **Check it moves.** Cancel a sandbox subscription (or set a test reader's row to
+   `cancelled` through `admin-set-entitlement`), then:
+
+   ```sql
+   select id, kind, to_email, status, attempts, last_error, provider_id, processed_at
+   from public.email_outbox order by id desc limit 10;
+   select jobname, schedule, active from cron.job
+   where jobname in ('email-dispatch-tick', 'subscription-cancellation-reminders', 'prune-email-outbox');
+   ```
+
+   `pending` with the cron running means `runtime_config` is missing a key (the tick
+   logs a notice) or the Edge secrets are unset (the function answers
+   `EMAIL_CONFIG_ERROR` and claims nothing). `failed` with `last_error` names Resend's
+   own code — `validation_error` is usually an unverified sender domain.
+
 ## Verify everything
 
 ```sql

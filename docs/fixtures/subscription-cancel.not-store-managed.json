@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "NOT_STORE_MANAGED",
+    "message": "This membership is not billed through the App Store or Google Play. Contact support to make changes."
+  }
+}

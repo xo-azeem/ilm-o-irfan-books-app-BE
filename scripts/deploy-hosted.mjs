@@ -10,7 +10,12 @@
  *
  * Optional:
  *   PUSH_DISPATCH_SECRET          shared secret the database sends as x-push-secret
+ *   ACCOUNT_DELETION_SECRET       shared secret the database sends as x-ops-secret
  *   FCM_SERVICE_ACCOUNT_B64       base64 of the Firebase service-account JSON key
+ *   EMAIL_DISPATCH_SECRET         shared secret the database sends to email-dispatch as x-ops-secret
+ *   RESEND_API_KEY                Resend API key for transactional mail (membership emails)
+ *   EMAIL_FROM                    verified sender, e.g. "Ilm o Irfan <no-reply@yourdomain>"
+ *   EMAIL_REPLY_TO                optional reply-to address
  *   DEPLOY_SEED=1                 run supabase/seed.sql after db push
  *   DEPLOY_ALLOW_PLACEHOLDER_RC=1 allow a staging-only placeholder webhook auth
  *   SUPABASE_DB_PASSWORD          passed to `supabase link` when non-interactive
@@ -40,7 +45,12 @@ Required environment:
 
 Optional:
   PUSH_DISPATCH_SECRET          Shared secret for push-dispatch (see docs/setup-guide.md)
+  ACCOUNT_DELETION_SECRET       Shared secret for account-deletion-run (see docs/setup-guide.md)
   FCM_SERVICE_ACCOUNT_B64       base64 of the Firebase service-account JSON key
+  EMAIL_DISPATCH_SECRET         Shared secret for email-dispatch (see docs/setup-guide.md)
+  RESEND_API_KEY                Resend API key for membership emails
+  EMAIL_FROM                    Verified sender, e.g. "Ilm o Irfan <no-reply@yourdomain>"
+  EMAIL_REPLY_TO                Optional reply-to address
   DEPLOY_SEED=1                 Apply supabase/seed.sql after migrations
   DEPLOY_ALLOW_PLACEHOLDER_RC=1 Use a staging placeholder if RC is not ready
   SUPABASE_DB_PASSWORD          Database password for non-interactive link
@@ -115,7 +125,12 @@ const pdfTtl = (process.env.SIGNED_PDF_EXPIRES_IN ?? '').trim()
 const allowPlaceholder = process.env.DEPLOY_ALLOW_PLACEHOLDER_RC === '1'
 const doSeed = process.env.DEPLOY_SEED === '1'
 const pushSecret = (process.env.PUSH_DISPATCH_SECRET ?? '').trim()
+const deletionSecret = (process.env.ACCOUNT_DELETION_SECRET ?? '').trim()
 const fcmServiceAccount = (process.env.FCM_SERVICE_ACCOUNT_B64 ?? '').trim()
+const emailSecret = (process.env.EMAIL_DISPATCH_SECRET ?? '').trim()
+const resendApiKey = (process.env.RESEND_API_KEY ?? '').trim()
+const emailFrom = (process.env.EMAIL_FROM ?? '').trim()
+const emailReplyTo = (process.env.EMAIL_REPLY_TO ?? '').trim()
 
 if (!rcAuth) {
   if (allowPlaceholder) {
@@ -178,7 +193,14 @@ writeFileSync(
     `SIGNED_PDF_EXPIRES_IN=${pdfTtl}`,
     // Push is optional: without these the outbox fills and nothing is sent.
     ...(pushSecret ? [`PUSH_DISPATCH_SECRET=${pushSecret}`] : []),
+    // Account deletion: without it approved requests run only from the admin app.
+    ...(deletionSecret ? [`ACCOUNT_DELETION_SECRET=${deletionSecret}`] : []),
     ...(fcmServiceAccount ? [`FCM_SERVICE_ACCOUNT_B64=${fcmServiceAccount}`] : []),
+    // Membership email: without these the outbox fills and nothing is sent.
+    ...(emailSecret ? [`EMAIL_DISPATCH_SECRET=${emailSecret}`] : []),
+    ...(resendApiKey ? [`RESEND_API_KEY=${resendApiKey}`] : []),
+    ...(emailFrom ? [`EMAIL_FROM=${emailFrom}`] : []),
+    ...(emailReplyTo ? [`EMAIL_REPLY_TO=${emailReplyTo}`] : []),
     '',
   ].join('\n'),
   'utf8',
@@ -234,8 +256,12 @@ Webhook URL (when RevenueCat is ready):
   ${url}/functions/v1/revenuecat-webhook
 
 Push (when Firebase is ready — docs/setup-guide.md → Push notifications):
-  ${pushSecret ? 'PUSH_DISPATCH_SECRET set' : 'PUSH_DISPATCH_SECRET not set'} · ${fcmServiceAccount ? 'FCM key set' : 'FCM key not set'}
+  ${pushSecret ? 'PUSH_DISPATCH_SECRET set' : 'PUSH_DISPATCH_SECRET not set'} · ${fcmServiceAccount ? 'FCM key set' : 'FCM key not set'} · ${deletionSecret ? 'ACCOUNT_DELETION_SECRET set' : 'ACCOUNT_DELETION_SECRET not set'}
   Then: insert supabase_url + push_dispatch_secret into private.runtime_config
+
+Membership email (docs/setup-guide.md → Membership emails):
+  ${emailSecret ? 'EMAIL_DISPATCH_SECRET set' : 'EMAIL_DISPATCH_SECRET not set'} · ${resendApiKey ? 'RESEND_API_KEY set' : 'RESEND_API_KEY not set'} · ${emailFrom ? 'EMAIL_FROM set' : 'EMAIL_FROM not set'}
+  Then: insert email_dispatch_secret into private.runtime_config
 
 Next:
   1. Dashboard → Authentication → enable Email provider

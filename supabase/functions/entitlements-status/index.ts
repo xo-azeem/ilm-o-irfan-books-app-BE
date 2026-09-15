@@ -45,6 +45,7 @@ Deno.serve(async (req) => {
             'starts_at',
             'expires_at',
             'store',
+            'cancel_requested_at',
             'created_at',
             'updated_at',
             'plan:plans(id, code, name, price_cents, currency, interval, features, is_active)',
@@ -104,6 +105,13 @@ Deno.serve(async (req) => {
       // Why, so the app can tell "your card failed" apart from "you never
       // subscribed" without inferring it from status and a timestamp.
       reason: state.reason,
+
+      // The cancel flow. `store` names the sheet the app opens; a pending
+      // request is one the reader made in the app that the store has not
+      // confirmed by webhook yet, so the membership still renews.
+      store: state.store ?? null,
+      cancelRequestedAt: state.cancelRequestedAt ?? null,
+      cancelPending: state.cancelPending ?? false,
 
       // The client runs the countdown that actually locks the screen, so it
       // needs to know how far its own clock is off. Without this a device

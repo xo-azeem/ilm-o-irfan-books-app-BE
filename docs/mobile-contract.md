@@ -342,6 +342,13 @@ appear next to a book nobody can buy.
 - The amount charged at purchase comes from **App Store / Play via RevenueCat** — show that localized price on buy buttons.
 - Never client-write `entitlements`. Comps: admin `admin-set-entitlement` (`store=promotional`); RC webhooks can overwrite.
 
+### Cancelling
+
+- Only the store can stop a subscription renewing. The flow is: confirm with the reader → `POST subscription-cancel` (records `cancelRequestedAt`) → `Purchases.showManageSubscriptions()` (fall back to the response's `manageUrl`) → on return, re-read `entitlements-status`.
+- Until the store confirms, `cancelPending` is true and the membership **still renews** — say so, offer to reopen the store, and offer "keep my membership" (`withdraw_subscription_cancellation()` RPC). When the webhook lands, `status = 'cancelled'`, `reason = 'cancelled_paid_through'`, and access runs to `expiresAt`; show "ends on", never "renews on". The backend emails the reader at each step; the app does not need to.
+- `NOT_STORE_MANAGED` (comp / Stripe) → point at support rather than the store. No entitlement or an admin with none → no cancel control at all.
+- Resuming is also the store's: a reader who turns auto-renew back on gets `UNCANCELLATION` → `active` again.
+
 ---
 
 ## Do not

@@ -7,7 +7,7 @@
 //
 // Routing contract (every value a string — FCM data is string-only):
 //
-//   route        'book' | 'collection' | 'home' | 'library' | 'membership'
+//   route        'book' | 'collection' | 'home' | 'library' | 'membership' | 'privacy'
 //   bookId       when route = 'book'
 //   collectionId when route = 'collection'
 //   kind         the outbox kind, for the app's cache invalidation
@@ -25,6 +25,8 @@ export type PushKind =
   | 'book_updated'
   | 'membership_activated'
   | 'membership_expired'
+  | 'account_deletion_approved'
+  | 'account_deletion_rejected'
 
 export type PushChannel = 'catalog' | 'library' | 'account'
 
@@ -34,6 +36,7 @@ export type PushRoute =
   | { route: 'home' }
   | { route: 'library' }
   | { route: 'membership' }
+  | { route: 'privacy' }
 
 export type PushContent = {
   title: string
@@ -55,6 +58,10 @@ export type PushFacts = {
   collectionSubtitle?: string | null
   publishedCount?: number
   count?: number
+  // Account deletion decisions.
+  requestId?: string
+  scheduledFor?: string | null
+  note?: string | null
 }
 
 // The topic every device subscribes to for catalogue announcements. The app
@@ -207,6 +214,33 @@ export function composePush(kind: PushKind, facts: PushFacts, count: number): Pu
         body: 'Renew to keep reading the full library.',
         channel: 'account',
         route: { route: 'membership' },
+        priority: 'high',
+      }
+
+    case 'account_deletion_approved': {
+      const when = facts.scheduledFor ? new Date(facts.scheduledFor) : null
+      const dateText = when && !Number.isNaN(when.getTime())
+        ? when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+        : null
+      return {
+        title: 'Account deletion approved',
+        body: dateText
+          ? `Your account will be deleted on ${dateText}. Open Privacy & security before then to cancel.`
+          : 'Your account will be deleted shortly. Open Privacy & security to cancel.',
+        channel: 'account',
+        route: { route: 'privacy' },
+        priority: 'high',
+      }
+    }
+
+    case 'account_deletion_rejected':
+      return {
+        title: 'Account deletion declined',
+        body: facts.note
+          ? `Reason: ${facts.note}`
+          : 'Your account stays as it is. See Privacy & security for details.',
+        channel: 'account',
+        route: { route: 'privacy' },
         priority: 'high',
       }
   }

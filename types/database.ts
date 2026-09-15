@@ -129,6 +129,90 @@ export type Database = {
           },
         ]
       }
+      account_deletion_requests: {
+        Row: {
+          attempts: number
+          completed_at: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_note: string | null
+          email: string | null
+          full_name: string | null
+          id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          reason: string | null
+          requested_at: string
+          scheduled_for: string | null
+          snapshot: Json
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_note?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          reason?: string | null
+          requested_at?: string
+          scheduled_for?: string | null
+          snapshot?: Json
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_note?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          reason?: string | null
+          requested_at?: string
+          scheduled_for?: string | null
+          snapshot?: Json
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      data_export_log: {
+        Row: {
+          created_at: string
+          id: number
+          row_counts: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          row_counts?: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          row_counts?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       admin_audit_log: {
         Row: {
           action: string
@@ -884,8 +968,66 @@ export type Database = {
           },
         ]
       }
+      email_outbox: {
+        Row: {
+          attempts: number
+          created_at: string
+          data: Json
+          deliver_after: string
+          id: number
+          kind: string
+          last_error: string | null
+          processed_at: string | null
+          provider_id: string | null
+          status: string
+          to_email: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          data?: Json
+          deliver_after?: string
+          id?: never
+          kind: string
+          last_error?: string | null
+          processed_at?: string | null
+          provider_id?: string | null
+          status?: string
+          to_email?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          data?: Json
+          deliver_after?: string
+          id?: never
+          kind?: string
+          last_error?: string | null
+          processed_at?: string | null
+          provider_id?: string | null
+          status?: string
+          to_email?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_outbox_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       entitlements: {
         Row: {
+          cancel_requested_at: string | null
+          cancel_reminder_sent_at: string | null
           created_at: string
           expires_at: string | null
           last_revenuecat_event_at: string | null
@@ -901,6 +1043,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cancel_requested_at?: string | null
+          cancel_reminder_sent_at?: string | null
           created_at?: string
           expires_at?: string | null
           last_revenuecat_event_at?: string | null
@@ -916,6 +1060,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          cancel_requested_at?: string | null
+          cancel_reminder_sent_at?: string | null
           created_at?: string
           expires_at?: string | null
           last_revenuecat_event_at?: string | null
@@ -2374,7 +2520,26 @@ export type Database = {
         }
       }
       admin_dashboard_stats: { Args: never; Returns: Json }
+      account_deletion_claim: { Args: { p_limit?: number }; Returns: Json }
+      account_deletion_mark: {
+        Args: { p_error?: string | null; p_outcome: string; p_request_id: string }
+        Returns: undefined
+      }
+      account_deletion_status: { Args: never; Returns: Json }
+      admin_decide_deletion_request: {
+        Args: {
+          p_approve: boolean
+          p_immediate?: boolean
+          p_note?: string | null
+          p_request_id: string
+        }
+        Returns: Json
+      }
       admin_delete_books: { Args: { p_ids: string[] }; Returns: Json }
+      admin_deletion_requests: {
+        Args: { p_limit?: number; p_status?: string | null }
+        Returns: Json
+      }
       admin_delete_category: {
         Args: { p_force?: boolean; p_id: string }
         Returns: Json
@@ -2735,8 +2900,23 @@ export type Database = {
         Args: { b: Database["public"]["Tables"]["books"]["Row"] }
         Returns: string
       }
+      cancel_account_deletion_request: { Args: never; Returns: Json }
+      email_outbox_claim: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          data: Json
+          id: number
+          kind: string
+          to_email: string | null
+          user_id: string | null
+        }[]
+      }
       my_access_state: { Args: never; Returns: Json }
+      my_data_export: { Args: never; Returns: Json }
+      my_sessions: { Args: never; Returns: Json }
       prune_access_events: { Args: { p_keep_days?: number }; Returns: number }
+      prune_email_outbox: { Args: { p_keep_days?: number }; Returns: number }
       prune_push_tables: { Args: never; Returns: number }
       push_outbox_claim: {
         Args: { p_limit?: number }
@@ -2885,6 +3065,11 @@ export type Database = {
         Args: { p_user_id?: string }
         Returns: boolean
       }
+      request_account_deletion: { Args: { p_reason?: string | null }; Returns: Json }
+      revoke_session: { Args: { p_session_id: string }; Returns: Json }
+      request_subscription_cancellation: { Args: never; Returns: Json }
+      subscription_cancellation_reminders: { Args: never; Returns: number }
+      withdraw_subscription_cancellation: { Args: never; Returns: Json }
       vault_check: {
         Args: { p_book_ids: string[] }
         Returns: {

@@ -99,6 +99,12 @@ verify_jwt = false
 [functions.push-dispatch]
 verify_jwt = false
 
+# Executes approved account deletions. Called by pg_cron via pg_net with
+# x-ops-secret, or by an admin (JWT checked inside; verify_jwt stays off
+# so the database path can reach it).
+[functions.account-deletion-run]
+verify_jwt = false
+
 [functions.home-feed]
 verify_jwt = false
 
@@ -158,6 +164,14 @@ verify_jwt = true
 
 [functions.entitlements-status]
 verify_jwt = true
+
+[functions.subscription-cancel]
+verify_jwt = true
+
+# Called by the database (pg_net + pg_cron) with x-ops-secret; JWT checked
+# inside via the shared secret, never by the app.
+[functions.email-dispatch]
+verify_jwt = false
 
 [functions.admin-books]
 verify_jwt = true

@@ -1,0 +1,20 @@
+{
+  "data": {
+    "userId": "00000000-0000-4000-8000-000000000001",
+    "status": "active",
+    "startsAt": "2026-09-01T10:00:00+00:00",
+    "expiresAt": "2026-10-01T10:00:00+00:00",
+    "isActive": true,
+    "isAdmin": false,
+    "canAccessPremium": true,
+    "reason": "active",
+    "serverTime": "2026-09-16T12:00:00+00:00",
+    "secondsRemaining": 1288800,
+    "store": "play_store",
+    "cancelRequestedAt": "2026-09-16T12:00:00+00:00",
+    "cancelPending": true,
+    "requested": true,
+    "alreadyCancelled": false,
+    "manageUrl": "https://play.google.com/store/account/subscriptions"
+  }
+}
