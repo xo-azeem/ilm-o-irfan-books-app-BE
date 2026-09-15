@@ -131,19 +131,49 @@ export function resolveEventTimestampMs(event: RcEvent): number | null {
 /** Default plan when the event has no product_id or the SKU is not in `plans`. */
 export const FALLBACK_PLAN_CODE = 'premium_monthly'
 
+export type PlanProductColumn =
+  | 'app_store_product_id'
+  | 'play_store_product_id'
+  | 'revenuecat_product_id'
+
 export type PlanLookup =
-  | { by: 'revenuecat_product_id'; value: string }
+  | { by: 'product_id'; value: string; columns: PlanProductColumn[] }
   | { by: 'code'; value: typeof FALLBACK_PLAN_CODE }
 
 /**
- * Prefer matching `plans.revenuecat_product_id` to the store/RC product id.
- * Fall back to the single v1 plan code when the event omits product_id.
- * The webhook still falls back to `premium_monthly` if the product_id row is missing.
+ * Column order for matching `event.product_id` against `plans`.
+ * App Store / Play SKUs often differ; Apple Pay and Google Pay are payment
+ * methods inside those stores, not separate product ids.
  */
-export function resolvePlanLookup(productId: string | null | undefined): PlanLookup {
+export function preferredPlanProductColumns(
+  store: string | null | undefined,
+): PlanProductColumn[] {
+  const mapped = mapStore(store)
+  if (mapped === 'app_store') {
+    return ['app_store_product_id', 'revenuecat_product_id', 'play_store_product_id']
+  }
+  if (mapped === 'play_store') {
+    return ['play_store_product_id', 'revenuecat_product_id', 'app_store_product_id']
+  }
+  return ['revenuecat_product_id', 'app_store_product_id', 'play_store_product_id']
+}
+
+/**
+ * Prefer matching store-specific plan SKUs to the store/RC product id.
+ * Fall back to the single v1 plan code when the event omits product_id.
+ * The webhook still falls back to `premium_monthly` if no SKU row matches.
+ */
+export function resolvePlanLookup(
+  productId: string | null | undefined,
+  store?: string | null,
+): PlanLookup {
   const trimmed = typeof productId === 'string' ? productId.trim() : ''
   if (trimmed) {
-    return { by: 'revenuecat_product_id', value: trimmed }
+    return {
+      by: 'product_id',
+      value: trimmed,
+      columns: preferredPlanProductColumns(store),
+    }
   }
   return { by: 'code', value: FALLBACK_PLAN_CODE }
 }

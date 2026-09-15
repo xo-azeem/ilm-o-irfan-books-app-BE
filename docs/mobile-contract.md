@@ -338,6 +338,7 @@ appear next to a book nobody can buy.
 ### Plan prices vs store IAP
 
 - `plans-list` / plan rows expose `price_cents` + `currency` for **catalog copy** (e.g. PKR marketing).
+- Plan rows also expose `app_store_product_id`, `play_store_product_id`, and `revenuecat_product_id` for ops/debug — **do not** use them as the charge amount. Checkout uses RevenueCat’s localized store price; Apple Pay / Google Pay appear inside the App Store / Play purchase sheet when the user’s device supports them.
 - The amount charged at purchase comes from **App Store / Play via RevenueCat** — show that localized price on buy buttons.
 - Never client-write `entitlements`. Comps: admin `admin-set-entitlement` (`store=promotional`); RC webhooks can overwrite.
 

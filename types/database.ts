@@ -1052,6 +1052,8 @@ export type Database = {
           name: string
           price_cents: number
           revenuecat_product_id: string | null
+          app_store_product_id: string | null
+          play_store_product_id: string | null
           sort_order: number
           updated_at: string
         }
@@ -1066,6 +1068,8 @@ export type Database = {
           name: string
           price_cents: number
           revenuecat_product_id?: string | null
+          app_store_product_id?: string | null
+          play_store_product_id?: string | null
           sort_order?: number
           updated_at?: string
         }
@@ -1080,6 +1084,8 @@ export type Database = {
           name?: string
           price_cents?: number
           revenuecat_product_id?: string | null
+          app_store_product_id?: string | null
+          play_store_product_id?: string | null
           sort_order?: number
           updated_at?: string
         }
@@ -2039,6 +2045,8 @@ export type Database = {
           name: string | null
           price_cents: number | null
           revenuecat_product_id: string | null
+          app_store_product_id: string | null
+          play_store_product_id: string | null
           sort_order: number | null
           updated_at: string | null
         }
@@ -2054,6 +2062,8 @@ export type Database = {
           name?: string | null
           price_cents?: number | null
           revenuecat_product_id?: string | null
+          app_store_product_id?: string | null
+          play_store_product_id?: string | null
           sort_order?: number | null
           updated_at?: string | null
         }
@@ -2069,6 +2079,8 @@ export type Database = {
           name?: string | null
           price_cents?: number | null
           revenuecat_product_id?: string | null
+          app_store_product_id?: string | null
+          play_store_product_id?: string | null
           sort_order?: number | null
           updated_at?: string | null
         }
@@ -2446,6 +2458,7 @@ export type Database = {
       }
       admin_upsert_plan: {
         Args: {
+          p_app_store_product_id?: string
           p_code?: string
           p_currency?: string
           p_features?: Json
@@ -2453,6 +2466,7 @@ export type Database = {
           p_interval?: string
           p_is_active?: boolean
           p_name?: string
+          p_play_store_product_id?: string
           p_price_cents?: number
           p_revenuecat_product_id?: string
           p_sort_order?: number
@@ -2468,6 +2482,8 @@ export type Database = {
           name: string
           price_cents: number
           revenuecat_product_id: string | null
+          app_store_product_id: string | null
+          play_store_product_id: string | null
           sort_order: number
           updated_at: string
         }

@@ -43,6 +43,12 @@ Deno.serve(async (req) => {
     const revenuecat_product_id = asOptionalText('revenuecat_product_id')(
       payload.revenuecat_product_id ?? payload.revenuecatProductId ?? null,
     )
+    const app_store_product_id = asOptionalText('app_store_product_id')(
+      payload.app_store_product_id ?? payload.appStoreProductId ?? null,
+    )
+    const play_store_product_id = asOptionalText('play_store_product_id')(
+      payload.play_store_product_id ?? payload.playStoreProductId ?? null,
+    )
     const is_active = Object.hasOwn(payload, 'is_active') || Object.hasOwn(payload, 'isActive')
       ? asBoolean('is_active')(payload.is_active ?? payload.isActive)
       : null
@@ -60,6 +66,8 @@ Deno.serve(async (req) => {
       interval,
       features,
       revenuecat_product_id,
+      app_store_product_id,
+      play_store_product_id,
       is_active,
       sort_order,
     ].some((value) => value !== null)
@@ -80,6 +88,8 @@ Deno.serve(async (req) => {
         p_interval: interval,
         p_features: features,
         p_revenuecat_product_id: revenuecat_product_id,
+        p_app_store_product_id: app_store_product_id,
+        p_play_store_product_id: play_store_product_id,
         p_is_active: is_active,
         p_sort_order: sort_order,
       })
