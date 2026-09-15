@@ -51,6 +51,8 @@ const snapshot = {
   uri_allow_list: cfg.uri_allow_list,
   external_email_enabled: cfg.external_email_enabled,
   external_google_enabled: cfg.external_google_enabled,
+  external_google_skip_nonce_check: cfg.external_google_skip_nonce_check,
+  security_manual_linking_enabled: cfg.security_manual_linking_enabled,
   mailer_autoconfirm: cfg.mailer_autoconfirm,
   disable_signup: cfg.disable_signup,
   rate_limit_email_sent: cfg.rate_limit_email_sent,

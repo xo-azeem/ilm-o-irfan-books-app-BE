@@ -31,7 +31,10 @@
     "deploy:hosted": "node scripts/deploy-hosted.mjs",
     "push:configure": "node scripts/configure-push-hosted.mjs",
     "smoke:hosted": "node scripts/smoke-hosted.mjs",
-    "smoke:rls": "node scripts/rls-smoke.mjs"
+    "smoke:rls": "node scripts/rls-smoke.mjs",
+    "auth:print": "node scripts/print-hosted-auth-config.mjs",
+    "auth:uris": "node scripts/configure-hosted-auth-uris.mjs",
+    "auth:google": "node scripts/enable-hosted-google-auth.mjs"
   },
   "devDependencies": {
     "supabase": "^2.26.0"
