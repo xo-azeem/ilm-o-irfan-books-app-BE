@@ -200,7 +200,7 @@ export const endpointManifest: EndpointDefinition[] = [
     method: 'POST',
     access: 'authenticated',
     description:
-      'Records the reader's request to cancel their membership; the app then opens the store's manage-subscriptions sheet, which is the only place a store subscription can be stopped.',
+      "Records the reader's request to cancel their membership; the app then opens the store's manage-subscriptions sheet, which is the only place a store subscription can be stopped.",
     notes:
       'Wraps request_subscription_cancellation(). Answers user_access_state() plus { requested, alreadyCancelled, manageUrl }. 409 NO_SUBSCRIPTION when nothing is renewing; 409 NOT_STORE_MANAGED for a promotional / Stripe row. The store confirms by webhook (status -> cancelled, access runs to expires_at) and the reader is emailed by email-dispatch.',
   },
@@ -509,7 +509,7 @@ export const endpointManifest: EndpointDefinition[] = [
     access: 'admin',
     description: 'Executes approved account deletions whose grace period has elapsed. Called by pg_cron (x-ops-secret) every 15 minutes, or by an admin pressing Run now.',
     notes:
-      'Claims due rows via account_deletion_claim, re-checks the billing blockers, removes the reader's avatars, sends account_deletion_completed via Resend (audit row with null user_id), deletes the auth user (cascades through profiles), marks each row completed or failed. Readers file and withdraw through the account_deletion_status / request_account_deletion / cancel_account_deletion_request RPCs; admins decide through admin_deletion_requests / admin_decide_deletion_request. Answers { claimed, completed, failed, outcomes[] }.',
+      "Claims due rows via account_deletion_claim, re-checks the billing blockers, removes the reader's avatars, sends account_deletion_completed via Resend (audit row with null user_id), deletes the auth user (cascades through profiles), marks each row completed or failed. Readers file and withdraw through the account_deletion_status / request_account_deletion / cancel_account_deletion_request RPCs; admins decide through admin_deletion_requests / admin_decide_deletion_request. Answers { claimed, completed, failed, outcomes[] }.",
   },
   {
     name: 'email-dispatch',
