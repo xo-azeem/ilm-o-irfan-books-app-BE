@@ -20,12 +20,7 @@
 
 import { requireAdmin, requireMethod, serviceClient } from '../_shared/auth.ts'
 import { timingSafeEqualString } from '../_shared/crypto.ts'
-import {
-  composeEmail,
-  isDeliverableAddress,
-  loadEmailConfig,
-  sendEmail,
-} from '../_shared/email.ts'
+import { composeEmail, isDeliverableAddress, loadEmailConfig, sendEmail } from '../_shared/email.ts'
 import { fail, failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
 
 const MAX_ROWS = 20
@@ -58,7 +53,12 @@ async function removeAvatars(userId: string): Promise<void> {
 async function deleteOne(row: ClaimedRow): Promise<Outcome> {
   if (row.blockers.length > 0) {
     const first = row.blockers[0]
-    return { id: row.id, userId: row.userId, outcome: 'failed', error: `${first.code}: ${first.message}` }
+    return {
+      id: row.id,
+      userId: row.userId,
+      outcome: 'failed',
+      error: `${first.code}: ${first.message}`,
+    }
   }
 
   const admin = serviceClient()
@@ -71,56 +71,79 @@ async function deleteOne(row: ClaimedRow): Promise<Outcome> {
     console.warn(`[account-deletion-run] ${row.userId}: ${(error as Error).message}`)
   }
 
-  // Outbox rows cascade-delete with profiles, so the farewell letter must go
-  // out (or at least be attempted) before auth.users is removed. user_id is
-  // left null on the audit row so it survives the cascade.
-  if (isDeliverableAddress(row.email)) {
-    const config = loadEmailConfig()
-    const content = composeEmail('account_deletion_completed', {
-      userId: row.userId,
-      requestId: row.id,
-      fullName: null,
-    })
-    let providerId: string | null = null
-    let sendError: string | null = null
-    if (config) {
-      const outcome = await sendEmail(
-        config,
-        row.email.trim(),
-        content,
-        `account-deletion-completed-${row.id}`,
-      )
-      if (outcome.ok) {
-        providerId = outcome.providerId
-      } else {
-        sendError = outcome.code
-        console.warn(`[account-deletion-run] farewell mail ${row.id}: ${outcome.code}`)
-      }
-    }
-    await admin.from('email_outbox').insert({
-      user_id: null,
-      to_email: row.email.trim(),
-      kind: 'account_deletion_completed',
-      data: { userId: row.userId, requestId: row.id },
-      status: providerId ? 'sent' : config ? 'failed' : 'skipped',
-      attempts: 1,
-      provider_id: providerId,
-      last_error: sendError ?? (config ? null : 'RESEND_NOT_CONFIGURED'),
-      processed_at: new Date().toISOString(),
-    })
-  }
-
   const { error } = await admin.auth.admin.deleteUser(row.userId)
   if (error) {
     // Already gone (a previous run died after this step) counts as done.
     const status = (error as { status?: number }).status
-    if (status === 404 || /not found/i.test(error.message)) {
-      return { id: row.id, userId: row.userId, outcome: 'completed' }
+    const alreadyGone = status === 404 || /not found/i.test(error.message)
+    if (!alreadyGone) {
+      return {
+        id: row.id,
+        userId: row.userId,
+        outcome: 'failed',
+        error: `auth delete failed: ${error.message}`,
+      }
     }
-    return { id: row.id, userId: row.userId, outcome: 'failed', error: `auth delete failed: ${error.message}` }
   }
 
+  // Only now is "your account has been deleted" true, so only now is it sent.
+  // Nothing here needs the profile: the address was captured on the request
+  // row when the reader asked, and the audit row below keeps user_id null so
+  // it is not swept away by the cascade that just ran. A run that dies between
+  // the delete and this send is picked up by the next tick, which sees the
+  // 404 above and lands here again; the idempotency key stops the duplicate.
+  await sendFarewell(admin, row)
+
   return { id: row.id, userId: row.userId, outcome: 'completed' }
+}
+
+async function sendFarewell(
+  admin: ReturnType<typeof serviceClient>,
+  row: ClaimedRow,
+): Promise<void> {
+  if (!isDeliverableAddress(row.email)) return
+
+  const to = row.email.trim()
+  const config = loadEmailConfig()
+  let providerId: string | null = null
+  let sendError: string | null = null
+
+  if (config) {
+    const outcome = await sendEmail(
+      config,
+      to,
+      composeEmail('account_deletion_completed', {
+        userId: row.userId,
+        requestId: row.id,
+        fullName: null,
+      }),
+      `account-deletion-completed-${row.id}`,
+    )
+    if (outcome.ok) {
+      providerId = outcome.providerId
+    } else {
+      sendError = outcome.code
+      console.warn(`[account-deletion-run] farewell mail ${row.id}: ${outcome.code}`)
+    }
+  }
+
+  // The audit row is the only record that the letter went (or why it did
+  // not). Losing it silently would leave support unable to answer "did you
+  // tell me?", so a failed insert is at least logged.
+  const { error } = await admin.from('email_outbox').insert({
+    user_id: null,
+    to_email: to,
+    kind: 'account_deletion_completed',
+    data: { userId: row.userId, requestId: row.id },
+    status: providerId ? 'sent' : config ? 'failed' : 'skipped',
+    attempts: 1,
+    provider_id: providerId,
+    last_error: sendError ?? (config ? null : 'RESEND_NOT_CONFIGURED'),
+    processed_at: new Date().toISOString(),
+  })
+  if (error) {
+    console.error(`[account-deletion-run] farewell audit row ${row.id}: ${error.message}`)
+  }
 }
 
 Deno.serve(async (req) => {

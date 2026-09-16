@@ -48,8 +48,16 @@ export type EmailFacts = {
   token?: string | null
   tokenHash?: string | null
   redirectTo?: string | null
+  // The project's Site URL as Auth reports it. Kept for the record; it is the
+  // app, not the API, so the verify link is NOT built on it.
   siteUrl?: string | null
+  // The Supabase API base (SUPABASE_URL). /auth/v1/verify lives here.
+  verifyBaseUrl?: string | null
   emailActionType?: string | null
+  // auth_email_change only: which inbox this letter is for, and the address
+  // being adopted, so the two letters can say different things.
+  emailChangeStage?: 'current' | 'new' | null
+  newEmail?: string | null
 }
 
 export type EmailContent = {
@@ -82,8 +90,11 @@ export function authActionToKind(action: string | null | undefined): EmailKind |
     case 'invite':
       return 'auth_invite'
     case 'reauthentication':
-    case 'email':
       return 'auth_reauthentication'
+    // GoTrue's plain email-OTP action, distinct from reauthentication. A
+    // sign-in-code letter is the one whose copy is true for it.
+    case 'email':
+      return 'auth_magiclink'
     default:
       return null
   }
@@ -135,8 +146,11 @@ function otpDigits(facts: EmailFacts): string | null {
   return raw || null
 }
 
+// GoTrue's verify endpoint is on the API host. The hook payload's site_url is
+// the project's Site URL - the app - so a link built on it lands on a page
+// that does not exist. No base means no link; the code still works.
 function verifyUrl(facts: EmailFacts, type: string): string | null {
-  const site = (facts.siteUrl ?? '').replace(/\/+$/, '')
+  const site = (facts.verifyBaseUrl ?? '').replace(/\/+$/, '')
   const hash = (facts.tokenHash ?? '').trim()
   if (!site || !hash) return null
   const redirect = (facts.redirectTo ?? '').trim()
@@ -160,33 +174,50 @@ type Draft = {
 // stylesheets; a single column because half of these are read on a phone.
 function render(draft: Draft): EmailContent {
   const paragraphsHtml = draft.paragraphs
-    .map((p) => `<p style="margin:0 0 16px;font-size:16px;line-height:1.55;color:#2b2b2b;">${escapeHtml(p)}</p>`)
+    .map((p) =>
+      `<p style="margin:0 0 16px;font-size:16px;line-height:1.55;color:#2b2b2b;">${
+        escapeHtml(p)
+      }</p>`
+    )
     .join('')
 
   const ctaHtml = draft.cta
-    ? `<p style="margin:24px 0 8px;"><a href="${escapeHtml(draft.cta.url)}" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#b8860b;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;">${escapeHtml(draft.cta.label)}</a></p>`
+    ? `<p style="margin:24px 0 8px;"><a href="${
+      escapeHtml(draft.cta.url)
+    }" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#b8860b;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;">${
+      escapeHtml(draft.cta.label)
+    }</a></p>`
     : ''
 
-  const footer =
-    draft.footer ??
+  const footer = draft.footer ??
     `You are receiving this because it concerns your ${APP_NAME} account.`
 
   const html = `<!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escapeHtml(draft.subject)}</title></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${
+    escapeHtml(draft.subject)
+  }</title></head>
 <body style="margin:0;padding:0;background:#f6f3ee;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f3ee;">
     <tr><td align="center" style="padding:32px 16px;">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:12px;">
         <tr><td style="padding:28px 28px 8px;">
-          <p style="margin:0 0 20px;font-size:13px;letter-spacing:1.6px;text-transform:uppercase;color:#b8860b;font-weight:600;">${escapeHtml(APP_NAME)}</p>
-          <h1 style="margin:0 0 20px;font-size:22px;line-height:1.3;color:#1a1a1a;">${escapeHtml(draft.subject)}</h1>
-          <p style="margin:0 0 16px;font-size:16px;line-height:1.55;color:#2b2b2b;">${escapeHtml(draft.intro)}</p>
+          <p style="margin:0 0 20px;font-size:13px;letter-spacing:1.6px;text-transform:uppercase;color:#b8860b;font-weight:600;">${
+    escapeHtml(APP_NAME)
+  }</p>
+          <h1 style="margin:0 0 20px;font-size:22px;line-height:1.3;color:#1a1a1a;">${
+    escapeHtml(draft.subject)
+  }</h1>
+          <p style="margin:0 0 16px;font-size:16px;line-height:1.55;color:#2b2b2b;">${
+    escapeHtml(draft.intro)
+  }</p>
           ${paragraphsHtml}
           ${ctaHtml}
         </td></tr>
         <tr><td style="padding:8px 28px 28px;">
-          <p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#7a7a7a;">${escapeHtml(footer)}</p>
+          <p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#7a7a7a;">${
+    escapeHtml(footer)
+  }</p>
         </td></tr>
       </table>
     </td></tr>
@@ -222,14 +253,17 @@ function authOtpLetter(
       : 'Open the app and continue from the screen that asked for this email. If you did not request this, you can ignore this message.',
   ]
   if (!otp && !link) {
-    paragraphs.push('If you cannot find the code in the app, request a new email from Login or Profile.')
+    paragraphs.push(
+      'If you cannot find the code in the app, request a new email from Login or Profile.',
+    )
   }
   return render({
     subject,
     intro: greeting(facts),
     paragraphs,
     cta: link ? { label: 'Open secure link', url: link } : undefined,
-    footer: `You are receiving this because someone used this address with ${APP_NAME}. If that was not you, ignore this email.`,
+    footer:
+      `You are receiving this because someone used this address with ${APP_NAME}. If that was not you, ignore this email.`,
   })
 }
 
@@ -278,8 +312,12 @@ export function composeEmail(kind: EmailKind, facts: EmailFacts): EmailContent {
         intro: greeting(facts),
         paragraphs: [
           facts.wasCancelled
-            ? `As requested, your ${plan} membership ended${until ? ` on ${until}` : ''} and you have not been charged again.`
-            : `Your ${plan} membership ended${until ? ` on ${until}` : ''}, so the library is no longer open on your account.`,
+            ? `As requested, your ${plan} membership ended${
+              until ? ` on ${until}` : ''
+            } and you have not been charged again.`
+            : `Your ${plan} membership ended${
+              until ? ` on ${until}` : ''
+            }, so the library is no longer open on your account.`,
           'Everything you built is safe — your reading positions, bookmarks and wishlist are kept — and a new membership picks up exactly where you left off. Open the app and choose a plan whenever you are ready.',
         ],
         footer:
@@ -294,8 +332,12 @@ export function composeEmail(kind: EmailKind, facts: EmailFacts): EmailContent {
         intro: greeting(facts),
         paragraphs: [
           facts.renewed
-            ? `You asked to cancel your ${plan} membership in the app, but ${store} has not recorded a cancellation, and the membership has since renewed${until ? ` through ${until}` : ''}.`
-            : `You asked to cancel your ${plan} membership in the app, but ${store} has not confirmed it yet. Until it does, the membership stays on auto-renew${until ? ` and will bill again on ${until}` : ''}.`,
+            ? `You asked to cancel your ${plan} membership in the app, but ${store} has not recorded a cancellation, and the membership has since renewed${
+              until ? ` through ${until}` : ''
+            }.`
+            : `You asked to cancel your ${plan} membership in the app, but ${store} has not confirmed it yet. Until it does, the membership stays on auto-renew${
+              until ? ` and will bill again on ${until}` : ''
+            }.`,
           `Subscriptions are billed by ${store}, so the cancellation has to be completed there: open your subscriptions, choose ${APP_NAME}, and turn off auto-renew. We will email you as soon as the store confirms.`,
           facts.renewed
             ? `If you were charged for a period you did not want, refunds are decided by ${store} — request one from the same subscriptions page.`
@@ -338,7 +380,9 @@ export function composeEmail(kind: EmailKind, facts: EmailFacts): EmailContent {
           scheduled
             ? `Your ${APP_NAME} account is scheduled for deletion on ${scheduled}. Until then you can sign in and cancel from Profile → Privacy & security.`
             : `Your ${APP_NAME} account will be deleted shortly. Open Profile → Privacy & security if you need to cancel.`,
-          note ? `Note from the team: ${note}` : 'After deletion, your profile, library and reading history are removed from our systems.',
+          note
+            ? `Note from the team: ${note}`
+            : 'After deletion, your profile, library and reading history are removed from our systems.',
         ],
       })
 
@@ -348,7 +392,9 @@ export function composeEmail(kind: EmailKind, facts: EmailFacts): EmailContent {
         intro: greeting(facts),
         paragraphs: [
           `Your ${APP_NAME} account will stay as it is.`,
-          note ? `Reason: ${note}` : 'If you still want to leave, you can file a new request from Profile → Privacy & security.',
+          note
+            ? `Reason: ${note}`
+            : 'If you still want to leave, you can file a new request from Profile → Privacy & security.',
         ],
       })
 
@@ -379,13 +425,28 @@ export function composeEmail(kind: EmailKind, facts: EmailFacts): EmailContent {
         'recovery',
       )
 
-    case 'auth_email_change':
+    case 'auth_email_change': {
+      // With Secure Email Change on, Auth hands us two codes and both inboxes
+      // must confirm. The letter to the current address says what is about
+      // to happen to it; the one to the new address asks it to accept.
+      const target = (facts.newEmail ?? '').trim()
+      if (facts.emailChangeStage === 'current') {
+        return authOtpLetter(
+          `Confirm the email change on your ${APP_NAME} account`,
+          facts,
+          target
+            ? `You asked to change the email on your ${APP_NAME} account to ${target}. Confirm from this address to allow it; the new address has its own code.`
+            : `You asked to change the email on your ${APP_NAME} account. Confirm from this address to allow it; the new address has its own code.`,
+          'email_change',
+        )
+      }
       return authOtpLetter(
         `Confirm your new ${APP_NAME} email`,
         facts,
         `Confirm this address to finish changing the email on your ${APP_NAME} account.`,
         'email_change',
       )
+    }
 
     case 'auth_magiclink':
       return authOtpLetter(
@@ -415,6 +476,115 @@ export function composeEmail(kind: EmailKind, facts: EmailFacts): EmailContent {
 
 // ---------------------------------------------------------------------------
 // Transport
+// ---------------------------------------------------------------------------
+// Auth Send Email Hook: which letters one hook call turns into
+// ---------------------------------------------------------------------------
+
+export type AuthHookUser = {
+  id?: string
+  email?: string
+  new_email?: string
+  user_metadata?: { full_name?: string; name?: string }
+}
+
+export type AuthHookEmailData = {
+  token?: string
+  token_hash?: string
+  redirect_to?: string
+  email_action_type?: string
+  site_url?: string
+  token_new?: string
+  token_hash_new?: string
+}
+
+export type AuthHookSend = {
+  to: string
+  kind: EmailKind
+  facts: EmailFacts
+  idempotencyKey: string
+}
+
+// One hook call is usually one letter. email_change is the exception: with
+// Secure Email Change on, Auth issues two codes and both inboxes have to
+// confirm, and the field names are crossed for backward compatibility -
+// `token_hash_new` goes to the CURRENT address with `token`, `token_hash` goes
+// to the NEW address with `token_new`. Getting that backwards means the new
+// address never gets a code that works, so the mapping lives here, next to
+// its test, rather than inline in the function.
+//
+// Notification-only actions (password changed, MFA enrolled, ...) plan
+// nothing: the function acknowledges them and Auth sends nothing.
+export function planAuthHookSends(
+  user: AuthHookUser,
+  emailData: AuthHookEmailData,
+  verifyBaseUrl: string | null,
+): AuthHookSend[] {
+  const kind = authActionToKind(emailData.email_action_type)
+  if (!kind) return []
+
+  const current = (user.email ?? '').trim()
+  const fullName = (user.user_metadata?.full_name ?? user.user_metadata?.name ?? '').trim() ||
+    null
+
+  const base: EmailFacts = {
+    userId: user.id,
+    fullName,
+    redirectTo: emailData.redirect_to ?? null,
+    siteUrl: emailData.site_url ?? null,
+    verifyBaseUrl,
+    emailActionType: emailData.email_action_type ?? null,
+  }
+
+  const key = (to: string, hash: string | null | undefined) =>
+    ['auth-send-email', kind, user.id ?? to, to, (hash ?? '').slice(0, 24)].join('-')
+
+  const send = (
+    to: string,
+    otp: string | null | undefined,
+    hash: string | null | undefined,
+    extra: Partial<EmailFacts> = {},
+  ): AuthHookSend | null =>
+    isDeliverableAddress(to)
+      ? {
+        to,
+        kind,
+        facts: { ...base, otp: otp ?? null, token: otp ?? null, tokenHash: hash ?? null, ...extra },
+        idempotencyKey: key(to, hash),
+      }
+      : null
+
+  if (kind !== 'auth_email_change') {
+    const one = send(current, emailData.token, emailData.token_hash)
+    return one ? [one] : []
+  }
+
+  const next = (user.new_email ?? '').trim()
+  const secure = Boolean((emailData.token_hash_new ?? '').trim())
+
+  if (secure) {
+    return [
+      send(current, emailData.token, emailData.token_hash_new, {
+        emailChangeStage: 'current',
+        newEmail: next || null,
+      }),
+      send(next, emailData.token_new, emailData.token_hash, {
+        emailChangeStage: 'new',
+        newEmail: next || null,
+      }),
+    ].filter((x): x is AuthHookSend => x !== null)
+  }
+
+  // Secure Email Change off: one code, for the new address only. Auth may
+  // put it in either token field.
+  const one = send(
+    next || current,
+    emailData.token_new || emailData.token,
+    emailData.token_hash,
+    { emailChangeStage: 'new', newEmail: next || null },
+  )
+  return one ? [one] : []
+}
+
 // ---------------------------------------------------------------------------
 
 export type EmailConfig = {
