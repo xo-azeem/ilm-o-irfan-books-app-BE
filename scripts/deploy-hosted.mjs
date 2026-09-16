@@ -16,6 +16,7 @@
  *   RESEND_API_KEY                Resend API key for transactional mail (membership emails)
  *   EMAIL_FROM                    verified sender, e.g. "Ilm o Irfan <no-reply@yourdomain>"
  *   EMAIL_REPLY_TO                optional reply-to address
+ *   SEND_EMAIL_HOOK_SECRET        Auth Send Email Hook secret (v1,whsec_...)
  *   DEPLOY_SEED=1                 run supabase/seed.sql after db push
  *   DEPLOY_ALLOW_PLACEHOLDER_RC=1 allow a staging-only placeholder webhook auth
  *   SUPABASE_DB_PASSWORD          passed to `supabase link` when non-interactive
@@ -51,6 +52,7 @@ Optional:
   RESEND_API_KEY                Resend API key for membership emails
   EMAIL_FROM                    Verified sender, e.g. "Ilm o Irfan <no-reply@yourdomain>"
   EMAIL_REPLY_TO                Optional reply-to address
+  SEND_EMAIL_HOOK_SECRET        Auth Send Email Hook secret (v1,whsec_...)
   DEPLOY_SEED=1                 Apply supabase/seed.sql after migrations
   DEPLOY_ALLOW_PLACEHOLDER_RC=1 Use a staging placeholder if RC is not ready
   SUPABASE_DB_PASSWORD          Database password for non-interactive link
@@ -131,6 +133,7 @@ const emailSecret = (process.env.EMAIL_DISPATCH_SECRET ?? '').trim()
 const resendApiKey = (process.env.RESEND_API_KEY ?? '').trim()
 const emailFrom = (process.env.EMAIL_FROM ?? '').trim()
 const emailReplyTo = (process.env.EMAIL_REPLY_TO ?? '').trim()
+const sendEmailHookSecret = (process.env.SEND_EMAIL_HOOK_SECRET ?? '').trim()
 
 if (!rcAuth) {
   if (allowPlaceholder) {
@@ -201,6 +204,7 @@ writeFileSync(
     ...(resendApiKey ? [`RESEND_API_KEY=${resendApiKey}`] : []),
     ...(emailFrom ? [`EMAIL_FROM=${emailFrom}`] : []),
     ...(emailReplyTo ? [`EMAIL_REPLY_TO=${emailReplyTo}`] : []),
+    ...(sendEmailHookSecret ? [`SEND_EMAIL_HOOK_SECRET=${sendEmailHookSecret}`] : []),
     '',
   ].join('\n'),
   'utf8',
@@ -260,7 +264,7 @@ Push (when Firebase is ready — docs/setup-guide.md → Push notifications):
   Then: insert supabase_url + push_dispatch_secret into private.runtime_config
 
 Membership email (docs/setup-guide.md → Membership emails):
-  ${emailSecret ? 'EMAIL_DISPATCH_SECRET set' : 'EMAIL_DISPATCH_SECRET not set'} · ${resendApiKey ? 'RESEND_API_KEY set' : 'RESEND_API_KEY not set'} · ${emailFrom ? 'EMAIL_FROM set' : 'EMAIL_FROM not set'}
+  ${emailSecret ? 'EMAIL_DISPATCH_SECRET set' : 'EMAIL_DISPATCH_SECRET not set'} · ${resendApiKey ? 'RESEND_API_KEY set' : 'RESEND_API_KEY not set'} · ${emailFrom ? 'EMAIL_FROM set' : 'EMAIL_FROM not set'} · ${sendEmailHookSecret ? 'SEND_EMAIL_HOOK_SECRET set' : 'SEND_EMAIL_HOOK_SECRET not set'}
   Then: insert email_dispatch_secret into private.runtime_config
 
 Next:

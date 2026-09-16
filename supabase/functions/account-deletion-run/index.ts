@@ -20,6 +20,12 @@
 
 import { requireAdmin, requireMethod, serviceClient } from '../_shared/auth.ts'
 import { timingSafeEqualString } from '../_shared/crypto.ts'
+import {
+  composeEmail,
+  isDeliverableAddress,
+  loadEmailConfig,
+  sendEmail,
+} from '../_shared/email.ts'
 import { fail, failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
 
 const MAX_ROWS = 20
@@ -63,6 +69,45 @@ async function deleteOne(row: ClaimedRow): Promise<Outcome> {
     // Storage is best-effort but not silent: a stuck bucket must not leave a
     // reader's identity in place, and must not be forgotten either.
     console.warn(`[account-deletion-run] ${row.userId}: ${(error as Error).message}`)
+  }
+
+  // Outbox rows cascade-delete with profiles, so the farewell letter must go
+  // out (or at least be attempted) before auth.users is removed. user_id is
+  // left null on the audit row so it survives the cascade.
+  if (isDeliverableAddress(row.email)) {
+    const config = loadEmailConfig()
+    const content = composeEmail('account_deletion_completed', {
+      userId: row.userId,
+      requestId: row.id,
+      fullName: null,
+    })
+    let providerId: string | null = null
+    let sendError: string | null = null
+    if (config) {
+      const outcome = await sendEmail(
+        config,
+        row.email.trim(),
+        content,
+        `account-deletion-completed-${row.id}`,
+      )
+      if (outcome.ok) {
+        providerId = outcome.providerId
+      } else {
+        sendError = outcome.code
+        console.warn(`[account-deletion-run] farewell mail ${row.id}: ${outcome.code}`)
+      }
+    }
+    await admin.from('email_outbox').insert({
+      user_id: null,
+      to_email: row.email.trim(),
+      kind: 'account_deletion_completed',
+      data: { userId: row.userId, requestId: row.id },
+      status: providerId ? 'sent' : config ? 'failed' : 'skipped',
+      attempts: 1,
+      provider_id: providerId,
+      last_error: sendError ?? (config ? null : 'RESEND_NOT_CONFIGURED'),
+      processed_at: new Date().toISOString(),
+    })
   }
 
   const { error } = await admin.auth.admin.deleteUser(row.userId)

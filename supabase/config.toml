@@ -173,6 +173,10 @@ verify_jwt = true
 [functions.email-dispatch]
 verify_jwt = false
 
+# Auth Send Email Hook — signature checked inside; Auth does not send a user JWT.
+[functions.auth-send-email]
+verify_jwt = false
+
 [functions.admin-books]
 verify_jwt = true
 
