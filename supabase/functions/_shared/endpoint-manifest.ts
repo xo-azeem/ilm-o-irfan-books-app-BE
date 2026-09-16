@@ -509,7 +509,7 @@ export const endpointManifest: EndpointDefinition[] = [
     access: 'admin',
     description: 'Executes approved account deletions whose grace period has elapsed. Called by pg_cron (x-ops-secret) every 15 minutes, or by an admin pressing Run now.',
     notes:
-      'Claims due rows via account_deletion_claim, re-checks the billing blockers, removes the reader's avatars and the auth user (cascades through profiles), marks each row completed or failed. Readers file and withdraw through the account_deletion_status / request_account_deletion / cancel_account_deletion_request RPCs; admins decide through admin_deletion_requests / admin_decide_deletion_request. Answers { claimed, completed, failed, outcomes[] }.',
+      'Claims due rows via account_deletion_claim, re-checks the billing blockers, removes the reader's avatars, sends account_deletion_completed via Resend (audit row with null user_id), deletes the auth user (cascades through profiles), marks each row completed or failed. Readers file and withdraw through the account_deletion_status / request_account_deletion / cancel_account_deletion_request RPCs; admins decide through admin_deletion_requests / admin_decide_deletion_request. Answers { claimed, completed, failed, outcomes[] }.',
   },
   {
     name: 'email-dispatch',
@@ -519,6 +519,16 @@ export const endpointManifest: EndpointDefinition[] = [
     description: 'Drains email_outbox into Resend. Called by the database (pg_net trigger + minutely pg_cron) with the x-ops-secret header, never by the app.',
     notes:
       'Claims via email_outbox_claim (skip-locked), composes each letter from _shared/email.ts, sends with an idempotency key, writes back sent / failed / skipped or a backoff. Needs EMAIL_DISPATCH_SECRET (= runtime_config.email_dispatch_secret), RESEND_API_KEY and EMAIL_FROM; until they are set, rows wait in pending. Answers { claimed, sent, failed, skipped, retried }.',
+  },
+  {
+    name: 'auth-send-email',
+    route: '/functions/v1/auth-send-email',
+    method: 'POST',
+    access: 'public',
+    description:
+      'Auth Send Email Hook: verifies the Hook signature, composes signup/recovery/email-change (and related) letters from _shared/email.ts, delivers via Resend.',
+    notes:
+      'Enable in Dashboard → Authentication → Hooks → Send Email. Secrets: SEND_EMAIL_HOOK_SECRET, RESEND_API_KEY, EMAIL_FROM. Auth OTP/token_hash stay authoritative; this only brands and sends.',
   },
   {
     name: 'push-dispatch',
