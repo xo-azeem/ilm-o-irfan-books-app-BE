@@ -113,7 +113,7 @@ export const endpointManifest: EndpointDefinition[] = [
     route: '/functions/v1/profile-update',
     method: 'PUT',
     access: 'authenticated',
-    description: 'Updates editable profile fields.',
+    description: 'Updates editable profile fields, including locale (en | ur), the interface language kept on the account.',
   },
   {
     name: 'reading-progress',
@@ -576,7 +576,7 @@ export const endpointManifest: EndpointDefinition[] = [
     route: '/functions/v1/recommendations?limit=20&sections=3',
     method: 'GET',
     access: 'authenticated',
-    description: 'Personalised "Because you read ..." rails built from the caller reading history.',
+    description: 'Personalised "Because you read ..." rails built from the caller reading history, titled in the Accept-Language language (en | ur) or the saved profile locale.',
     notes: 'Rebuilt server-side when stale; never cache this response across users.',
   },
   {

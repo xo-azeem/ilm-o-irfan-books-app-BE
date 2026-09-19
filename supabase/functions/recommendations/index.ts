@@ -1,4 +1,5 @@
 import { requireMethod, requireUser } from '../_shared/auth.ts'
+import { requestLocale } from '../_shared/locale.ts'
 import { withRecommendationCoverUrls } from '../_shared/covers.ts'
 import { handleError, handleOptions, ok } from '../_shared/http.ts'
 import { failFromRpcError } from '../_shared/rpc.ts'
@@ -43,6 +44,10 @@ Deno.serve(async (req) => {
       MAX_PER_SECTION,
     )
 
+    // The rails are titled in the language the app is showing; the RPC falls
+    // back to the reader's saved preference, then English.
+    const locale = requestLocale(req)
+
     // Called with the caller's own JWT: recommendations_for_me() reads
     // auth.uid() and takes no user id, so there is no argument to tamper with
     // and no way to ask for somebody else's taste profile.
@@ -54,6 +59,7 @@ Deno.serve(async (req) => {
       p_limit: limit,
       p_sections: sections,
       p_per_section: perSection,
+      p_locale: locale,
     })
 
     if (error) {

@@ -28,9 +28,9 @@ The Edge Function endpoint base is `/functions/v1/...`.
 
 | Endpoint | Method | Auth | Purpose |
 | --- | --- | --- | --- |
-| `/functions/v1/profile-read?tz=` | GET | User | Own profile + `streak` (with `recent_days`), `readingGoal`, `achievements` — see [Reading record](#reading-record) |
+| `/functions/v1/profile-read?tz=` | GET | User | Own profile (incl. `locale`) + `streak` (with `recent_days`), `readingGoal`, `achievements` — see [Reading record](#reading-record) |
 | `/functions/v1/reading-goal-update` | POST | User | `{ target: 1-100 }` → the `readingGoal` object — see [Reading record](#reading-record) |
-| `/functions/v1/profile-update` | PUT/PATCH | User | Partial contact fields including `date_of_birth` (YYYY-MM-DD); email/role not writable |
+| `/functions/v1/profile-update` | PUT/PATCH | User | Partial contact fields including `date_of_birth` (YYYY-MM-DD) and `locale` (`en` | `ur` | null — the interface language, synced to every device); email/role not writable |
 | `/functions/v1/reading-progress` | GET/POST | User | Reading position: one row (`?book_id=`), the full list, or a last-write-wins upsert — see [Reading position](#reading-position-and-bookmarks) |
 | `/functions/v1/wishlist-list` | GET | User | List saved books |
 | `/functions/v1/wishlist-toggle` | POST | User | Save or remove favorite books |

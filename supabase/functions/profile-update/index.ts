@@ -1,5 +1,6 @@
 import { requireMethod, requireUser } from '../_shared/auth.ts'
 import {
+  BadRequestError,
   fail,
   failFromDbError,
   handleError,
@@ -7,6 +8,7 @@ import {
   ok,
   readJsonBody,
 } from '../_shared/http.ts'
+import { isAppLocale } from '../_shared/locale.ts'
 import { asOptionalDate, asOptionalText, pickProvided, type FieldSpec } from '../_shared/payload.ts'
 
 // Only these columns are writable by the owner. role, email, id and the
@@ -42,10 +44,23 @@ const EDITABLE_FIELDS: FieldSpec[] = [
     aliases: ['postal_code', 'postalCode'],
     coerce: asOptionalText('postal_code'),
   },
+  // The interface language chosen in the app, kept on the account so every
+  // device the reader signs in on opens in it. Null clears the choice.
+  {
+    column: 'locale',
+    aliases: ['locale'],
+    coerce: (value: unknown) => {
+      if (value === null || value === undefined || value === '') return null
+      if (!isAppLocale(value)) {
+        throw new BadRequestError('locale must be one of: en, ur')
+      }
+      return value
+    },
+  },
 ]
 
 const PROFILE_COLUMNS =
-  'id, full_name, email, phone, avatar_path, date_of_birth, address_line1, address_line2, city, state, postal_code, country, role, created_at, updated_at'
+  'id, full_name, email, phone, avatar_path, date_of_birth, address_line1, address_line2, city, state, postal_code, country, locale, role, created_at, updated_at'
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)

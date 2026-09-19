@@ -3,7 +3,7 @@ import { fail, failFromDbError, handleError, handleOptions, ok } from '../_share
 import { resolveTimeZone } from '../_shared/timezone.ts'
 
 const PROFILE_COLUMNS =
-  'id, full_name, email, phone, avatar_path, date_of_birth, address_line1, address_line2, city, state, postal_code, country, role, created_at, updated_at'
+  'id, full_name, email, phone, avatar_path, date_of_birth, address_line1, address_line2, city, state, postal_code, country, locale, role, created_at, updated_at'
 
 // The avatars bucket is private, so avatar_path on its own renders nothing.
 // Signing it here saves the app a second round trip on every profile load.
