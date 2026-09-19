@@ -7,7 +7,7 @@
  *   npm run email:domain -- --apply when verified, set EMAIL_FROM as an Edge
  *                                   secret and rewrite it in .env
  *
- * Reads from .env: RESEND_API_KEY, EMAIL_DOMAIN (default ilmoirfan.com),
+ * Reads from .env: RESEND_API_KEY, EMAIL_DOMAIN (default ilmoirfanpublisher.com),
  * EMAIL_FROM_NAME (default "Ilm o Irfan"), EMAIL_FROM_LOCAL (default no-reply).
  *
  * Why this exists: until the domain is verified Resend only delivers to the
@@ -36,7 +36,7 @@ loadDotEnv()
 
 const apply = process.argv.includes('--apply')
 const apiKey = (process.env.RESEND_API_KEY ?? '').trim()
-const domain = (process.env.EMAIL_DOMAIN ?? 'ilmoirfan.com').trim().toLowerCase()
+const domain = (process.env.EMAIL_DOMAIN ?? 'ilmoirfanpublisher.com').trim().toLowerCase()
 const fromName = (process.env.EMAIL_FROM_NAME ?? 'Ilm o Irfan').trim()
 const fromLocal = (process.env.EMAIL_FROM_LOCAL ?? 'no-reply').trim()
 const from = `${fromName} <${fromLocal}@${domain}>`
