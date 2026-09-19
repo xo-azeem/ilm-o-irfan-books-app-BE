@@ -481,6 +481,14 @@ the app and the store never confirmed — the database queues a letter in
 1. **Resend.** Create an API key and verify the sending domain
    (Resend → Domains). `EMAIL_FROM` must be on that domain.
 
+   Until the domain is verified, Resend delivers only to the account owner's own
+   address and refuses every other recipient with 403 — the sandbox `onboarding@resend.dev`
+   sender is not usable for real readers. `npm run email:domain` asks Resend to re-check
+   the DNS and lists what is still missing; once it reports `verified`,
+   `npm run email:domain -- --apply` sets `EMAIL_FROM` on the project and in `.env`.
+   Do not switch `EMAIL_FROM` to the domain by hand before that, or even the owner
+   address stops receiving mail.
+
 2. **Edge secrets** (or put them in `.env` and run `npm run deploy:hosted`):
 
    ```bash
