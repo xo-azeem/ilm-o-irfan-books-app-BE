@@ -1,5 +1,5 @@
 import { anonClient, requireMethod } from '../_shared/auth.ts'
-import { failFromDbError, handleError, handleOptions, ok, publicCache } from '../_shared/http.ts'
+import { failFromDbError, handleError, handleOptions, ok } from '../_shared/http.ts'
 
 // The product flags every install checks before it draws anything: whether
 // the app is in maintenance, whether sign-ups are open, the oldest build still
@@ -7,11 +7,11 @@ import { failFromDbError, handleError, handleOptions, ok, publicCache } from '..
 // settings (admin-settings); read here by the anon role, which has SELECT on
 // app_settings by policy.
 //
-// A short public cache: the app re-reads on every return to the foreground,
-// and a minute is the promise the admin tool makes ("readers pick it up
-// within a minute"). featured_collection_id is deliberately not here — Home
-// already takes it from home-feed with the collections it applies to.
-const STATUS_CACHE_SECONDS = 60
+// Never cached: the app polls this while a reader is held on the maintenance
+// notice, and the whole point is that the very next read sees the switch
+// flip. It is one small row; the app asks on launch, on foreground and once
+// a minute. featured_collection_id is deliberately not here — Home already
+// takes it from home-feed with the collections it applies to.
 
 const STATUS_COLUMNS =
   'maintenance_mode, maintenance_message, signup_enabled, min_supported_version, support_email, updated_at'
@@ -54,18 +54,14 @@ Deno.serve(async (req) => {
     }
 
     // No row is the same as every flag at its default: the app stays open.
-    return ok(
-      {
-        maintenanceMode: data?.maintenance_mode === true,
-        maintenanceMessage: text(data?.maintenance_message),
-        signupEnabled: data?.signup_enabled !== false,
-        minSupportedVersion: text(data?.min_supported_version),
-        supportEmail: text(data?.support_email),
-        updatedAt: data?.updated_at ?? null,
-      },
-      200,
-      publicCache(STATUS_CACHE_SECONDS),
-    )
+    return ok({
+      maintenanceMode: data?.maintenance_mode === true,
+      maintenanceMessage: text(data?.maintenance_message),
+      signupEnabled: data?.signup_enabled !== false,
+      minSupportedVersion: text(data?.min_supported_version),
+      supportEmail: text(data?.support_email),
+      updatedAt: data?.updated_at ?? null,
+    })
   } catch (error) {
     return handleError('app-status', error)
   }

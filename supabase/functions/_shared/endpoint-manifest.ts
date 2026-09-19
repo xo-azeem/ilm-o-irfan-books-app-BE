@@ -23,7 +23,7 @@ export const endpointManifest: EndpointDefinition[] = [
     description:
       'Returns the product flags every install checks: maintenance mode and its notice, whether sign-ups are open, the oldest supported app version, the support email.',
     notes:
-      'Read before Home and on every return to the foreground; cached 60 s. Set from admin-settings. Admins are never gated by the app on any of these.',
+      'Read before Home, on every return to the foreground, once a minute while open and every 20 s while the notice is up; never cached. Set from admin-settings. Admins are never gated by the app on any of these.',
   },
   {
     name: 'home-feed',

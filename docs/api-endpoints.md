@@ -985,14 +985,16 @@ Awarded by `private.award_achievements()` right after every streak update, inser
 
 `app-status` is the read side of the admin tool's **System → App settings**
 (`admin-settings` is the write side). It answers the reader-visible columns of
-`app_settings` as the anon role, cached 60 s:
+`app_settings` as the anon role, never cached (the app polls it):
 
 ```json
 { "data": { "maintenanceMode": false, "maintenanceMessage": null, "signupEnabled": true,
             "minSupportedVersion": null, "supportEmail": "help@…", "updatedAt": "…" } }
 ```
 
-The app reads it under the splash and on every return to the foreground, and:
+The app reads it under the splash, on every return to the foreground, once a
+minute while open and every 20 s while a reader is held on the notice — so
+maintenance turned off reaches every reader within about 20 s — and:
 
 - `maintenanceMode` — replaces the reader app with the notice (`maintenanceMessage`
   or a default). Admins are never gated, so the switch can always be turned off.
