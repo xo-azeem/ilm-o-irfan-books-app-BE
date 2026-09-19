@@ -16,6 +16,16 @@ export type EndpointDefinition = {
 
 export const endpointManifest: EndpointDefinition[] = [
   {
+    name: 'app-status',
+    route: '/functions/v1/app-status',
+    method: 'GET',
+    access: 'public',
+    description:
+      'Returns the product flags every install checks: maintenance mode and its notice, whether sign-ups are open, the oldest supported app version, the support email.',
+    notes:
+      'Read before Home and on every return to the foreground; cached 60 s. Set from admin-settings. Admins are never gated by the app on any of these.',
+  },
+  {
     name: 'home-feed',
     route: '/functions/v1/home-feed',
     method: 'GET',
@@ -67,7 +77,8 @@ export const endpointManifest: EndpointDefinition[] = [
     route: '/functions/v1/collection-books?id=<uuid>|slug=<slug>',
     method: 'GET',
     access: 'public',
-    description: 'Returns paginated books in one published collection (curated order, or the weekly draw for trending), plus source.',
+    description:
+      'Returns paginated books in one published collection (curated order, or the weekly draw for trending), plus source.',
     notes:
       'Pass id or slug (not both). Envelope includes collection meta beside page fields. Pagination count excludes unpublished membership.',
   },
@@ -507,7 +518,8 @@ export const endpointManifest: EndpointDefinition[] = [
     route: '/functions/v1/account-deletion-run',
     method: 'POST',
     access: 'admin',
-    description: 'Executes approved account deletions whose grace period has elapsed. Called by pg_cron (x-ops-secret) every 15 minutes, or by an admin pressing Run now.',
+    description:
+      'Executes approved account deletions whose grace period has elapsed. Called by pg_cron (x-ops-secret) every 15 minutes, or by an admin pressing Run now.',
     notes:
       "Claims due rows via account_deletion_claim, re-checks the billing blockers, removes the reader's avatars, sends account_deletion_completed via Resend (audit row with null user_id), deletes the auth user (cascades through profiles), marks each row completed or failed. Readers file and withdraw through the account_deletion_status / request_account_deletion / cancel_account_deletion_request RPCs; admins decide through admin_deletion_requests / admin_decide_deletion_request. Answers { claimed, completed, failed, outcomes[] }.",
   },
@@ -516,7 +528,8 @@ export const endpointManifest: EndpointDefinition[] = [
     route: '/functions/v1/email-dispatch',
     method: 'POST',
     access: 'public',
-    description: 'Drains email_outbox into Resend. Called by the database (pg_net trigger + minutely pg_cron) with the x-ops-secret header, never by the app.',
+    description:
+      'Drains email_outbox into Resend. Called by the database (pg_net trigger + minutely pg_cron) with the x-ops-secret header, never by the app.',
     notes:
       'Claims via email_outbox_claim (skip-locked), composes each letter from _shared/email.ts, sends with an idempotency key, writes back sent / failed / skipped or a backoff. Needs EMAIL_DISPATCH_SECRET (= runtime_config.email_dispatch_secret), RESEND_API_KEY and EMAIL_FROM; until they are set, rows wait in pending. Answers { claimed, sent, failed, skipped, retried }.',
   },
@@ -535,7 +548,8 @@ export const endpointManifest: EndpointDefinition[] = [
     route: '/functions/v1/push-dispatch',
     method: 'POST',
     access: 'public',
-    description: 'Drains push_outbox into FCM. Called by the database (pg_net trigger + minutely pg_cron) with the x-push-secret header, never by the app.',
+    description:
+      'Drains push_outbox into FCM. Called by the database (pg_net trigger + minutely pg_cron) with the x-push-secret header, never by the app.',
     notes:
       'Claims due rows, composes the tray text per kind, sends one request per topic row and one per (reader, device) for targeted rows, disables tokens FCM reports dead. Answers { claimed, sent, failed, skipped, requests, disabledTokens }.',
   },

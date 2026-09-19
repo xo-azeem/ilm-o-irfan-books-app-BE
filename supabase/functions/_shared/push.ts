@@ -8,6 +8,7 @@
 // Routing contract (every value a string — FCM data is string-only):
 //
 //   route        'book' | 'collection' | 'home' | 'library' | 'membership' | 'privacy'
+//                | 'adminDeletions' (admins only — the tool's People → Deletions)
 //   bookId       when route = 'book'
 //   collectionId when route = 'collection'
 //   kind         the outbox kind, for the app's cache invalidation
@@ -27,6 +28,8 @@ export type PushKind =
   | 'membership_expired'
   | 'account_deletion_approved'
   | 'account_deletion_rejected'
+  // To every admin: a reader has filed a deletion request.
+  | 'account_deletion_requested'
 
 export type PushChannel = 'catalog' | 'library' | 'account'
 
@@ -37,6 +40,7 @@ export type PushRoute =
   | { route: 'library' }
   | { route: 'membership' }
   | { route: 'privacy' }
+  | { route: 'adminDeletions' }
 
 export type PushContent = {
   title: string
@@ -62,6 +66,9 @@ export type PushFacts = {
   requestId?: string
   scheduledFor?: string | null
   note?: string | null
+  // Account deletion requests, as told to admins.
+  email?: string | null
+  fullName?: string | null
 }
 
 // The topic every device subscribes to for catalogue announcements. The app
@@ -132,7 +139,9 @@ export function composePush(kind: PushKind, facts: PushFacts, count: number): Pu
       const subtitle = (facts.collectionSubtitle ?? '').trim()
       return {
         title: `New collection: ${facts.collectionTitle ?? 'on Home'}`,
-        body: `${books} ${plural(books, 'book', 'books')}${subtitle ? ` · ${subtitle}` : ' · tap to explore'}`,
+        body: `${books} ${plural(books, 'book', 'books')}${
+          subtitle ? ` · ${subtitle}` : ' · tap to explore'
+        }`,
         channel: 'catalog',
         route: collectionRoute(facts),
         priority: 'normal',
@@ -141,7 +150,9 @@ export function composePush(kind: PushKind, facts: PushFacts, count: number): Pu
 
     case 'collection_books_added':
       return {
-        title: `${n} new ${plural(n, 'book', 'books')} in ${facts.collectionTitle ?? 'a collection'}`,
+        title: `${n} new ${plural(n, 'book', 'books')} in ${
+          facts.collectionTitle ?? 'a collection'
+        }`,
         body: 'Tap to see what was added',
         channel: 'catalog',
         route: collectionRoute(facts),
@@ -151,53 +162,53 @@ export function composePush(kind: PushKind, facts: PushFacts, count: number): Pu
     case 'book_deleted':
       return n === 1
         ? {
-            title: `${quote(facts.bookTitle)} was removed`,
-            body: 'It is no longer available in Ilm o Irfan.',
-            channel: 'library',
-            route: { route: 'library' },
-            priority: 'high',
-          }
+          title: `${quote(facts.bookTitle)} was removed`,
+          body: 'It is no longer available in Ilm o Irfan.',
+          channel: 'library',
+          route: { route: 'library' },
+          priority: 'high',
+        }
         : {
-            title: `${n} books were removed`,
-            body: 'They are no longer available in your library.',
-            channel: 'library',
-            route: { route: 'library' },
-            priority: 'high',
-          }
+          title: `${n} books were removed`,
+          body: 'They are no longer available in your library.',
+          channel: 'library',
+          route: { route: 'library' },
+          priority: 'high',
+        }
 
     case 'book_file_replaced':
       return n === 1 && facts.bookId
         ? {
-            title: `${quote(facts.bookTitle)} has a new edition`,
-            body: 'Download it again to keep reading offline.',
-            channel: 'library',
-            route: { route: 'book', bookId: facts.bookId },
-            priority: 'high',
-          }
+          title: `${quote(facts.bookTitle)} has a new edition`,
+          body: 'Download it again to keep reading offline.',
+          channel: 'library',
+          route: { route: 'book', bookId: facts.bookId },
+          priority: 'high',
+        }
         : {
-            title: `${n} of your books have new editions`,
-            body: 'Download them again to keep reading offline.',
-            channel: 'library',
-            route: { route: 'library' },
-            priority: 'high',
-          }
+          title: `${n} of your books have new editions`,
+          body: 'Download them again to keep reading offline.',
+          channel: 'library',
+          route: { route: 'library' },
+          priority: 'high',
+        }
 
     case 'book_updated':
       return n === 1 && facts.bookId
         ? {
-            title: `${quote(facts.bookTitle)} was updated`,
-            body: 'The details for this book have changed.',
-            channel: 'library',
-            route: { route: 'book', bookId: facts.bookId },
-            priority: 'normal',
-          }
+          title: `${quote(facts.bookTitle)} was updated`,
+          body: 'The details for this book have changed.',
+          channel: 'library',
+          route: { route: 'book', bookId: facts.bookId },
+          priority: 'normal',
+        }
         : {
-            title: `${n} of your books were updated`,
-            body: 'Their details have changed.',
-            channel: 'library',
-            route: { route: 'library' },
-            priority: 'normal',
-          }
+          title: `${n} of your books were updated`,
+          body: 'Their details have changed.',
+          channel: 'library',
+          route: { route: 'library' },
+          priority: 'normal',
+        }
 
     case 'membership_activated':
       return {
@@ -243,11 +254,34 @@ export function composePush(kind: PushKind, facts: PushFacts, count: number): Pu
         route: { route: 'privacy' },
         priority: 'high',
       }
+
+    case 'account_deletion_requested': {
+      // Several requests in the merge window fold into one line; a single one
+      // names the reader so the admin knows who before opening the tool.
+      const who = (facts.fullName ?? '').trim() || (facts.email ?? '').trim()
+      return {
+        title: count > 1
+          ? `${count} readers asked to delete their accounts`
+          : 'A reader asked to delete their account',
+        body: count > 1
+          ? 'They are waiting on a decision. Open People → Deletions to review them.'
+          : who
+          ? `${who} is waiting on a decision. Open People → Deletions to review it.`
+          : 'They are waiting on a decision. Open People → Deletions to review it.',
+        channel: 'account',
+        route: { route: 'adminDeletions' },
+        priority: 'high',
+      }
+    }
   }
 }
 
 /** The string-only `data` map the app reads on tap and in the foreground. */
-export function pushData(kind: PushKind, content: PushContent, count: number): Record<string, string> {
+export function pushData(
+  kind: PushKind,
+  content: PushContent,
+  count: number,
+): Record<string, string> {
   const data: Record<string, string> = {
     kind,
     route: content.route.route,

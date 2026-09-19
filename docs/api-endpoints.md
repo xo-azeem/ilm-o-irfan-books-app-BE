@@ -12,6 +12,7 @@ The Edge Function endpoint base is `/functions/v1/...`.
 
 | Endpoint | Method | Auth | Purpose |
 | --- | --- | --- | --- |
+| `/functions/v1/app-status` | GET | Public | The product flags every install checks before Home: `maintenanceMode`, `maintenanceMessage`, `signupEnabled`, `minSupportedVersion`, `supportEmail`, `updatedAt` — see [App status](#app-status) |
 | `/functions/v1/home-feed` | GET | Public | Collections (admin-made only), categories, newest books, `carousel`, `shelves.hero` / `trending` / `newArrivals`, `shelvesMeta`, `featuredCollectionId`, `supportEmail` (book cards include `coverUrl`) — see [Home shelves](#home-shelves) |
 | `/functions/v1/books-list` | GET | Public | Paginated published books — see [Discover filters](#discover-filters) |
 | `/functions/v1/book-detail?id=<bookId>` | GET | Public | Book detail with author and metadata (`coverUrl`; no `pdf_path`) |
@@ -628,6 +629,8 @@ in [setup-guide.md → Push notifications](./setup-guide.md#push-notifications).
 | `book_updated` | A live book's title, description, author, cover, page count, read time, language or genre changes; 2-minute merge window | the same readers | the book |
 | `membership_activated` | `access_events.is_active` flips to true | that reader | Home |
 | `membership_expired` | `access_events.is_active` flips to false | that reader | Membership |
+| `account_deletion_approved` / `_rejected` | An admin decides a deletion request | that reader | Privacy & security |
+| `account_deletion_requested` | A reader files a deletion request (`request_account_deletion`) | **every admin** (`profiles.role = 'admin'`), `route: adminDeletions` | the admin tool's People → Deletions |
 
 Rules that keep it quiet: the admin who made the change is never a recipient;
 unpublishing sends nothing (the device keeps its copy, see above); admins get no
@@ -977,6 +980,35 @@ Awarded by `private.award_achievements()` right after every streak update, inser
 - Admin endpoints should validate `is_admin()` and use RPCs when possible.
 - Large or expensive list queries should use page + pageSize and a stable sort key.
 - Premium-only actions should run through Edge Functions, not client-side trust.
+
+## App status
+
+`app-status` is the read side of the admin tool's **System → App settings**
+(`admin-settings` is the write side). It answers the reader-visible columns of
+`app_settings` as the anon role, cached 60 s:
+
+```json
+{ "data": { "maintenanceMode": false, "maintenanceMessage": null, "signupEnabled": true,
+            "minSupportedVersion": null, "supportEmail": "help@…", "updatedAt": "…" } }
+```
+
+The app reads it under the splash and on every return to the foreground, and:
+
+- `maintenanceMode` — replaces the reader app with the notice (`maintenanceMessage`
+  or a default). Admins are never gated, so the switch can always be turned off.
+- `minSupportedVersion` — a build whose `expo.version` is older is asked to
+  update. Unparseable values are ignored by the app. Admins bypass.
+- `signupEnabled = false` — the app hides "Create an account"; the database
+  refuses new users too, so Google sign-in cannot create one:
+  `private.enforce_signups_open()` runs `BEFORE INSERT` on `auth.users`
+  (Auth reports it as a database error), and
+  `private.before_user_created_hook(event)` answers a clean 403 with the
+  sentence when the **Before User Created** hook is enabled on the project
+  (Authentication → Hooks → `pg-functions://postgres/private/before_user_created_hook`).
+  Closing sign-ups also blocks dashboard invites until reopened.
+- `supportEmail` — where the notice's "Contact support" writes to.
+
+`featured_collection_id` is not here: Home takes it from `home-feed`.
 
 ## Configured function map
 

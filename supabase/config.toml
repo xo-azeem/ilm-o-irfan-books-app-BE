@@ -105,6 +105,9 @@ verify_jwt = false
 [functions.account-deletion-run]
 verify_jwt = false
 
+[functions.app-status]
+verify_jwt = false
+
 [functions.home-feed]
 verify_jwt = false
 
