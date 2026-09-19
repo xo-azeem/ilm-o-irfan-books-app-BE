@@ -158,7 +158,10 @@ is  "out of range 400"      "$(code -X POST "$B/reading-progress" "${A[@]}" -d "
 is  "both scales 400"       "$(code -X POST "$B/reading-progress" "${A[@]}" -d "{\"book_id\":\"$BOOK\",\"progress\":0.5,\"progress_percent\":50}")" 400
 is  "bad uuid 400"          "$(code -X POST "$B/reading-progress" "${A[@]}" -d '{"book_id":"nope"}')" 400
 is  "missing book 404"      "$(code -X POST "$B/reading-progress" "${A[@]}" -d '{"book_id":"99999999-9999-9999-9999-999999999999"}')" 404
-has "newer client stamp applies"  "$(curl -s -X POST "$B/reading-progress" "${A[@]}" -d "{\"book_id\":\"$BOOK\",\"current_page\":9,\"total_pages\":50,\"client_updated_at\":\"2099-01-01T00:00:00Z\"}")" '"applied":true'
+# One hour ahead, not a far-future date: stamps more than 24h ahead of the server are
+# rejected as INVALID_REQUEST (CLIENT_UPDATED_AT_MAX_FUTURE_MS in _shared/progress.ts).
+SOON=$(date -u -d "+1 hour" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+1H +%Y-%m-%dT%H:%M:%SZ)
+has "newer client stamp applies"  "$(curl -s -X POST "$B/reading-progress" "${A[@]}" -d "{\"book_id\":\"$BOOK\",\"current_page\":9,\"total_pages\":50,\"client_updated_at\":\"$SOON\"}")" '"applied":true'
 has "older client stamp skipped"  "$(curl -s -X POST "$B/reading-progress" "${A[@]}" -d "{\"book_id\":\"$BOOK\",\"current_page\":8,\"client_updated_at\":\"2000-01-01T00:00:00Z\"}")" '"applied":false'
 has "one past the end clamps"     "$(curl -s -X POST "$B/reading-progress" "${A[@]}" -d "{\"book_id\":\"$BOOK\",\"current_page\":51,\"total_pages\":50}")" '"current_page":50'
 has "single row by book_id"       "$(curl -s "$B/reading-progress?book_id=$BOOK" "${A[@]}")" '"current_page":50'
@@ -341,49 +344,50 @@ echo "== revenuecat webhook apply (APP_STORE + PLAY_STORE) =="
 # Success paths need the same Authorization value the local functions serve process
 # was started with. Export REVENUECAT_WEBHOOK_AUTH before `supabase functions serve`.
 RC_AUTH="${REVENUECAT_WEBHOOK_AUTH:-}"
-UID=$(psqlq "select id from public.profiles where email='$EMAIL';" | tr -d ' ')
+# E2E_UID, not UID: bash reserves UID (read-only, the OS user id).
+E2E_UID=$(psqlq "select id from public.profiles where email='$EMAIL';" | tr -d ' ')
 NOW_MS=$(($(date +%s) * 1000))
 EXP_MS=$((NOW_MS + 30 * 24 * 60 * 60 * 1000))
-if [ -z "$RC_AUTH" ] || [ -z "$UID" ]; then
+if [ -z "$RC_AUTH" ] || [ -z "$E2E_UID" ]; then
   ok "webhook apply skipped (set REVENUECAT_WEBHOOK_AUTH to enable; need e2e user)"
 else
   # Ensure seed plan product id is present for product_id lookup.
   psqlq "update public.plans set revenuecat_product_id='premium_monthly' where code='premium_monthly';" >/dev/null
-  psqlq "delete from public.entitlements where user_id='$UID';" >/dev/null
+  psqlq "delete from public.entitlements where user_id='$E2E_UID';" >/dev/null
 
   APP_EVENT=aaaaaaaa-e2e0-4000-8000-000000000001
   PLAY_EVENT=aaaaaaaa-e2e0-4000-8000-000000000002
   psqlq "delete from public.revenuecat_events where id in ('$APP_EVENT','$PLAY_EVENT');" >/dev/null
 
   APP_BODY=$(printf '{"event":{"id":"%s","type":"INITIAL_PURCHASE","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"premium_monthly","store":"APP_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
-    "$APP_EVENT" "$UID" "$NOW_MS" "$EXP_MS" "$NOW_MS")
+    "$APP_EVENT" "$E2E_UID" "$NOW_MS" "$EXP_MS" "$NOW_MS")
   APP_RES=$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" \
     -H "Authorization: $RC_AUTH" -d "$APP_BODY")
   has "APP_STORE initial purchase applied" "$APP_RES" '"applied":true'
   has "APP_STORE maps store" "$APP_RES" '"store":"app_store"'
   is "APP_STORE entitlement active" \
-    "$(psqlq "select status from public.entitlements where user_id='$UID';" | tr -d ' ')" "active"
+    "$(psqlq "select status from public.entitlements where user_id='$E2E_UID';" | tr -d ' ')" "active"
   is "APP_STORE store column" \
-    "$(psqlq "select store from public.entitlements where user_id='$UID';" | tr -d ' ')" "app_store"
+    "$(psqlq "select store from public.entitlements where user_id='$E2E_UID';" | tr -d ' ')" "app_store"
 
   DUP=$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" \
     -H "Authorization: $RC_AUTH" -d "$APP_BODY")
   has "APP_STORE duplicate is idempotent" "$DUP" '"duplicate":true'
 
   PLAY_BODY=$(printf '{"event":{"id":"%s","type":"INITIAL_PURCHASE","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"premium_monthly","store":"PLAY_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
-    "$PLAY_EVENT" "$UID" "$((NOW_MS + 1000))" "$EXP_MS" "$((NOW_MS + 1000))")
+    "$PLAY_EVENT" "$E2E_UID" "$((NOW_MS + 1000))" "$EXP_MS" "$((NOW_MS + 1000))")
   PLAY_RES=$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" \
     -H "Authorization: $RC_AUTH" -d "$PLAY_BODY")
   has "PLAY_STORE initial purchase applied" "$PLAY_RES" '"applied":true'
   has "PLAY_STORE maps store" "$PLAY_RES" '"store":"play_store"'
   is "PLAY_STORE store column" \
-    "$(psqlq "select store from public.entitlements where user_id='$UID';" | tr -d ' ')" "play_store"
+    "$(psqlq "select store from public.entitlements where user_id='$E2E_UID';" | tr -d ' ')" "play_store"
 
   # Unknown SKU still falls back to premium_monthly so a mistyped product id does not drop access.
   UNK_EVENT=aaaaaaaa-e2e0-4000-8000-000000000003
   psqlq "delete from public.revenuecat_events where id='$UNK_EVENT';" >/dev/null
   UNK_BODY=$(printf '{"event":{"id":"%s","type":"INITIAL_PURCHASE","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"unknown.sku.not.in.plans","store":"APP_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
-    "$UNK_EVENT" "$UID" "$((NOW_MS + 2000))" "$EXP_MS" "$((NOW_MS + 2000))")
+    "$UNK_EVENT" "$E2E_UID" "$((NOW_MS + 2000))" "$EXP_MS" "$((NOW_MS + 2000))")
   UNK_RES=$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" \
     -H "Authorization: $RC_AUTH" -d "$UNK_BODY")
   has "unknown product_id still applies via premium_monthly fallback" "$UNK_RES" '"applied":true'
@@ -397,28 +401,28 @@ else
   psqlq "delete from public.revenuecat_events where id in ('$REN_EVENT','$CAN_EVENT','$EXP_EVENT','$BILL_EVENT');" >/dev/null
 
   REN_BODY=$(printf '{"event":{"id":"%s","type":"RENEWAL","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"premium_monthly","store":"APP_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
-    "$REN_EVENT" "$UID" "$((NOW_MS + 3000))" "$((EXP_MS + 86400000))" "$((NOW_MS + 3000))")
+    "$REN_EVENT" "$E2E_UID" "$((NOW_MS + 3000))" "$((EXP_MS + 86400000))" "$((NOW_MS + 3000))")
   has "RENEWAL applied" "$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" -H "Authorization: $RC_AUTH" -d "$REN_BODY")" '"applied":true'
   is "RENEWAL leaves status active" \
-    "$(psqlq "select status from public.entitlements where user_id='$UID';" | tr -d ' ')" "active"
+    "$(psqlq "select status from public.entitlements where user_id='$E2E_UID';" | tr -d ' ')" "active"
 
   CAN_BODY=$(printf '{"event":{"id":"%s","type":"CANCELLATION","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"premium_monthly","store":"PLAY_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
-    "$CAN_EVENT" "$UID" "$((NOW_MS + 4000))" "$((NOW_MS + 86400000))" "$((NOW_MS + 4000))")
+    "$CAN_EVENT" "$E2E_UID" "$((NOW_MS + 4000))" "$((NOW_MS + 86400000))" "$((NOW_MS + 4000))")
   has "CANCELLATION applied" "$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" -H "Authorization: $RC_AUTH" -d "$CAN_BODY")" '"applied":true'
   is "CANCELLATION paid-through is cancelled" \
-    "$(psqlq "select status from public.entitlements where user_id='$UID';" | tr -d ' ')" "cancelled"
+    "$(psqlq "select status from public.entitlements where user_id='$E2E_UID';" | tr -d ' ')" "cancelled"
 
   BILL_BODY=$(printf '{"event":{"id":"%s","type":"BILLING_ISSUE","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"premium_monthly","store":"PLAY_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
-    "$BILL_EVENT" "$UID" "$((NOW_MS + 5000))" "$((NOW_MS + 86400000))" "$((NOW_MS + 5000))")
+    "$BILL_EVENT" "$E2E_UID" "$((NOW_MS + 5000))" "$((NOW_MS + 86400000))" "$((NOW_MS + 5000))")
   has "BILLING_ISSUE applied" "$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" -H "Authorization: $RC_AUTH" -d "$BILL_BODY")" '"applied":true'
   is "BILLING_ISSUE status" \
-    "$(psqlq "select status from public.entitlements where user_id='$UID';" | tr -d ' ')" "billing_issue"
+    "$(psqlq "select status from public.entitlements where user_id='$E2E_UID';" | tr -d ' ')" "billing_issue"
 
   EXP_BODY=$(printf '{"event":{"id":"%s","type":"EXPIRATION","app_user_id":"%s","entitlement_ids":["premium"],"product_id":"premium_monthly","store":"APP_STORE","purchased_at_ms":%s,"expiration_at_ms":%s,"event_timestamp_ms":%s}}' \
-    "$EXP_EVENT" "$UID" "$((NOW_MS + 6000))" "$((NOW_MS - 1000))" "$((NOW_MS + 6000))")
+    "$EXP_EVENT" "$E2E_UID" "$((NOW_MS + 6000))" "$((NOW_MS - 1000))" "$((NOW_MS + 6000))")
   has "EXPIRATION applied" "$(curl -s -X POST "$B/revenuecat-webhook" -H "Content-Type: application/json" -H "Authorization: $RC_AUTH" -d "$EXP_BODY")" '"applied":true'
   is "EXPIRATION status" \
-    "$(psqlq "select status from public.entitlements where user_id='$UID';" | tr -d ' ')" "expired"
+    "$(psqlq "select status from public.entitlements where user_id='$E2E_UID';" | tr -d ' ')" "expired"
 fi
 
 echo
@@ -586,12 +590,14 @@ is "user cannot write reading_streaks" \
 # A SELECT policy on storage.objects is what authorises the LIST operation.
 # covers is a public bucket, so files render from /object/public/ without RLS;
 # a SELECT policy there would only let anyone download the whole catalog index.
+# The is_admin()-gated *_admin_read policies (20260916140000) are the exception:
+# they let the admin console list objects and are not reachable by a client.
 is "covers bucket cannot be enumerated by clients" \
-  "$(psqlq "select case when exists (select 1 from pg_policies where schemaname='storage' and tablename='objects' and cmd='SELECT' and qual like '%covers%') then 'ALLOWED' else 'blocked' end;")" "blocked"
+  "$(psqlq "select case when exists (select 1 from pg_policies where schemaname='storage' and tablename='objects' and cmd='SELECT' and qual like '%covers%' and qual not like '%is_admin()%') then 'ALLOWED' else 'blocked' end;")" "blocked"
 is "covers bucket is still public (so covers render)" \
   "$(psqlq "select public from storage.buckets where id='covers';")" "t"
 is "no client SELECT policy on the pdfs bucket" \
-  "$(psqlq "select case when exists (select 1 from pg_policies where schemaname='storage' and tablename='objects' and cmd='SELECT' and qual like '%pdfs%') then 'ALLOWED' else 'blocked' end;")" "blocked"
+  "$(psqlq "select case when exists (select 1 from pg_policies where schemaname='storage' and tablename='objects' and cmd='SELECT' and qual like '%pdfs%' and qual not like '%is_admin()%') then 'ALLOWED' else 'blocked' end;")" "blocked"
 is "anon cannot execute is_admin" \
   "$(psqlq "select case when has_function_privilege('anon','public.is_admin()','EXECUTE') then 'ALLOWED' else 'blocked' end;")" "blocked"
 is "anon cannot execute storage_object_exists" \
