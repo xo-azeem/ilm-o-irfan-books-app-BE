@@ -255,4 +255,4 @@ If purchase succeeds but entitlement stays false: check webhook logs (Supabase F
 
 - [`staging-billing-auth.md`](./staging-billing-auth.md)  
 - [`fe-handoff.md`](./fe-handoff.md)  
-- FE [`docs/staging-connect.md`](../../../ilm-o-irfan-books-app/docs/staging-connect.md)  
+- FE [`docs/staging-connect.md`](../../../Ilm-o-Irfan-App-FE/docs/staging-connect.md)  

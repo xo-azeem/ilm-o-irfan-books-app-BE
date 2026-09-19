@@ -4,7 +4,7 @@ Supabase + PostgreSQL backend for the **Ilm o Irfan** React Native e-book app.
 
 ## Companion frontend
 
-`D:\ilm-o-irfan-books-app`
+`D:\Projects\Ilm-o-Irfan-App-FE`
 
 ## Stack
 
@@ -20,10 +20,8 @@ Supabase + PostgreSQL backend for the **Ilm o Irfan** React Native e-book app.
 Design & cost notes: [`docs/backend-stack.md`](docs/backend-stack.md)  
 Schema reference: [`docs/schema.md`](docs/schema.md)  
 **Mobile contract (FE team):** [`docs/mobile-contract.md`](docs/mobile-contract.md)  
-**FE/BE parity audit:** [`docs/audits/2026-09-06-fe-be-parity.md`](docs/audits/2026-09-06-fe-be-parity.md)  
 **Setup + pgAdmin steps:** [`docs/setup-guide.md`](docs/setup-guide.md)  
-**Beast backlog:** [`docs/backend-beast-roadmap.md`](docs/backend-beast-roadmap.md)  
-**Work progress report:** [`docs/backend-work-progress.md`](docs/backend-work-progress.md)  
+**What is left before launch:** [`../Ilm-o-Irfan-App-FE/docs/launch-blockers.md`](../Ilm-o-Irfan-App-FE/docs/launch-blockers.md)  
 **FE fixtures:** [`docs/fixtures/`](docs/fixtures/)  
 **Runbooks:** [`docs/runbooks/`](docs/runbooks/)  
 **Env matrix:** [`docs/ops/env-matrix.md`](docs/ops/env-matrix.md)  

@@ -1,7 +1,6 @@
 # Mobile API contract (v1)
 
 Frozen contract for the Ilm o Irfan React Native app.  
-Backend branch: `feat/mobile-api-parity` · Audit: [`audits/2026-09-06-fe-be-parity.md`](./audits/2026-09-06-fe-be-parity.md)  
 Fixtures: [`fixtures/`](./fixtures/) · Inventory: [`../supabase/functions/_shared/endpoint-manifest.ts`](../supabase/functions/_shared/endpoint-manifest.ts)
 
 The API stays **snake_case**. Map to camelCase on the client; do not ask the backend to rename fields.

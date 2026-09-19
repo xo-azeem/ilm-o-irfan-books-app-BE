@@ -8,8 +8,8 @@
 
 When you ask the agent to add or change backend pieces (schema, auth, storage, Edge Functions, seed data, etc.), it must:
 
-1. Open and inspect the companion frontend at `D:\ilm-o-irfan-books-app` to learn screens, data shapes, and expected API behavior.
-2. Follow `docs/backend-stack.md` (copied from the FE docs) for Supabase/Postgres/Auth/Storage/RevenueCat design.
+1. Open and inspect the companion frontend at `D:\Projects\Ilm-o-Irfan-App-FE` to learn screens, data shapes, and expected API behavior.
+2. Follow `docs/backend-stack.md` for Supabase/Postgres/Auth/Storage/RevenueCat design.
 3. Create only what is needed for the request, keeping FE ↔ BE contracts aligned.
 
 ## Why it exists
@@ -20,9 +20,8 @@ This backend exists to serve **Ilm o Irfan** — an Islamic e-book React Native 
 
 | Resource | Location |
 | --- | --- |
-| Frontend app | `D:\ilm-o-irfan-books-app` |
+| Frontend app | `D:\Projects\Ilm-o-Irfan-App-FE` |
 | Backend stack & cost guide | `docs/backend-stack.md` |
-| FE copy of the same guide | `D:\ilm-o-irfan-books-app\docs\backend-stack.md` |
 | Cursor rule | `.cursor/rules/frontend-aligned-backend.mdc` |
 
 ## How to use it

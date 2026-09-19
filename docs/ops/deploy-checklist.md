@@ -3,7 +3,7 @@
 Use this after a Supabase project exists. **Never commit real secrets.**  
 Canonical schema source: `supabase/migrations/` (prefer `db push` over pasting SQL).
 
-Companion FE: `D:\ilm-o-irfan-books-app`  
+Companion FE: `D:\Projects\Ilm-o-Irfan-App-FE`  
 FE handoff values: [`fe-handoff.md`](./fe-handoff.md)
 
 ---
@@ -11,7 +11,7 @@ FE handoff values: [`fe-handoff.md`](./fe-handoff.md)
 ## Recommended: one-pass script
 
 ```bash
-cd D:/ilm-o-irfan-books-app-BE
+cd D:/Projects/Ilm-o-Irfan-App-BE
 npx supabase login   # or set SUPABASE_ACCESS_TOKEN
 
 # Required in env / .env (gitignored):

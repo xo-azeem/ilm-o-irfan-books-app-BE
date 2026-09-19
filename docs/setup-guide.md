@@ -27,7 +27,7 @@ Use this for the real app (Auth, Storage, Edge Functions, RLS).
 ### 2–4. Link, migrate, deploy functions, set secrets
 
 ```bash
-cd D:/ilm-o-irfan-books-app-BE
+cd D:/Projects/Ilm-o-Irfan-App-BE
 npm install
 npx supabase login
 # Put in .env (gitignored): SUPABASE_PROJECT_REF, REVENUECAT_*, SIGNED_PDF_EXPIRES_IN
@@ -67,7 +67,7 @@ Prefer **`npm run deploy:hosted`** / `db push` so migration history stays consis
 **Option 2b — CLI steps without the wrapper**
 
 ```bash
-cd D:/ilm-o-irfan-books-app-BE
+cd D:/Projects/Ilm-o-Irfan-App-BE
 npm install
 npx supabase login
 npx supabase link --project-ref YOUR_PROJECT_REF
@@ -301,7 +301,7 @@ select label, book_count from public.category_with_counts;
 Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
 ```bash
-cd D:/ilm-o-irfan-books-app-BE
+cd D:/Projects/Ilm-o-Irfan-App-BE
 npm install
 npx supabase start
 ```
