@@ -17,7 +17,7 @@ npx supabase login   # or set SUPABASE_ACCESS_TOKEN
 # Required in env / .env (gitignored):
 #   SUPABASE_PROJECT_REF
 #   REVENUECAT_WEBHOOK_AUTH          # or DEPLOY_ALLOW_PLACEHOLDER_RC=1 for staging
-#   REVENUECAT_ENTITLEMENT_ID=premium
+#   REVENUECAT_ENTITLEMENT_ID=ilm_o_irfan_pro
 #   SIGNED_PDF_EXPIRES_IN=300
 
 DEPLOY_SEED=1 npm run deploy:hosted
@@ -54,7 +54,7 @@ npm run db:push
 DEPLOY_SEED=1 npx supabase db query --linked --file supabase/seed.sql   # optional
 npm run functions:deploy
 npx supabase secrets set REVENUECAT_WEBHOOK_AUTH="Bearer YOUR_SHARED_SECRET"
-npx supabase secrets set REVENUECAT_ENTITLEMENT_ID="premium"
+npx supabase secrets set REVENUECAT_ENTITLEMENT_ID="ilm_o_irfan_pro"
 npx supabase secrets set SIGNED_PDF_EXPIRES_IN="300"
 npx supabase secrets unset ALLOW_PDF_WITHOUT_ENTITLEMENT   # if present
 ```

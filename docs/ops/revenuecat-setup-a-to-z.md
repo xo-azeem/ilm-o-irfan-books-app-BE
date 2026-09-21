@@ -16,7 +16,7 @@ App iOS bundle id: **set a real id before App Store Connect** (repo still has th
 | Mistake | What breaks |
 | --- | --- |
 | `Purchases.logIn(email)` or anonymous id | Webhook returns `400 USER_NOT_FOUND` / invalid event — **must be Supabase Auth UUID** |
-| Entitlement id ≠ `premium` | Purchases succeed in store but our gate never sees premium |
+| Entitlement id ≠ `ilm_o_irfan_pro` (the value of `REVENUECAT_ENTITLEMENT_ID`) | Purchases succeed in store but our gate never sees the entitlement |
 | Putting `REVENUECAT_WEBHOOK_AUTH` or secret API key in the React Native app | Anyone can forge entitlements |
 | Leaving webhook auth as `STAGING_PLACEHOLDER_NOT_LIVE` and sending real events | Auth failures / ignored events |
 | Sharing the same webhook secret across staging and production | Cross-env spoofing / chaos |
@@ -98,13 +98,13 @@ Write Play Product ID here: `________________`
 5. **Entitlements** → New → Identifier must be exactly:
 
 ```text
-premium
+ilm_o_irfan_pro
 ```
 
    (Matches `REVENUECAT_ENTITLEMENT_ID` on Supabase.)
 
 6. **Products** → import / add the App Store + Play product ids from Phases 2–3.  
-7. Attach **both** products to entitlement `premium`.  
+7. Attach **both** products to entitlement `ilm_o_irfan_pro`.  
 8. **Offerings** → create/edit **Current** offering → add a **Monthly** package that points at those products.  
 9. **API keys** → copy:
    - iOS **public** SDK key (`appl_…`)  
@@ -135,7 +135,7 @@ Rebuild the native app after changing keys.
 
 ```bash
 npx supabase secrets set REVENUECAT_WEBHOOK_AUTH="Bearer YOUR_LONG_SECRET" --project-ref rwnmckrepvycydmtgvcq
-npx supabase secrets set REVENUECAT_ENTITLEMENT_ID="premium" --project-ref rwnmckrepvycydmtgvcq
+npx supabase secrets set REVENUECAT_ENTITLEMENT_ID="ilm_o_irfan_pro" --project-ref rwnmckrepvycydmtgvcq
 ```
 
 3. In RevenueCat → Project → **Integrations / Webhooks**:

@@ -42,7 +42,7 @@ the values) with `npx supabase secrets list`.
 | `SUPABASE_ANON_KEY` | injected | injected | injected | Also shipped in the app |
 | `SUPABASE_SERVICE_ROLE_KEY` | injected | injected | injected | Never leaves function secrets |
 | `REVENUECAT_WEBHOOK_AUTH` | any test value | staging-only secret | its own rotated secret | Must match RevenueCat exactly; never shared between environments |
-| `REVENUECAT_ENTITLEMENT_ID` | `premium` | `premium` | `premium` | Must match the entitlement id in RevenueCat |
+| `REVENUECAT_ENTITLEMENT_ID` | `ilm_o_irfan_pro` | `ilm_o_irfan_pro` | `ilm_o_irfan_pro` | Must match the entitlement id in RevenueCat and the app's `REVENUECAT_ENTITLEMENT_ID` |
 | `SIGNED_PDF_EXPIRES_IN` | `300` | `300` | `300` | Seconds. Long enough to start a download, short enough not to be a share link |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | optional | required to test Google | required | Configured in the Dashboard for hosted projects |
 
@@ -80,7 +80,7 @@ deploy is **manual only**:
 | `SUPABASE_PROJECT_REF_STAGING` | Staging project ref |
 | `SUPABASE_DB_PASSWORD_STAGING` | Non-interactive `supabase link` (optional if already linked in CI) |
 | `REVENUECAT_WEBHOOK_AUTH` | Function secret |
-| `REVENUECAT_ENTITLEMENT_ID` | Usually `premium` |
+| `REVENUECAT_ENTITLEMENT_ID` | `ilm_o_irfan_pro` (the RevenueCat dashboard's entitlement identifier) |
 | `SIGNED_PDF_EXPIRES_IN` | Usually `300` |
 
 Workflow: **Actions → Deploy hosted (staging) → Run workflow**. Never on push.  

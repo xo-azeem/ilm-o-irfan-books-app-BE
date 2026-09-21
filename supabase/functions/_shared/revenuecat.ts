@@ -137,8 +137,22 @@ export type PlanProductColumn =
   | 'revenuecat_product_id'
 
 export type PlanLookup =
-  | { by: 'product_id'; value: string; columns: PlanProductColumn[] }
+  | { by: 'product_id'; value: string; values: string[]; columns: PlanProductColumn[] }
   | { by: 'code'; value: typeof FALLBACK_PLAN_CODE }
+
+// Google Play reports a subscription as `subscriptionId:basePlanId` (and
+// `:offerId` after that) since Billing Library 5, so `premium_monthly:monthly`
+// is the same plan an admin entered as `premium_monthly`. The ids to try, most
+// specific first, so a plan keyed on the full id still wins over the base.
+export function productIdCandidates(productId: string): string[] {
+  const out = [productId]
+  let cut = productId.lastIndexOf(':')
+  while (cut > 0) {
+    out.push(productId.slice(0, cut))
+    cut = productId.lastIndexOf(':', cut - 1)
+  }
+  return out
+}
 
 /**
  * Column order for matching `event.product_id` against `plans`.
@@ -179,6 +193,7 @@ export function resolvePlanLookup(
     return {
       by: 'product_id',
       value: trimmed,
+      values: productIdCandidates(trimmed),
       columns: preferredPlanProductColumns(store),
     }
   }

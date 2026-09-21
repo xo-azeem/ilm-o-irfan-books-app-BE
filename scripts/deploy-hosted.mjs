@@ -5,7 +5,7 @@
  *   SUPABASE_PROJECT_REF
  *   SUPABASE_ACCESS_TOKEN   (or an existing `npx supabase login` session)
  *   REVENUECAT_WEBHOOK_AUTH
- *   REVENUECAT_ENTITLEMENT_ID   (default premium if unset is rejected — set explicitly)
+ *   REVENUECAT_ENTITLEMENT_ID   (the dashboard entitlement, ilm_o_irfan_pro — set explicitly)
  *   SIGNED_PDF_EXPIRES_IN
  *
  * Optional:
@@ -41,7 +41,7 @@ Required environment:
   SUPABASE_PROJECT_REF          Project ref (subdomain of *.supabase.co)
   SUPABASE_ACCESS_TOKEN         Access token, or run: npx supabase login
   REVENUECAT_WEBHOOK_AUTH       Exact Authorization header RC will send
-  REVENUECAT_ENTITLEMENT_ID     Usually "premium"
+  REVENUECAT_ENTITLEMENT_ID     The RevenueCat entitlement identifier (ilm_o_irfan_pro)
   SIGNED_PDF_EXPIRES_IN         Seconds, usually "300"
 
 Optional:
@@ -149,7 +149,7 @@ if (!rcAuth) {
   }
 }
 
-if (!rcEntitlement) die('REVENUECAT_ENTITLEMENT_ID is required (usually premium)')
+if (!rcEntitlement) die('REVENUECAT_ENTITLEMENT_ID is required (the dashboard entitlement, e.g. ilm_o_irfan_pro)')
 if (!pdfTtl) die('SIGNED_PDF_EXPIRES_IN is required (usually 300)')
 
 if (!process.env.SUPABASE_ACCESS_TOKEN) {

@@ -6,9 +6,9 @@ API URL: `https://rwnmckrepvycydmtgvcq.supabase.co`
 ## RevenueCat
 
 1. Create a RevenueCat project (or use an existing sandbox project).
-2. Entitlement id must be **`premium`** (matches `REVENUECAT_ENTITLEMENT_ID`).
+2. Entitlement id must be **`ilm_o_irfan_pro`** (matches `REVENUECAT_ENTITLEMENT_ID` on both the backend and the app).
 3. Create one auto-renewing subscription in **App Store Connect** and **Google Play Console**.
-4. In RevenueCat, attach both store products to entitlement `premium` (default offering).
+4. In RevenueCat, attach both store products to entitlement `ilm_o_irfan_pro` (default offering).
 5. Set plan SKUs on `premium_monthly` (Apple and Play may differ):
 
 ```sql
@@ -51,7 +51,7 @@ npx supabase secrets set REVENUECAT_WEBHOOK_AUTH="Bearer YOUR_REAL_SHARED_SECRET
 
 - [ ] App Store product id created → `plans.app_store_product_id`
 - [ ] Play product id created → `plans.play_store_product_id`
-- [ ] RC entitlement `premium` linked to both
+- [ ] RC entitlement `ilm_o_irfan_pro` linked to both
 - [ ] `plans.revenuecat_product_id` set (shared alias / primary)
 - [ ] Webhook auth no longer a placeholder
 - [ ] Sandbox INITIAL_PURCHASE → `entitlements.store` is `app_store` or `play_store`

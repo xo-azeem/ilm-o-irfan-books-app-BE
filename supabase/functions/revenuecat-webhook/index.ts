@@ -159,17 +159,20 @@ Deno.serve(async (req) => {
     let planError: { message?: string; code?: string } | null = null
 
     if (planLookup.by === 'product_id') {
-      for (const column of planLookup.columns) {
-        const byProduct = await admin
-          .from('plans')
-          .select('id')
-          .eq(column, planLookup.value)
-          .maybeSingle()
-        planError = byProduct.error
-        if (planError) break
-        if (byProduct.data) {
-          plan = byProduct.data
-          break
+      // The full store id first, then without its Play base-plan suffix.
+      lookup: for (const value of planLookup.values) {
+        for (const column of planLookup.columns) {
+          const byProduct = await admin
+            .from('plans')
+            .select('id')
+            .eq(column, value)
+            .maybeSingle()
+          planError = byProduct.error
+          if (planError) break lookup
+          if (byProduct.data) {
+            plan = byProduct.data
+            break lookup
+          }
         }
       }
     }

@@ -40,7 +40,7 @@ In-app subscription checkout is FE + RevenueCat. The backend only accepts the we
 | Rule | Detail |
 | --- | --- |
 | `app_user_id` | Must be the **Supabase Auth user UUID** (`Purchases.logIn(user.id)`). Email / `$RCAnonymousID` → `400 USER_NOT_FOUND` / invalid event |
-| Entitlement id | `premium` (`REVENUECAT_ENTITLEMENT_ID`) |
+| Entitlement id | `ilm_o_irfan_pro` (`REVENUECAT_ENTITLEMENT_ID`, same value in the app's `.env`) |
 | Plan | `premium_monthly`; webhook matches `event.product_id` → `plans.revenuecat_product_id`, else falls back to that plan code |
 | Stores | `APP_STORE` / `MAC_APP_STORE` → `app_store`; `PLAY_STORE` → `play_store` |
 | After purchase | Refresh **`entitlements-status`** (and Realtime `entitlement_changed`). Never write `entitlements` from the client |
