@@ -5,7 +5,7 @@
 // an empty page. Both now call collection_page(), which resolves the
 // collection and picks the list in SQL:
 //
-//   trending      this week's draw, in draw order         source = 'weekly'
+//   trending      curated members, else this week's draw  source = 'curated' | 'weekly'
 //   new-arrivals  curated members, else newest published  source = 'curated' | 'newest'
 //   anything else curated members in admin sort_order     source = 'curated'
 //

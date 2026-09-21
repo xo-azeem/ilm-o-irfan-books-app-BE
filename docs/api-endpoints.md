@@ -290,7 +290,7 @@ not re-sort them or top them up — so what the backend puts there is exactly wh
 | Rail | Source | Length | Empty-source fallback |
 | --- | --- | --- | --- |
 | `hero` | `collections.slug = 'home-hero'`, in `sort_order` | up to 8 | 5 newest published books |
-| `trending` | `collection_page('trending')` — this week's draw, see [Weekly trending](#weekly-trending) | 10 | none needed |
+| `trending` | `collection_page('trending')` — curated members, else this week's draw (see [Weekly trending](#weekly-trending)) | 10 | built in (`source: "weekly"`) |
 | `newArrivals` | `collection_page('new-arrivals')` — curated members, else every published book newest-first | 10 | built in (`source: "newest"`) |
 
 `trending` and `newArrivals` are the **first page of the same list `collection-books`
@@ -344,7 +344,8 @@ published members only.
 
 | Collection | List | `source` |
 | --- | --- | --- |
-| `trending` | this week's draw (`weekly_trending_books`), draw order; `totalCount` = draw length | `weekly` |
+| `trending` with curated members | members, published only, admin `sort_order` — however many the admin picked | `curated` |
+| `trending` with no members | this week's draw (`weekly_trending_books`), draw order; `totalCount` = draw length | `weekly` |
 | `new-arrivals` with curated members | members, published only, admin `sort_order` | `curated` |
 | `new-arrivals` with no members | every published book, newest first; `totalCount` = published count | `newest` |
 | anything else | members, published only, admin `sort_order` | `curated` |
