@@ -12,7 +12,7 @@ The Edge Function endpoint base is `/functions/v1/...`.
 
 | Endpoint | Method | Auth | Purpose |
 | --- | --- | --- | --- |
-| `/functions/v1/app-status` | GET | Public | The product flags every install checks before Home: `maintenanceMode`, `maintenanceMessage`, `signupEnabled`, `minSupportedVersion`, `supportEmail`, `updatedAt` — see [App status](#app-status) |
+| `/functions/v1/app-status` | GET | Public | The product flags every install checks before Home: `maintenanceMode`, `maintenanceMessage`, `signupEnabled`, `minSupportedVersion`, `supportEmail`, `revenueCatAndroidKey`, `revenueCatIosKey`, `updatedAt` — see [App status](#app-status) |
 | `/functions/v1/home-feed` | GET | Public | Collections (admin-made only), categories, newest books, `carousel`, `shelves.hero` / `trending` / `newArrivals`, `shelvesMeta`, `featuredCollectionId`, `supportEmail` (book cards include `coverUrl`) — see [Home shelves](#home-shelves) |
 | `/functions/v1/books-list` | GET | Public | Paginated published books — see [Discover filters](#discover-filters) |
 | `/functions/v1/book-detail?id=<bookId>` | GET | Public | Book detail with author and metadata (`coverUrl`; no `pdf_path`) |
@@ -990,8 +990,18 @@ Awarded by `private.award_achievements()` right after every streak update, inser
 
 ```json
 { "data": { "maintenanceMode": false, "maintenanceMessage": null, "signupEnabled": true,
-            "minSupportedVersion": null, "supportEmail": "help@…", "updatedAt": "…" } }
+            "minSupportedVersion": null, "supportEmail": "help@…",
+            "revenueCatAndroidKey": "goog_…", "revenueCatIosKey": null, "updatedAt": "…" } }
 ```
+
+`revenueCatAndroidKey` / `revenueCatIosKey` are the RevenueCat **public** SDK keys
+(`goog_…` / `appl_…`, or a `test_…` Test Store key), set in **System → App settings**
+once RevenueCat exists. The app configures the SDK with them at launch, so a build made
+before the store accounts existed starts selling without a rebuild; a key baked into the
+build wins over these. `null` = not configured yet (checkout reports itself unavailable).
+A check constraint on `app_settings` and `admin-settings` both refuse anything not
+shaped like a public key, so the secret `sk_…` key can never land on this anon-readable
+row.
 
 The app reads it under the splash, on every return to the foreground, once a
 minute while open and every 20 s while a reader is held on the notice — so

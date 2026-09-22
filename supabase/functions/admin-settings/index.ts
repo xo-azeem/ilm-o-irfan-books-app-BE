@@ -1,5 +1,6 @@
 import { requireAdmin, requireMethod } from '../_shared/auth.ts'
 import {
+  BadRequestError,
   fail,
   failFromDbError,
   handleError,
@@ -53,7 +54,34 @@ const EDITABLE_FIELDS: FieldSpec[] = [
     aliases: ['min_supported_version', 'minSupportedVersion'],
     coerce: asOptionalText('min_supported_version'),
   },
+  // Public SDK keys only. The app-status endpoint serves these to every
+  // install as anon, so a secret key pasted here by mistake would be
+  // published — refused before the row's own constraint gets to say so.
+  {
+    column: 'revenuecat_android_key',
+    aliases: ['revenuecat_android_key', 'revenueCatAndroidKey'],
+    coerce: asPublicSdkKey('revenuecat_android_key', ['goog_', 'test_']),
+  },
+  {
+    column: 'revenuecat_ios_key',
+    aliases: ['revenuecat_ios_key', 'revenueCatIosKey'],
+    coerce: asPublicSdkKey('revenuecat_ios_key', ['appl_', 'test_']),
+  },
 ]
+
+function asPublicSdkKey(label: string, prefixes: string[]) {
+  const text = asOptionalText(label)
+  return (value: unknown): string | null => {
+    const key = text(value)
+    if (key === null) return null
+    if (!prefixes.some((p) => key.startsWith(p)) || !/^[A-Za-z0-9_]+$/.test(key)) {
+      throw new BadRequestError(
+        `${label} must be a RevenueCat public SDK key (${prefixes.map((p) => p + '…').join(' or ')}); never the secret key`,
+      )
+    }
+    return key
+  }
+}
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req)

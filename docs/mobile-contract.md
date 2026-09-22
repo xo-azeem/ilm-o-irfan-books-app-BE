@@ -163,6 +163,7 @@ Library shelves nest a leaner `book` object (also with `coverUrl`):
 | `count: "24 books"` | `book_count` (number) |
 | Lucide `icon` | `icon_key` (string) |
 | About / support email | `home-feed.supportEmail` (`app_settings.support_email`) |
+| RevenueCat SDK key (runtime) | `app-status.revenueCatAndroidKey` / `revenueCatIosKey` — public keys; a key in the build wins |
 | Saved lessons | `wishlist-*` endpoints |
 
 ---

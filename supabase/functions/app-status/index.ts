@@ -13,8 +13,11 @@ import { failFromDbError, handleError, handleOptions, ok } from '../_shared/http
 // a minute. featured_collection_id is deliberately not here — Home already
 // takes it from home-feed with the collections it applies to.
 
+// The RevenueCat keys are the *public* SDK keys (goog_… / appl_… / test_…),
+// the ones every build of the app ships anyway; the table's check constraint
+// refuses anything else, so nothing secret can reach this response.
 const STATUS_COLUMNS =
-  'maintenance_mode, maintenance_message, signup_enabled, min_supported_version, support_email, updated_at'
+  'maintenance_mode, maintenance_message, signup_enabled, min_supported_version, support_email, revenuecat_android_key, revenuecat_ios_key, updated_at'
 
 type SettingsRow = {
   maintenance_mode: boolean | null
@@ -22,6 +25,8 @@ type SettingsRow = {
   signup_enabled: boolean | null
   min_supported_version: string | null
   support_email: string | null
+  revenuecat_android_key: string | null
+  revenuecat_ios_key: string | null
   updated_at: string | null
 }
 
@@ -60,6 +65,10 @@ Deno.serve(async (req) => {
       signupEnabled: data?.signup_enabled !== false,
       minSupportedVersion: text(data?.min_supported_version),
       supportEmail: text(data?.support_email),
+      // Set from the admin tool once RevenueCat exists; a build with its
+      // own key ignores these. null means "not configured yet".
+      revenueCatAndroidKey: text(data?.revenuecat_android_key),
+      revenueCatIosKey: text(data?.revenuecat_ios_key),
       updatedAt: data?.updated_at ?? null,
     })
   } catch (error) {
