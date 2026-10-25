@@ -10,6 +10,7 @@ import {
 import { LANGUAGES } from '../_shared/catalog-filters.ts'
 import {
   asBoolean,
+  asDecimal,
   asInteger,
   asOptionalEnum,
   asOptionalInteger,
@@ -77,6 +78,13 @@ const OPTIONAL_FIELDS: FieldSpec[] = [
   { column: 'tag', aliases: ['tag'], coerce: asOptionalText('tag') },
   { column: 'tags', aliases: ['tags'], coerce: asStringArray('tags') },
   { column: 'is_premium', aliases: ['is_premium', 'isPremium'], coerce: asBoolean('is_premium') },
+  {
+    // Editorial, like the rest of this list — see the note in
+    // admin-book-update. Omitted, the column default of 0.0 stands.
+    column: 'rating',
+    aliases: ['rating'],
+    coerce: asDecimal('rating', { min: 0, max: 5, places: 1 }),
+  },
   {
     column: 'is_published',
     aliases: ['is_published', 'isPublished'],

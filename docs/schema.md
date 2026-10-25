@@ -42,6 +42,8 @@ books.pdf_path   → Storage pdfs/
 
 - **authors** — `slug`, `name`, `bio`, `avatar_path`
 - **books** — title, description, author FK, genre, rating, price, cover/pdf paths, colors, tags, `is_premium`, `is_published`, FTS vector
+  - `rating` (`numeric(2,1)`, 0–5) and `rating_count` are **editorial**, not earned: there is no reviews table and nothing computes them. `rating` is set by an admin through `admin-book-update` / the admin editor; it drives the `rating` sort and the `minRating` filter.
+  - `is_premium` is **always true**. The catalogue is subscription-only and the `books_no_free_titles` check constraint (migration `20261026120000`) makes a free book impossible to write. Only an admin reads without a membership; `get-signed-pdf` requires an active entitlement or the admin role for every book and never consulted this flag.
 - **categories** — explore chips (`icon_key`, accents)
 - **book_categories** — M:N
 - **collections** — curated shelves / hero

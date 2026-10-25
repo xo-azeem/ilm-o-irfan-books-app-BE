@@ -53,7 +53,7 @@ The Edge Function endpoint base is `/functions/v1/...`.
 | Endpoint | Method | Auth | Purpose |
 | --- | --- | --- | --- |
 | `/functions/v1/admin-books` | GET | Admin | Catalog admin list with counts |
-| `/functions/v1/admin-book-update` | PATCH | Admin | Update metadata, publish state, premium state |
+| `/functions/v1/admin-book-update` | PATCH | Admin | Update metadata, rating, publish state, premium state |
 | `/functions/v1/admin-book-create` | POST | Admin | Create book (`title` + `authorId` required; slug optional) |
 | `/functions/v1/admin-authors` | GET | Admin | Paginated author CMS rows |
 | `/functions/v1/admin-author-create` | POST | Admin | Create author |

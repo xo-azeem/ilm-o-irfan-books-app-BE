@@ -168,6 +168,44 @@ export function asInteger(label: string, opts: { min?: number; max?: number } = 
   }
 }
 
+/**
+ * A number with a fixed number of decimal places, within a range.
+ *
+ * Written for `books.rating`, which is `numeric(2, 1)` with a
+ * `rating >= 0 and rating <= 5` check: a value outside that range is the
+ * caller's mistake and is told so here, with the field's name on it, rather
+ * than coming back as a constraint violation from the database.
+ *
+ * Rounding rather than rejecting on precision is deliberate — 4.25 from a
+ * slider is a reasonable thing for a client to send, and 4.3 is what the
+ * column would have stored anyway.
+ */
+export function asDecimal(
+  label: string,
+  opts: { min?: number; max?: number; places?: number } = {},
+) {
+  const places = opts.places ?? 1
+
+  return (value: unknown): number => {
+    const parsed = Number(value)
+
+    if (!Number.isFinite(parsed)) {
+      throw new BadRequestError(`${label} must be a number`)
+    }
+
+    if (opts.min !== undefined && parsed < opts.min) {
+      throw new BadRequestError(`${label} must be >= ${opts.min}`)
+    }
+
+    if (opts.max !== undefined && parsed > opts.max) {
+      throw new BadRequestError(`${label} must be <= ${opts.max}`)
+    }
+
+    const scale = 10 ** places
+    return Math.round(parsed * scale) / scale
+  }
+}
+
 export function asOptionalInteger(label: string, opts: { min?: number; max?: number } = {}) {
   const inner = asInteger(label, opts)
 

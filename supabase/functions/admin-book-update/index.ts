@@ -10,6 +10,7 @@ import {
 import { LANGUAGES } from '../_shared/catalog-filters.ts'
 import {
   asBoolean,
+  asDecimal,
   asInteger,
   asOptionalEnum,
   asOptionalInteger,
@@ -21,9 +22,16 @@ import {
 } from '../_shared/payload.ts'
 import { assertPublishable } from '../_shared/publishing.ts'
 
-// Allow-list. Anything not named here (id, slug, rating, timestamps,
-// published_at) is not writable through this endpoint. published_at in
-// particular is stamped by a trigger on the first publish.
+// Allow-list. Anything not named here (id, slug, timestamps, published_at) is
+// not writable through this endpoint. published_at in particular is stamped by
+// a trigger on the first publish.
+//
+// `rating` is on the list. It was deliberately left off while it was supposed
+// to be earned, but nothing ever earned it: there is no reviews table and no
+// writer anywhere in the system, so every book sat at the column default of
+// 0.0 for good, while the admin editor showed the figure as read-only text and
+// the catalogue sorted and filtered on it. It is an editorial field, so the
+// editors can now set it.
 const EDITABLE_FIELDS: FieldSpec[] = [
   { column: 'title', aliases: ['title'], coerce: asOptionalText('title') },
   { column: 'description', aliases: ['description'], coerce: asOptionalText('description') },
@@ -34,6 +42,12 @@ const EDITABLE_FIELDS: FieldSpec[] = [
     coerce: asBoolean('is_published'),
   },
   { column: 'is_premium', aliases: ['is_premium', 'isPremium'], coerce: asBoolean('is_premium') },
+  {
+    // numeric(2, 1), checked 0..5 by the column itself.
+    column: 'rating',
+    aliases: ['rating'],
+    coerce: asDecimal('rating', { min: 0, max: 5, places: 1 }),
+  },
   {
     column: 'price_cents',
     aliases: ['price_cents', 'priceCents'],
